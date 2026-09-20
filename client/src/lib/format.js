@@ -22,3 +22,15 @@ export function toIsoDate(date) {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+export function describeChange({ scope, action }) {
+  const verb = action === 'add' ? 'Added' : 'Removed';
+  return scope === 'from_here_on'
+    ? `${verb}, from this period on`
+    : `${verb}, this period only`;
+}
+
+export function formatRange({ minValue, maxValue }) {
+  if (minValue === null && maxValue === null) return '—';
+  return `${minValue ?? '…'} to ${maxValue ?? '…'}`;
+}

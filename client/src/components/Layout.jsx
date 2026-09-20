@@ -6,6 +6,7 @@ function Layout() {
       <header className="topbar">
         <nav>
           <NavLink to="/students">Students</NavLink>
+          <NavLink to="/parameters">Parameters</NavLink>
           <NavLink to="/settings">Settings</NavLink>
         </nav>
       </header>
