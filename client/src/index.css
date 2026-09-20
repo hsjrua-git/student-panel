@@ -260,3 +260,51 @@ table.history th[scope='row'] {
   font-weight: 600;
   white-space: nowrap;
 }
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid #8884;
+  margin-bottom: 1rem;
+}
+
+.tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: inherit;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.tab.active {
+  border-bottom-color: currentColor;
+  font-weight: 600;
+}
+
+.meter {
+  width: 8rem;
+  height: 0.6rem;
+  background: #8883;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: #4f46e5;
+}
+
+.chart-box {
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.summary {
+  margin: 1rem 0 0;
+}
+
+label.inline select {
+  margin-left: 0.25rem;
+}

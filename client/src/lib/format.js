@@ -49,3 +49,9 @@ export function formatParameterHint(parameter) {
     .filter(Boolean)
     .join(' · ');
 }
+
+export function formatChange(change) {
+  if (change === null) return '—';
+  if (change === 0) return '0';
+  return `${change > 0 ? '▲' : '▼'} ${Math.abs(change)}`;
+}
