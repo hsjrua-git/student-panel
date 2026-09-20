@@ -34,6 +34,15 @@ router.put('/settings/period-anchor', async (req, res) => {
     return res.status(400).json({ error: 'The anchor date must be a Saturday.' });
   }
 
+  if ((await readAnchor()) !== anchorDate) {
+    const scores = await pool.query('SELECT 1 FROM evaluations LIMIT 1');
+    if (scores.rowCount > 0) {
+      return res.status(409).json({
+        error: 'The anchor date cannot be changed after scores exist.',
+      });
+    }
+  }
+
   await pool.query(
     `INSERT INTO settings (key, value)
      VALUES ($1, $2)

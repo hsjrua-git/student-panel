@@ -133,6 +133,33 @@ router.patch('/parameters/:id', async (req, res) => {
     return res.status(400).json({ error: 'Nothing to change.' });
   }
 
+    if ('minValue' in parsed.values || 'maxValue' in parsed.values) {
+    const currentResult = await pool.query(
+      `SELECT min_value::float8 AS "minValue", max_value::float8 AS "maxValue"
+       FROM parameters WHERE id = $1`,
+      [req.params.id]
+    );
+    if (currentResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Parameter not found.' });
+    }
+    const row = currentResult.rows[0];
+    const rangeChanges =
+      ('minValue' in parsed.values && parsed.values.minValue !== row.minValue) ||
+      ('maxValue' in parsed.values && parsed.values.maxValue !== row.maxValue);
+
+    if (rangeChanges) {
+      const scores = await pool.query(
+        'SELECT 1 FROM evaluations WHERE parameter_id = $1 LIMIT 1',
+        [req.params.id]
+      );
+      if (scores.rowCount > 0) {
+        return res.status(409).json({
+          error: 'The range cannot be changed after scores exist for this parameter.',
+        });
+      }
+    }
+  }
+
   const assignments = entries.map(
     ([key], index) => `${columns[key]} = $${index + 1}`
   );

@@ -3,6 +3,7 @@ import pool from './db/pool.js';
 import studentsRouter from './routes/students.js';
 import periodsRouter from './routes/periods.js';
 import parametersRouter from './routes/parameters.js';
+import evaluationsRouter from './routes/evaluations.js';
 
 const app = express();
 app.use(express.json());
@@ -19,6 +20,7 @@ app.get('/api/db-check', async (req, res) => {
 app.use('/api/students', studentsRouter);
 app.use('/api', periodsRouter);
 app.use('/api', parametersRouter);
+app.use('/api', evaluationsRouter);
 
 app.use((err, req, res, next) => {
   const status = err.status || 500;
