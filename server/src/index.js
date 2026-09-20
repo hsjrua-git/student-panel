@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from './db/pool.js';
 import studentsRouter from './routes/students.js';
+import periodsRouter from './routes/periods.js';
 
 const app = express();
 app.use(express.json());
@@ -15,6 +16,7 @@ app.get('/api/db-check', async (req, res) => {
 });
 
 app.use('/api/students', studentsRouter);
+app.use('/api', periodsRouter);
 
 app.use((err, req, res, next) => {
   const status = err.status || 500;

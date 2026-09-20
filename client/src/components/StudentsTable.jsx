@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listStudents } from '../api/students.js';
 import StudentRow from './StudentRow.jsx';
 
-const PAGE_SIZE = 3;
+const PAGE_SIZE = 25;
 
 function StudentsTable({ search, page, onPageChange }) {
   const { data, isPending, isError, error, isPlaceholderData } = useQuery({
