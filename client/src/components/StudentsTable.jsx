@@ -1,43 +1,75 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listStudents } from '../api/students.js';
-import { formatStudentCode, formatDateTime } from '../lib/format.js';
+import StudentRow from './StudentRow.jsx';
 
-function StudentsTable() {
-  const {
-    data: students,
-    isPending,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: ['students'],
-    queryFn: listStudents,
+const PAGE_SIZE = 3;
+
+function StudentsTable({ search, page, onPageChange }) {
+  const { data, isPending, isError, error, isPlaceholderData } = useQuery({
+    queryKey: ['students', { search, page }],
+    queryFn: () => listStudents({ search, page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
   });
+
+  const totalPages = data
+    ? Math.max(1, Math.ceil(data.total / data.pageSize))
+    : 1;
+
+  useEffect(() => {
+    if (data && page > totalPages) onPageChange(totalPages);
+  }, [data, page, totalPages, onPageChange]);
 
   if (isPending) return <p>Loading students...</p>;
   if (isError) return <p className="error">{error.message}</p>;
-  if (students.length === 0) {
-    return <p>No students yet. Add the first one above.</p>;
+  if (data.total === 0) {
+    return (
+      <p>
+        {search
+          ? `No students match "${search}".`
+          : 'No students yet. Add the first one above.'}
+      </p>
+    );
   }
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>Code</th>
-          <th>Full name</th>
-          <th>Added</th>
-        </tr>
-      </thead>
-      <tbody>
-        {students.map((student) => (
-          <tr key={student.id}>
-            <td className="code">{formatStudentCode(student.studentCode)}</td>
-            <td>{student.fullName}</td>
-            <td>{formatDateTime(student.createdAt)}</td>
+    <>
+      <table className={isPlaceholderData ? 'stale' : undefined}>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Full name</th>
+            <th>Added</th>
+            <th>Actions</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.students.map((student) => (
+            <StudentRow key={student.id} student={student} />
+          ))}
+        </tbody>
+      </table>
+
+      <div className="pager">
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+        >
+          Previous
+        </button>
+        <span>
+          Page {page} of {totalPages} ({data.total} students)
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+        >
+          Next
+        </button>
+      </div>
+    </>
   );
 }
 

@@ -59,3 +59,27 @@ td {
 .success {
   color: #2a8;
 }
+.search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+}
+
+.actions {
+  white-space: nowrap;
+}
+
+.actions button + button {
+  margin-left: 0.5rem;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+.stale {
+  opacity: 0.6;
+}

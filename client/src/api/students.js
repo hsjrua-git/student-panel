@@ -1,8 +1,12 @@
 import { request } from './http.js';
 
-export async function listStudents() {
-  const data = await request('/api/students');
-  return data.students;
+export function listStudents({ search = '', page = 1, pageSize = 25 } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  if (search) params.set('search', search);
+  return request(`/api/students?${params}`);
 }
 
 export function createStudent(fullName) {
@@ -10,4 +14,15 @@ export function createStudent(fullName) {
     method: 'POST',
     body: JSON.stringify({ fullName }),
   });
+}
+
+export function renameStudent(id, fullName) {
+  return request(`/api/students/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ fullName }),
+  });
+}
+
+export function deleteStudent(id) {
+  return request(`/api/students/${id}`, { method: 'DELETE' });
 }

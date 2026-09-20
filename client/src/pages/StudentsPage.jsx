@@ -1,7 +1,18 @@
+import { useState } from 'react';
 import StudentForm from '../components/StudentForm.jsx';
 import StudentsTable from '../components/StudentsTable.jsx';
+import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 
 function StudentsPage() {
+  const [searchText, setSearchText] = useState('');
+  const [page, setPage] = useState(1);
+  const search = useDebouncedValue(searchText.trim(), 300);
+
+  function handleSearchChange(event) {
+    setSearchText(event.target.value);
+    setPage(1);
+  }
+
   return (
     <main>
       <h1>Students</h1>
@@ -11,7 +22,15 @@ function StudentsPage() {
       </section>
       <section>
         <h2>All students</h2>
-        <StudentsTable />
+        <input
+          type="search"
+          className="search"
+          value={searchText}
+          onChange={handleSearchChange}
+          placeholder="Search by name or code"
+          aria-label="Search students"
+        />
+        <StudentsTable search={search} page={page} onPageChange={setPage} />
       </section>
     </main>
   );
