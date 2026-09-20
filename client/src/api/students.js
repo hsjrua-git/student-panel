@@ -26,3 +26,7 @@ export function renameStudent(id, fullName) {
 export function deleteStudent(id) {
   return request(`/api/students/${id}`, { method: 'DELETE' });
 }
+
+export function getStudent(id) {
+  return request(`/api/students/${id}`);
+}

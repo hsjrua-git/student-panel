@@ -34,3 +34,18 @@ export function formatRange({ minValue, maxValue }) {
   if (minValue === null && maxValue === null) return '—';
   return `${minValue ?? '…'} to ${maxValue ?? '…'}`;
 }
+
+export function formatShortIsoDate(isoDate) {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+export function formatParameterHint(parameter) {
+  const range = formatRange(parameter);
+  return [range === '—' ? null : range, parameter.unit]
+    .filter(Boolean)
+    .join(' · ');
+}

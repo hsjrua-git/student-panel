@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteStudent, renameStudent } from '../api/students.js';
 import { formatDateTime, formatStudentCode } from '../lib/format.js';
+import { Link } from 'react-router';
 
 function StudentRow({ student }) {
   const queryClient = useQueryClient();
@@ -63,7 +64,7 @@ function StudentRow({ student }) {
             </button>
           </form>
         ) : (
-          student.fullName
+          <Link to={`/students/${student.id}`}>{student.fullName}</Link>
         )}
         {isEditing && rename.isError && (
           <p className="error">{rename.error.message}</p>

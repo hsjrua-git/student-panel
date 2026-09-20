@@ -7,6 +7,7 @@ import {
   periodForDate,
   todayIso,
 } from '../lib/periods.js';
+import { parametersUsedInPeriod } from '../lib/parameterUse.js';
 
 const router = Router();
 const ANCHOR_KEY = 'period_anchor_date';
@@ -60,10 +61,21 @@ router.get('/periods', async (req, res) => {
     return res.json({ anchorDate: null, today, current: null, periods: [] });
   }
 
+  const changesResult = await pool.query(
+    `SELECT parameter_id  AS "parameterId",
+            period_number AS "periodNumber",
+            scope,
+            action
+     FROM parameter_changes`
+  );
+
   const current = periodForDate(anchorDate, today);
   const periods = [];
   for (let number = 1; number <= (current ?? 0); number++) {
-    periods.push(periodDates(anchorDate, number));
+    periods.push({
+      ...periodDates(anchorDate, number),
+      parameterIds: parametersUsedInPeriod(changesResult.rows, number),
+    });
   }
   res.json({ anchorDate, today, current, periods });
 });

@@ -231,3 +231,32 @@ input[type='radio'] {
   flex: none;
   padding: 0;
 }
+
+.num {
+  text-align: right;
+}
+
+.muted {
+  opacity: 0.6;
+}
+
+.na {
+  opacity: 0.35;
+  font-size: 0.85rem;
+}
+
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+input[type='checkbox'] {
+  flex: none;
+  padding: 0;
+}
+
+table.history th[scope='row'] {
+  font-weight: 600;
+  white-space: nowrap;
+}

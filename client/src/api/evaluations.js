@@ -16,3 +16,8 @@ export function saveEvaluations({ periodNumber, entries }) {
     body: JSON.stringify({ periodNumber, entries }),
   });
 }
+
+export async function listStudentEvaluations(studentId) {
+  const data = await request(`/api/evaluations?studentId=${studentId}`);
+  return data.evaluations;
+}
