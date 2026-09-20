@@ -12,9 +12,11 @@ import { buildEntries, cellKey } from '../lib/cells.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { usePeriods } from '../lib/usePeriods.js';
 import PeriodParametersPanel from '../components/PeriodParametersPanel.jsx';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 function EvaluatePage() {
   const queryClient = useQueryClient();
+  const { can } = useAuth();
   const periodsQuery = usePeriods();
   const periods = periodsQuery.data;
 
@@ -125,6 +127,18 @@ function EvaluatePage() {
     setPage(1);
   }
 
+  if (!can('staff')) {
+    return (
+      <main>
+        <h1>Evaluate</h1>
+        <p>
+          You do not have permission to enter scores. You can see scores on
+          each student's page.
+        </p>
+      </main>
+    );
+  }
+
   if (periodsQuery.isPending) {
     return (
       <main>
@@ -179,10 +193,12 @@ function EvaluatePage() {
         onChange={handlePeriodChange}
       />
 
-      <PeriodParametersPanel
-        periodNumber={periodNumber}
-        disabled={draftCount > 0}
-      />
+      {can('admin') && (
+        <PeriodParametersPanel
+          periodNumber={periodNumber}
+          disabled={draftCount > 0}
+        />
+      )}
 
       <div className="toolbar">
         <input

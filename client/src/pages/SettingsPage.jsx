@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { setPeriodAnchor } from '../api/periods.js';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import { usePeriods } from '../lib/usePeriods.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 function lastSaturday() {
   const date = new Date();
@@ -77,6 +78,7 @@ function AnchorForm({ savedAnchor }) {
 
 function SettingsPage() {
   const { data, isPending, isError, error } = usePeriods();
+  const { can } = useAuth();
 
   return (
     <main>
@@ -91,7 +93,7 @@ function SettingsPage() {
         {isPending && <p>Loading...</p>}
         {isError && <p className="error">{error.message}</p>}
         {data && <PeriodSummary data={data} />}
-        {data && <AnchorForm savedAnchor={data.anchorDate} />}
+        {data && can('admin') && <AnchorForm savedAnchor={data.anchorDate} />}
         <p className="hint">
           The start date can only be changed until the first score is saved,
           because changing it would move every saved score to a different week.

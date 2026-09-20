@@ -3,9 +3,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteStudent, renameStudent } from '../api/students.js';
 import { formatDateTime, formatStudentCode } from '../lib/format.js';
 import { Link } from 'react-router';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 function StudentRow({ student }) {
   const queryClient = useQueryClient();
+  const { can } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(student.fullName);
 
@@ -72,14 +74,22 @@ function StudentRow({ student }) {
         {remove.isError && <p className="error">{remove.error.message}</p>}
       </td>
       <td>{formatDateTime(student.createdAt)}</td>
-      <td className="actions">
-        <button type="button" onClick={startEditing} disabled={isEditing}>
-          Rename
-        </button>
-        <button type="button" onClick={handleDelete} disabled={remove.isPending}>
-          {remove.isPending ? 'Deleting...' : 'Delete'}
-        </button>
-      </td>
+      {can('staff') && (
+        <td className="actions">
+          <button type="button" onClick={startEditing} disabled={isEditing}>
+            Rename
+          </button>
+          {can('admin') && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={remove.isPending}
+            >
+              {remove.isPending ? 'Deleting...' : 'Delete'}
+            </button>
+          )}
+        </td>
+      )}
     </tr>
   );
 }

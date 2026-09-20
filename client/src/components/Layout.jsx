@@ -1,15 +1,35 @@
 import { NavLink, Outlet } from 'react-router';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 function Layout() {
+  const { user, can, logout } = useAuth();
+
   return (
     <>
       <header className="topbar">
         <nav>
-          <NavLink to="/students">Students</NavLink>
-          <NavLink to="/evaluate">Evaluate</NavLink>
-          <NavLink to="/parameters">Parameters</NavLink>
-          <NavLink to="/settings">Settings</NavLink>
+          {!user.mustChangePassword && (
+            <>
+              <NavLink to="/students">Students</NavLink>
+              {can('staff') && <NavLink to="/evaluate">Evaluate</NavLink>}
+              <NavLink to="/parameters">Parameters</NavLink>
+              <NavLink to="/settings">Settings</NavLink>
+            </>
+          )}
         </nav>
+        <div className="account">
+          <span>
+            {user.fullName} ({user.role})
+          </span>
+          <NavLink to="/change-password">Change password</NavLink>
+          <button
+            type="button"
+            onClick={() => logout.mutate()}
+            disabled={logout.isPending}
+          >
+            Sign out
+          </button>
+        </div>
       </header>
       <Outlet />
     </>

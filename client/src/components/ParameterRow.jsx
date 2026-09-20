@@ -3,9 +3,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateParameter } from '../api/parameters.js';
 import { formatRange } from '../lib/format.js';
 import { numberToText, parseOptionalNumber } from '../lib/numbers.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 function ParameterRow({ parameter }) {
   const queryClient = useQueryClient();
+  const { can } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(parameter.name);
   const [unit, setUnit] = useState(parameter.unit ?? '');
@@ -121,11 +123,13 @@ function ParameterRow({ parameter }) {
       <td>{parameter.name}</td>
       <td>{parameter.unit ?? '—'}</td>
       <td>{formatRange(parameter)}</td>
-      <td className="actions">
-        <button type="button" onClick={startEditing}>
-          Edit
-        </button>
-      </td>
+      {can('admin') && (
+        <td className="actions">
+          <button type="button" onClick={startEditing}>
+            Edit
+          </button>
+        </td>
+      )}
     </tr>
   );
 }

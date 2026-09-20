@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteParameterChange, listParameterChanges } from '../api/parameters.js';
 import { describeChange, formatDateTime } from '../lib/format.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 function ChangeRow({ change }) {
   const queryClient = useQueryClient();
+  const { can } = useAuth();
 
   const undo = useMutation({
     mutationFn: () => deleteParameterChange(change.id),
@@ -28,17 +30,20 @@ function ChangeRow({ change }) {
       <td>{change.parameterName}</td>
       <td>{describeChange(change)}</td>
       <td>{formatDateTime(change.createdAt)}</td>
-      <td className="actions">
-        <button type="button" onClick={handleUndo} disabled={undo.isPending}>
-          {undo.isPending ? 'Undoing...' : 'Undo'}
-        </button>
-        {undo.isError && <p className="error">{undo.error.message}</p>}
-      </td>
+      {can('admin') && (
+        <td className="actions">
+          <button type="button" onClick={handleUndo} disabled={undo.isPending}>
+            {undo.isPending ? 'Undoing...' : 'Undo'}
+          </button>
+          {undo.isError && <p className="error">{undo.error.message}</p>}
+        </td>
+      )}
     </tr>
   );
 }
 
 function ChangeHistory() {
+  const { can } = useAuth();
   const {
     data: changes,
     isPending,
@@ -62,7 +67,7 @@ function ChangeHistory() {
             <th>Parameter</th>
             <th>Change</th>
             <th>Recorded</th>
-            <th>Actions</th>
+            {can('admin') && <th>Actions</th>}
           </tr>
         </thead>
         <tbody>

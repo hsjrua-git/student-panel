@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { listParameters } from '../api/parameters.js';
 import ParameterRow from './ParameterRow.jsx';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 function ParametersTable() {
+  const { can } = useAuth();
   const {
     data: parameters,
     isPending,
@@ -24,7 +26,7 @@ function ParametersTable() {
             <th>Name</th>
             <th>Unit</th>
             <th>Range</th>
-            <th>Actions</th>
+            {can('admin') && <th>Actions</th>}
           </tr>
         </thead>
         <tbody>
