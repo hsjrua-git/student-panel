@@ -27,3 +27,20 @@ export async function listParameterChanges() {
 export function deleteParameterChange(id) {
   return request(`/api/parameter-changes/${id}`, { method: 'DELETE' });
 }
+
+export function createParameterChange(change) {
+  return request('/api/parameter-changes', {
+    method: 'POST',
+    body: JSON.stringify(change),
+  });
+}
+
+export function getChangeImpact({ parameterId, periodNumber, scope, action }) {
+  const params = new URLSearchParams({
+    parameterId,
+    periodNumber: String(periodNumber),
+    scope,
+    action,
+  });
+  return request(`/api/parameter-changes/impact?${params}`);
+}

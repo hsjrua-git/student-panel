@@ -43,3 +43,35 @@ export function parametersUsedInPeriod(changes, periodNumber) {
   }
   return usedIds;
 }
+
+export function withChange(changes, change) {
+  const others = changes.filter(
+    (existing) =>
+      !(
+        existing.parameterId === change.parameterId &&
+        existing.periodNumber === change.periodNumber &&
+        existing.scope === change.scope
+      )
+  );
+  return [...others, change];
+}
+
+export function hiddenScores({ changes, change, scoreCounts }) {
+  const after = withChange(changes, change);
+  let affectedScores = 0;
+  const periods = [];
+
+  for (const { periodNumber, count } of scoreCounts) {
+    const usedBefore = parametersUsedInPeriod(changes, periodNumber).includes(
+      change.parameterId
+    );
+    const usedAfter = parametersUsedInPeriod(after, periodNumber).includes(
+      change.parameterId
+    );
+    if (usedBefore && !usedAfter) {
+      affectedScores += count;
+      periods.push(periodNumber);
+    }
+  }
+  return { affectedScores, periods };
+}

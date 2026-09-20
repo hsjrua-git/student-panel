@@ -11,6 +11,7 @@ import PeriodPicker from '../components/PeriodPicker.jsx';
 import { buildEntries, cellKey } from '../lib/cells.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { usePeriods } from '../lib/usePeriods.js';
+import PeriodParametersPanel from '../components/PeriodParametersPanel.jsx';
 
 function EvaluatePage() {
   const queryClient = useQueryClient();
@@ -176,6 +177,11 @@ function EvaluatePage() {
         periods={periods}
         value={periodNumber}
         onChange={handlePeriodChange}
+      />
+
+      <PeriodParametersPanel
+        periodNumber={periodNumber}
+        disabled={draftCount > 0}
       />
 
       <div className="toolbar">

@@ -3,9 +3,11 @@ import pool from '../db/pool.js';
 import { parseParameterInput } from '../validation/parameter.js';
 import {
   MAX_PERIOD,
+  hiddenScores,
   isValidPeriodNumber,
   parametersUsedInPeriod,
 } from '../lib/parameterUse.js';
+import { isUuid } from '../lib/ids.js';
 
 const router = Router();
 
@@ -197,6 +199,64 @@ router.get('/parameter-changes', async (req, res) => {
      ORDER BY c.period_number, p.sort_order, c.scope`
   );
   res.json({ changes: result.rows });
+});
+
+router.get('/parameter-changes/impact', async (req, res) => {
+  const { parameterId, periodNumber, scope, action } = req.query;
+
+  if (!isUuid(parameterId)) {
+    return res.status(400).json({ error: 'parameterId must be a valid ID.' });
+  }
+  const isDigits =
+    typeof periodNumber === 'string' && /^\d+$/.test(periodNumber);
+  if (!isDigits || !isValidPeriodNumber(Number(periodNumber))) {
+    return res.status(400).json({
+      error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
+    });
+  }
+  if (!SCOPES.includes(scope)) {
+    return res
+      .status(400)
+      .json({ error: `scope must be one of: ${SCOPES.join(', ')}.` });
+  }
+  if (!ACTIONS.includes(action)) {
+    return res
+      .status(400)
+      .json({ error: `action must be one of: ${ACTIONS.join(', ')}.` });
+  }
+
+  const [changesResult, countsResult] = await Promise.all([
+    pool.query(
+      `SELECT parameter_id  AS "parameterId",
+              period_number AS "periodNumber",
+              scope,
+              action
+       FROM parameter_changes
+       WHERE parameter_id = $1`,
+      [parameterId]
+    ),
+    pool.query(
+      `SELECT period_number AS "periodNumber", count(*)::int AS count
+       FROM evaluations
+       WHERE parameter_id = $1 AND value IS NOT NULL
+       GROUP BY period_number
+       ORDER BY period_number`,
+      [parameterId]
+    ),
+  ]);
+
+  res.json(
+    hiddenScores({
+      changes: changesResult.rows,
+      change: {
+        parameterId,
+        periodNumber: Number(periodNumber),
+        scope,
+        action,
+      },
+      scoreCounts: countsResult.rows,
+    })
+  );
 });
 
 router.post('/parameter-changes', async (req, res) => {
