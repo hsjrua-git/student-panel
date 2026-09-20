@@ -17,10 +17,13 @@ export async function request(url, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       data?.error ??
         `Request failed (status ${response.status}). If this keeps happening, check that the server is running.`
     );
+    error.status = response.status;
+    error.data = data;
+    throw error;
   }
   return data;
 }
