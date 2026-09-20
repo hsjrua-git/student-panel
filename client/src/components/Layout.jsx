@@ -14,6 +14,7 @@ function Layout() {
               {can('staff') && <NavLink to="/evaluate">Evaluate</NavLink>}
               <NavLink to="/parameters">Parameters</NavLink>
               <NavLink to="/settings">Settings</NavLink>
+              {can('admin') && <NavLink to="/audit">Audit log</NavLink>}
             </>
           )}
         </nav>

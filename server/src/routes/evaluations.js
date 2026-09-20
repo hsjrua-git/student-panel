@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
+import { recordAudit } from '../lib/audit.js';
 import { isUuid } from '../lib/ids.js';
 import { periodForDate, todayIso } from '../lib/periods.js';
 import {
@@ -112,7 +113,10 @@ router.put('/evaluations/bulk', async (req, res) => {
        FROM parameters`
     ),
     pool.query(
-      `SELECT id FROM students
+      `SELECT id,
+              full_name    AS "fullName",
+              student_code AS "studentCode"
+       FROM students
        WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
       [studentIds]
     ),
@@ -126,7 +130,10 @@ router.put('/evaluations/bulk', async (req, res) => {
       .filter((parameter) => usedIds.has(parameter.id))
       .map((parameter) => [parameter.id, parameter])
   );
-  const knownStudentIds = new Set(studentsResult.rows.map((row) => row.id));
+  const studentsById = new Map(
+    studentsResult.rows.map((student) => [student.id, student])
+  );
+  const knownStudentIds = new Set(studentsById.keys());
 
   const problems = findProblems({
     entries,
@@ -141,10 +148,26 @@ router.put('/evaluations/bulk', async (req, res) => {
     });
   }
 
-  let changed = 0;
+  const changes = [];
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    const existing = await client.query(
+      `SELECT student_id   AS "studentId",
+              parameter_id AS "parameterId",
+              value::float8 AS value
+       FROM evaluations
+       WHERE period_number = $1 AND student_id = ANY($2::uuid[])`,
+      [periodNumber, studentIds]
+    );
+    const before = new Map(
+      existing.rows.map((row) => [
+        `${row.studentId}:${row.parameterId}`,
+        row.value,
+      ])
+    );
+
     for (const entry of entries) {
       const result =
         entry.value === null
@@ -164,8 +187,32 @@ router.put('/evaluations/bulk', async (req, res) => {
                WHERE evaluations.value IS DISTINCT FROM EXCLUDED.value`,
               [entry.studentId, entry.parameterId, periodNumber, entry.value]
             );
-      changed += result.rowCount;
+
+      if (result.rowCount > 0) {
+        const student = studentsById.get(entry.studentId);
+        changes.push({
+          studentId: entry.studentId,
+          student: student.fullName,
+          studentCode: student.studentCode,
+          parameterId: entry.parameterId,
+          parameter: usedParameters.get(entry.parameterId).name,
+          from: before.get(`${entry.studentId}:${entry.parameterId}`) ?? null,
+          to: entry.value,
+        });
+      }
     }
+
+    if (changes.length > 0) {
+      await recordAudit(client, {
+        userId: req.user.id,
+        actor: req.user.username,
+        action: 'scores.save',
+        entityType: 'period',
+        entityId: String(periodNumber),
+        details: { periodNumber, count: changes.length, changes },
+      });
+    }
+
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -174,7 +221,7 @@ router.put('/evaluations/bulk', async (req, res) => {
     client.release();
   }
 
-  res.json({ periodNumber, changed });
+  res.json({ periodNumber, changed: changes.length });
 });
 
 export default router;

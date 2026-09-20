@@ -1,0 +1,82 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { describeAudit } from '../src/lib/audit.js';
+
+test('describes student events', () => {
+  assert.equal(
+    describeAudit({
+      action: 'student.create',
+      details: { result: { fullName: 'Maria Lopez', studentCode: 'K7M2QX9A' } },
+    }),
+    'Added student Maria Lopez (K7M2-QX9A)'
+  );
+  assert.equal(
+    describeAudit({
+      action: 'student.delete',
+      studentName: 'Maria Lopez',
+      studentCode: 'K7M2QX9A',
+      details: {},
+    }),
+    'Deleted student Maria Lopez (K7M2-QX9A)'
+  );
+  assert.equal(
+    describeAudit({ action: 'student.delete', details: {} }),
+    'Deleted a student'
+  );
+});
+
+test('describes parameter changes', () => {
+  assert.equal(
+    describeAudit({
+      action: 'parameter_change.create',
+      changeParameterName: 'Balance',
+      details: {
+        result: { action: 'remove', scope: 'this_period_only', periodNumber: 7 },
+      },
+    }),
+    'Removed Balance for this period only, Period 7'
+  );
+  assert.equal(
+    describeAudit({
+      action: 'parameter_change.create',
+      changeParameterName: 'Balance',
+      details: {
+        result: { action: 'add', scope: 'from_here_on', periodNumber: 5 },
+      },
+    }),
+    'Added Balance from this period on, Period 5'
+  );
+});
+
+test('describes score saves with singular and plural', () => {
+  assert.equal(
+    describeAudit({ action: 'scores.save', details: { count: 3, periodNumber: 12 } }),
+    'Saved 3 scores in Period 12'
+  );
+  assert.equal(
+    describeAudit({ action: 'scores.save', details: { count: 1, periodNumber: 12 } }),
+    'Saved 1 score in Period 12'
+  );
+});
+
+test('describes sign-in events', () => {
+  assert.equal(describeAudit({ action: 'auth.login', details: {} }), 'Signed in');
+  assert.equal(
+    describeAudit({
+      action: 'auth.login_failed',
+      details: { attemptedUsername: 'admin' },
+    }),
+    'Failed sign-in attempt for "admin"'
+  );
+});
+
+test('unknown actions and generic changes still produce text', () => {
+  assert.equal(describeAudit({ action: 'something.new' }), 'something.new');
+  assert.equal(
+    describeAudit({
+      action: 'api.change',
+      details: { method: 'POST', path: '/api/x' },
+    }),
+    'POST /api/x'
+  );
+});

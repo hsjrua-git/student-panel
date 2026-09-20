@@ -3,6 +3,8 @@ import express from 'express';
 import session from 'express-session';
 import pool from './db/pool.js';
 import { attachUser, authorize, requireLogin } from './middleware/auth.js';
+import { auditRequests } from './middleware/audit.js';
+import auditRouter from './routes/audit.js';
 import authRouter from './routes/auth.js';
 import evaluationsRouter from './routes/evaluations.js';
 import parametersRouter from './routes/parameters.js';
@@ -44,6 +46,7 @@ app.use(
   })
 );
 app.use('/api', attachUser);
+app.use('/api', auditRequests);
 
 app.use('/api/auth', authRouter);
 app.use('/api', requireLogin);
@@ -61,6 +64,7 @@ app.use(
 app.use('/api/periods', authorize({ GET: 'viewer' }));
 app.use('/api/settings', authorize({ GET: 'viewer', PUT: 'admin' }));
 app.use('/api/evaluations', authorize({ GET: 'viewer', PUT: 'staff' }));
+app.use('/api/audit', authorize({ GET: 'admin' }), auditRouter);
 
 app.use('/api', periodsRouter);
 app.use('/api', parametersRouter);
