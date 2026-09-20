@@ -6,12 +6,20 @@
   "scripts": {
     "test": "node --test",
     "dev": "node --watch --env-file=.env src/index.js",
-    "migrate": "node --env-file=.env src/db/migrate.js"
+    "migrate": "node --env-file=.env src/db/migrate.js",
+    "create-user": "node --env-file=.env src/scripts/createUser.js"
   },
   "keywords": [],
   "type": "module",
   "dependencies": {
+    "argon2": "^0.45.1",
+    "connect-pg-simple": "^10.0.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "express-session": "^1.19.0",
     "pg": "^8.23.0"
+  },
+  "allowScripts": {
+    "argon2@0.45.1": true
   }
 }
