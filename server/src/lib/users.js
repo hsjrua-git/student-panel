@@ -18,8 +18,9 @@ export async function createUser({
   role,
   password,
   mustChangePassword = true,
+  db = pool,
 }) {
-  const result = await pool.query(
+  const result = await db.query(
     `INSERT INTO users (username, full_name, role, password_hash, must_change_password)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING ${USER_COLUMNS}`,

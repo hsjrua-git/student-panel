@@ -80,3 +80,50 @@ test('unknown actions and generic changes still produce text', () => {
     'POST /api/x'
   );
 });
+
+test('describes user management events', () => {
+  assert.equal(
+    describeAudit({
+      action: 'user.create',
+      details: { username: 'teacher1', fullName: 'Tina Teacher', role: 'staff' },
+    }),
+    'Created staff account "teacher1" (Tina Teacher)'
+  );
+  assert.equal(
+    describeAudit({ action: 'user.password_reset', details: { username: 'teacher1' } }),
+    'Reset the password of "teacher1"'
+  );
+  assert.equal(
+    describeAudit({
+      action: 'user.update',
+      details: {
+        username: 'teacher1',
+        changes: { role: { from: 'staff', to: 'viewer' } },
+      },
+    }),
+    'Updated user "teacher1": role staff → viewer'
+  );
+});
+
+test('describes user updates with several changes', () => {
+  assert.equal(
+    describeAudit({
+      action: 'user.update',
+      details: {
+        username: 'teacher1',
+        changes: {
+          isActive: { from: true, to: false },
+          fullName: { from: 'A', to: 'B' },
+        },
+      },
+    }),
+    'Updated user "teacher1": deactivated, renamed to B'
+  );
+  assert.equal(
+    describeAudit({
+      action: 'user.update',
+      details: { username: 'teacher1', changes: { isActive: { from: false, to: true } } },
+    }),
+    'Updated user "teacher1": reactivated'
+  );
+});

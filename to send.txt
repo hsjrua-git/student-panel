@@ -1,0 +1,364 @@
+this we arrived at for database:
+Yes, start with the database. Data is the one part that's painful to change once real students are in it. Screens and rules can be rewritten in an afternoon, but a wrong table shape means moving data. So we design the tables on paper first, and you decide what changes. Then we learn just enough (install, SQL) to build them.
+
+So the order becomes: data model (this message) → workshop and SQL → build the tables → the rest. Stage 1, "how the web works," moves to just before the server.
+
+The database on paper
+The five words you need
+Table: a list of one kind of thing, like a spreadsheet sheet (students, parameters).
+Row: one item in a table (one student).
+Column: one property every row has (full name).
+Primary key (PK): a value that uniquely identifies a row. We use random IDs (UUIDs).
+Foreign key (FK): a column holding another table's ID, pointing to a row there. The database refuses a pointer to nothing.
+
+Two more you'll meet: a constraint is a rule the database enforces itself (required, unique, range), and an index is a lookup speed-up, like a book's index.
+
+Design rules I followed
+Store each fact once. A score refers to "Speed" by ID and doesn't repeat the word.
+Calculate, don't store, what can be derived. Period dates and averages are not stored.
+Never hard-delete. Rows get a deleted_at or are retired, so history stays valid.
+Say who and when on things that change.
+Secrets never appear in readable form (passwords are hashes only).
+The map
+student_groups ──< students ──< evaluations >── parameters ──< parameter_changes
+     (optional)         │             │
+                        │             └──< score_overrides
+                        └──< student_field_values >── student_field_definitions   (optional)
+
+users ──< user_sessions        users ──< audit_log
+users ──1 user_preferences     users ──< saved_views
+settings (standalone)          import_batches (optional)
+
+──< means "one to many" (one student has many scores).
+
+Core tables (in the project no matter what)
+students
+Column	Type	Rules	Notes
+id	uuid	PK, auto	internal link
+student_code	text	unique, exactly 8 characters from a safe alphabet	what people see and read aloud
+full_name	text	required, 2 to 100 characters	not unique, two students can share a name
+group_id	uuid	FK → student_groups, optional	[D1]
+created_at	timestamp	auto	
+created_by	uuid	FK → users	who added them
+deleted_at	timestamp	empty = active	soft delete
+parameters (the catalog: what can be measured)
+Column	Type	Rules	Notes
+id	uuid	PK	
+name	text	required, unique ignoring case, 1 to 60 chars	"Speed"
+description	text	optional	help text on the entry grid [D6]
+unit	text	optional	"km/h", "points"
+min_value / max_value	number	optional, min ≤ max	locked once scores exist
+sort_order	whole number		column order in the grid
+created_at	timestamp		
+parameter_changes (the log that says which parameters each period uses)
+Column	Type	Rules
+id	uuid	PK
+parameter_id	uuid	FK → parameters
+period_number	whole number	≥ 1
+scope	text	from_here_on or this_period_only
+action	text	add or remove
+created_at, created_by		who and when
+
+Unique on (parameter, period, scope). A parameter's start is just its first "add" row.
+
+evaluations (the heart: one row = one score)
+Column	Type	Rules	Notes
+id	uuid	PK	
+student_id	uuid	FK → students	
+parameter_id	uuid	FK → parameters	
+period_number	whole number	≥ 1	"Period 12", dates come from the anchor
+value	number	empty = not measured or cleared	never store a fake 0
+comment	text	optional	[D3]
+entered_late	true/false	set once, at first save	true if the first save came after its own period ended
+editable_until	timestamp	set once, at first save	first save + 7 days (or + 1 day if late)
+created_at	timestamp	first save	clock for the lock
+updated_at, updated_by		last change	
+
+Unique on (student, parameter, period), so there's exactly one place per combination. Clearing a score empties the value but keeps the row, so nobody can clear and retype to restart the lock clock.
+
+score_overrides (admin edits after the lock, permanent record)
+Column	Type	Notes
+id	uuid	PK
+evaluation_id	uuid	FK → evaluations
+admin_id	uuid	FK → users
+reason	text	required, you can't override without one
+old_value / new_value	number	
+overridden_at	timestamp	
+settings (small key/value list)
+key	example value	Notes
+period_anchor_date	2026-09-19	Saturday that starts Period 1, locked once scores exist
+lock_days_normal	7	[D4] editable by admin
+lock_days_late	1	[D4]
+users
+Column	Type	Rules
+id	uuid	PK
+username	text	unique ignoring case, 3 to 32 characters
+full_name	text	
+password_hash	text	scrambled, never the password [D7]
+role	text	viewer, staff, admin [D5]
+is_active	true/false	deactivate instead of delete
+must_change_password	true/false	true after account creation or reset
+last_login_at, created_at, updated_at	timestamps	
+user_sessions
+
+Managed by the login library: sid, sess (data), expire. You don't design it, but it's a table.
+
+audit_log (append-only: only ever added to)
+Column	Type	Notes
+id	ever-increasing number	
+occurred_at	timestamp	
+user_id	uuid	FK → users, empty for a failed sign-in
+actor	text	username kept as text, so the row stays readable
+action	text	scores.save, student.delete...
+entity_type / entity_id	text	what it was about
+details	flexible JSON	old value, new value, etc.
+user_preferences (personalization, one row per user)
+Column	Type	Notes
+user_id	uuid	PK and FK → users
+visible_columns	JSON	per screen, which columns are shown
+page_size	whole number	25, 50...
+theme	text	light, dark, system
+dashboard_widgets	JSON	which widgets, in what order
+updated_at	timestamp	
+saved_views
+Column	Type	Notes
+id	uuid	PK
+user_id	uuid	FK → users (owner)
+name	text	"Group A, weak rhythm"
+screen	text	which screen it belongs to
+config	JSON	filters, sort order, columns
+is_shared	true/false	[D8]
+created_at	timestamp	
+
+Unique on (user, screen, name).
+
+schema_migrations
+
+The bookkeeping table for database changes. You'll meet it when we build the migration runner.
+
+Optional tables (decisions)
+Table	Purpose	Decision
+student_groups (id, name unique, archived_at)	classes, teams, levels	[D1]
+student_field_definitions + student_field_values	admins add their own student columns, like "Bus route"	[D2]
+import_batches (id, user_id, filename, row_count, status, created_at) + a batch_id on rows created by an import	lets an admin undo a whole CSV import	[D9]
+What is deliberately not stored
+Periods. There is no periods table. Period dates are computed from the anchor.
+Averages, trends, dashboard numbers. Always computed from evaluations, so they can never disagree with the scores.
+Passwords, only hashes.
+Decisions for you (reply with the code and your choice)
+#	Question	Options	My default
+D1	Group students (class/team)?	none / one group per student / many groups per student	one group per student
+D2	Admin-defined extra student fields?	none / yes	none now, easy to add later
+D3	Comment on each score?	none / optional note	optional note
+D4	Lock days configurable in Settings?	fixed 7 and 1 / admin-editable	admin-editable
+D5	Roles	3 fixed / more or configurable	3 fixed
+D6	Parameter description text?	none / optional	optional
+D7	Login by	username / email	username
+D8	Saved views	private only / can be shared with everyone	private and shareable
+D9	Undoable CSV imports?	no / yes	yes
+D10	Should scores allow decimals and negative numbers?	whole numbers only / decimals / any number	decimals allowed, negatives only if the range allows
+D11	Extra student info (birth date, guardian contact)?	none / some	none (less personal data means less responsibility)
+
+How to instruct me: just write things like "D1: many groups, D3: no comments, add a column started_on to students, remove description." You can also propose tables or columns I didn't list.
+
+Check your understanding
+
+DB.1 In your own words: what does the foreign key evaluations.student_id → students.id prevent?
+
+DB.2 Why is the period stored as a number in evaluations and not as dates?
+
+DB.3 A teacher clears a score, then types it again on day 9 (after a 7-day lock). What would go wrong if "clearing" deleted the row?
+
+DB.4 Which single table would you look at to answer "who changed Maria's Speed score and what was it before?" Which columns?
+
+DB.5 For each of these, say which table holds it: (a) whether Sam prefers dark theme, (b) the date Period 1 starts, (c) whether Vera's account is switched off, (d) the fact that Balance stops being used from Period 10.
+
+DB.6 Pick one of D1–D11 and argue for a different answer than my default, based on how you imagine using the app.
+
+Send your changes and answers. Once the structure is settled, we move to the workshop: a short lesson on the terminal, then installing PostgreSQL, and writing your first SQL by hand to build these tables yourself.
+
+Understood: no quizzes until you ask, and the design gets settled first. Your four answers change the database more than any earlier choice, so here is the revised structure.
+
+What your decisions mean
+Your choice	What it became
+D1 groups, many per student, optional, with subgroups	A groups table that can point at its own parent, plus a table linking students to groups
+D3 click to add details to a score	An optional note on each score, opened from a small icon
+D5 roles configurable by admins, any number	Roles and permissions become data, not fixed words in the code
+D11 + D2 admin-made optional student fields	A field-definitions table and a values table. D2 and D11 are now one feature
+
+One interpretation to confirm: by "something to click to add wanted details" I understood a note icon on each score cell; click it, type a note, save. If you meant structured details instead (like tags or a checklist), tell me.
+
+Revised map
+                     student_groups ──┐ (parent_id → itself: subgroups)
+                          │           │
+                 student_group_members
+                          │
+student_field_definitions │
+        │                 │
+student_field_values ──< students ──< evaluations >── parameters ──< parameter_changes
+                                          │
+                                   score_overrides
+
+roles ──< role_permissions          users >── roles
+users ──< user_sessions             users ──< audit_log
+users ──1 user_preferences          users ──< saved_views
+settings                            import_batches
+Changed and new tables
+students (simpler now)
+
+id, student_code, full_name, created_at, created_by, deleted_at. The group_id column is gone, since groups live in their own tables. There are no built-in extra fields either. Birth date, contact, and similar things are now admin-created fields.
+
+student_groups (groups and subgroups)
+Column	Type	Rules
+id	uuid	PK
+name	text	required, 1 to 80 characters
+parent_id	uuid	FK → student_groups (itself), empty = top-level group
+archived_at	timestamp	empty = active. Groups are archived, never deleted
+created_at, created_by		
+
+A group with a parent is a subgroup, so "Beginners" can sit under "Morning class" and "Group A" under "Beginners". Names must be unique among siblings (two groups with the same parent can't share a name).
+
+Rules I'd enforce (in the server, plus what the database can):
+
+A group can never become its own descendant. Moving "Morning class" inside "Group A" is refused.
+Archiving a group doesn't remove its members. It only hides it from pickers.
+student_group_members (which student is in which group)
+Column	Type	Rules
+student_id	uuid	FK → students
+group_id	uuid	FK → student_groups
+added_at, added_by		
+
+Primary key is (student_id, group_id), so a student can't be in the same group twice, but can be in many groups. A student with no rows here is simply ungrouped, which is fine.
+
+evaluations (one column changes)
+
+comment (text, optional, up to 500 characters) is the note. Two consequences:
+
+A row can now have a note but no value ("absent, sick"). So "this cell has content" means value or note is present. That rule changes how loading and clearing work.
+The edit lock applies to notes as well, and note edits are recorded in the audit log.
+roles and role_permissions (configurable roles)
+
+roles:
+
+Column	Type	Rules
+id	uuid	PK
+name	text	unique ignoring case
+description	text	optional
+is_system	true/false	true for the built-in Administrator role
+created_at	timestamp	
+
+role_permissions: (role_id, permission_key), primary key on both. One row means "this role has this permission."
+
+Why permissions are not a table you edit freely: the code must know what each permission means, so the list of permission keys is fixed in the code. Admins choose which roles get which keys. They can create new roles but not new kinds of permission.
+
+The starting permission list:
+
+Area	Permission keys
+Students	students.view, students.create, students.edit, students.delete
+Groups	groups.manage (create, rename, move, archive), groups.assign (put students in groups)
+Scores	scores.view, scores.enter (includes notes), scores.override (edit after lock)
+Parameters	parameters.view, parameters.manage (including per-period changes)
+Settings	settings.manage (start date, lock days)
+Student fields	fields.manage, fields.view_restricted
+People	users.manage, roles.manage, audit.view
+Data	data.import, data.export, dashboard.view, views.share
+
+Starter roles (all editable except Administrator): Viewer, Staff, Administrator.
+
+Safeguards against locking yourself out:
+
+The Administrator role can't be deleted or stripped of roles.manage and users.manage.
+The server refuses any change that would leave no active user holding roles.manage.
+The server checks permission keys, never role names, so renaming a role can't break anything.
+users (one column changes)
+
+role (fixed text) becomes role_id (FK → roles). Everything else stays.
+
+student_field_definitions (what extra fields exist)
+Column	Type	Rules
+id	uuid	PK
+label	text	shown on screens, unique ignoring case ("Birth date")
+field_type	text	text, long_text, number, date, yes_no, choice
+choices	JSON	only for choice: the list of allowed options
+is_restricted	true/false	if true, only roles with fields.view_restricted see it
+sort_order	whole number	
+archived_at	timestamp	hidden, not deleted, so old values survive
+created_at, created_by		
+
+The type is locked once any value exists, the same idea as parameter ranges, because changing "date" to "number" would corrupt the stored values.
+
+student_field_values (the values, all optional)
+Column	Type	Rules
+student_id	uuid	FK → students
+field_id	uuid	FK → student_field_definitions
+value_text / value_number / value_date / value_bool	one of each	only the one matching the field's type is filled
+updated_at, updated_by		
+
+Primary key is (student, field). A row exists only if a value was entered, which is what "all optional" means in a database.
+
+Consequences elsewhere
+
+These are things that change in later stages because of your decisions. I list them so nothing surprises you:
+
+Permissions: every server route checks a permission key. React shows or hides buttons based on the same keys, and the real check stays on the server.
+Audit log: new categories for groups, roles, fields, and notes.
+CSV import and export: must handle groups and custom fields as columns.
+Dashboard and saved views: can filter by group. Filtering by "Beginners" includes its subgroups.
+Student list: columns can include custom fields, and personalization lets each user pick them.
+Privacy: custom fields can hold personal data (contact details, birth dates), so the "restricted" flag and the data.export permission exist for a reason.
+New small decisions (defaults in bold, change any you like)
+#	Question	Options
+G1	How deep can subgroups go?	up to 5 levels / unlimited / 2 levels only
+G2	Does being in "Group A" (a subgroup) count as being in its parent "Beginners" when you filter?	yes, automatically / only if added to the parent directly
+R1	One role per user, or several?	one role / several (permissions add up)
+R2	Can a role be limited to certain groups (a coach sees only their group)?	no, roles apply to everyone / yes
+F1	Extra-field values stored as rows (above) or as one JSON column on students?	rows in student_field_values / JSON column (simpler, weaker checks)
+F2	Can extra fields be marked restricted?	yes / no
+N1	Who can see notes on scores?	anyone with scores.view / only people who can enter scores
+
+R2 is the one that most affects difficulty. If you say yes, every list, chart, and export has to respect "which students may this person see." That's doable, but it touches most of the app. The default keeps it simple, and it's also cheaper to add later than most changes here.
+
+The rest is unchanged
+
+parameters, parameter_changes, settings (including editable lock days), score_overrides, user_sessions, audit_log, user_preferences, saved_views, import_batches, and schema_migrations stay as I described them. The is_shared flag on saved views stays too, so you can share views with everyone.
+
+Tell me any changes to the new decisions (G1 to N1), or anything else you'd like different, such as adding or removing columns or tables. When the structure is settled, say go next, and we move to the workshop (the terminal and installing PostgreSQL) so you can start building these tables yourself.
+
+G1: not limited. G2: sutomatically. R1: one role. R2: no. F1: JSON. F2: yes. N1: anyone with view.
+
+if everything alright and I am right about below matter, go next.
+
+role_permissions: any key in any area can be set. If for example scores.enter can be permitted and scores.view can be prohibited for a user, continue and go next.
+
+Your decisions are recorded. Before we move on, here is what your last message means for the design, because you are mostly right and one part needs a refinement.
+
+Your role-permissions point
+
+You're right about the table. role_permissions is one row per (role, permission key), so any key can be given or withheld independently, in any area. A role can hold scores.enter without scores.view. I'm keeping that.
+
+One refinement. A few combinations make a screen useless unless something else is also present. Entering scores needs to know which students and which parameters to show, so the role editor will treat these as prerequisites and tick them automatically (you can't untick a prerequisite while something depends on it):
+
+Permission	Needs
+scores.enter	students.view, parameters.view
+scores.override	scores.enter
+students.create, students.edit, students.delete, groups.assign	students.view
+data.import	students.create, scores.enter
+
+scores.view is not a prerequisite of scores.enter, as you wanted. A role with entry but no view is a blind-entry role: the grid shows empty cells, the person types values, and Save works. They can't read scores back, and the server refuses reading scores for them. The audit log still records old values for admins. Say so if you want the prerequisites list changed.
+
+What your other answers changed
+G1, unlimited depth: allowed. The cost is that the server must reject any move that would make a group its own descendant. That check is essential, since without it a "loop" of groups could freeze a query.
+G2, automatic: filtering by "Beginners" includes every subgroup below it. We store only direct membership and compute the rest.
+R1, one role per user / R2, no group limits: simple. users.role_id holds a single role.
+F1, JSON: this replaces the student_field_values table with one column, students.extra, holding an object keyed by the field's ID (not its label), so renaming a label never breaks stored values. The database can no longer check types, so the server validates every value against the field definition. The type is still locked once any value exists.
+F2 + JSON, a security point: restricted and public values now live in the same column. The server must remove restricted keys from every answer for people without fields.view_restricted. Doing it in React would be useless, since anyone can read what the server sends.
+N1: notes are visible to anyone with scores.view.
+
+The design is settled as version 1. The tables are: students, student_groups, student_group_members, student_field_definitions, parameters, parameter_changes, evaluations, score_overrides, settings, roles, role_permissions, users, user_sessions, audit_log, user_preferences, saved_views, import_batches, and schema_migrations. If you want changes later, we'll make them with new migration files.
+
+
+
+
+
+23 test 4: teacher2 loses evaluate on reload, not on click
+

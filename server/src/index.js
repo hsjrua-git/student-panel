@@ -10,6 +10,7 @@ import evaluationsRouter from './routes/evaluations.js';
 import parametersRouter from './routes/parameters.js';
 import periodsRouter from './routes/periods.js';
 import studentsRouter from './routes/students.js';
+import usersRouter from './routes/users.js';
 
 const secret = process.env.SESSION_SECRET;
 if (!secret || secret.length < 32) {
@@ -65,6 +66,7 @@ app.use('/api/periods', authorize({ GET: 'viewer' }));
 app.use('/api/settings', authorize({ GET: 'viewer', PUT: 'admin' }));
 app.use('/api/evaluations', authorize({ GET: 'viewer', PUT: 'staff' }));
 app.use('/api/audit', authorize({ GET: 'admin' }), auditRouter);
+app.use('/api/users', authorize({ GET: 'admin', POST: 'admin', PATCH: 'admin' }), usersRouter);
 
 app.use('/api', periodsRouter);
 app.use('/api', parametersRouter);

@@ -61,6 +61,20 @@ export function describeAudit(entry) {
       return 'Changed their password';
     case 'api.change':
       return `${details.method ?? ''} ${details.path ?? ''}`.trim();
+    case 'user.create':
+      return `Created ${details.role ?? ''} account "${details.username ?? '?'}" (${details.fullName ?? ''})`;
+    case 'user.update': {
+      const changes = details.changes ?? {};
+      const parts = [];
+      if (changes.role) parts.push(`role ${changes.role.from} → ${changes.role.to}`);
+      if (changes.isActive) {
+        parts.push(changes.isActive.to ? 'reactivated' : 'deactivated');
+      }
+      if (changes.fullName) parts.push(`renamed to ${changes.fullName.to}`);
+      return `Updated user "${details.username ?? '?'}": ${parts.join(', ') || 'no changes'}`;
+    }
+    case 'user.password_reset':
+      return `Reset the password of "${details.username ?? '?'}"`;
     default:
       return entry.action;
   }

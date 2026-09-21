@@ -1,3 +1,5 @@
+import { ROLES, isRole } from '../lib/roles.js';
+
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 
 export function parseUsername(input) {
@@ -10,4 +12,57 @@ export function parseUsername(input) {
     };
   }
   return { value };
+}
+
+export function parseFullName(input) {
+  if (typeof input !== 'string') return { error: 'Full name is required.' };
+  const value = input.trim().replace(/\s+/g, ' ');
+  if (value.length < 1 || value.length > 100) {
+    return { error: 'Full name must be 1 to 100 characters.' };
+  }
+  return { value };
+}
+
+export function parseNewUser(body) {
+  const username = parseUsername(body?.username);
+  if (username.error) return { error: username.error };
+  const fullName = parseFullName(body?.fullName);
+  if (fullName.error) return { error: fullName.error };
+  if (!isRole(body?.role)) {
+    return { error: `Role must be one of: ${ROLES.join(', ')}.` };
+  }
+  return {
+    values: {
+      username: username.value,
+      fullName: fullName.value,
+      role: body.role,
+    },
+  };
+}
+
+export function parseUserUpdate(body) {
+  const input = body !== null && typeof body === 'object' ? body : {};
+  if ('username' in input) return { error: 'Usernames cannot be changed.' };
+
+  const values = {};
+  if ('fullName' in input) {
+    const name = parseFullName(input.fullName);
+    if (name.error) return { error: name.error };
+    values.fullName = name.value;
+  }
+  if ('role' in input) {
+    if (!isRole(input.role)) {
+      return { error: `Role must be one of: ${ROLES.join(', ')}.` };
+    }
+    values.role = input.role;
+  }
+  if ('isActive' in input) {
+    if (typeof input.isActive !== 'boolean') {
+      return { error: 'isActive must be true or false.' };
+    }
+    values.isActive = input.isActive;
+  }
+
+  if (Object.keys(values).length === 0) return { error: 'Nothing to change.' };
+  return { values };
 }
