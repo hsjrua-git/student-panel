@@ -7,6 +7,7 @@ import {
   formatRange,
   formatStudentCode,
 } from '../lib/format.js';
+import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
 const GRID_PAGE_SIZE = 50;
 
@@ -39,9 +40,13 @@ function EvaluationGrid({
   page,
   onPageChange,
 }) {
+  const { preferences } = usePreferences();
+  const sort = preferences.studentsSort;
+
   const { data, isPending, isError, error, isPlaceholderData } = useQuery({
-    queryKey: ['students', { search, page, pageSize: GRID_PAGE_SIZE }],
-    queryFn: () => listStudents({ search, page, pageSize: GRID_PAGE_SIZE }),
+    queryKey: ['students', { search, page, pageSize: GRID_PAGE_SIZE, sort }],
+    queryFn: () =>
+      listStudents({ search, page, pageSize: GRID_PAGE_SIZE, sort }),
     placeholderData: keepPreviousData,
   });
 

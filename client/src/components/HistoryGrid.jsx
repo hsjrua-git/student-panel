@@ -20,8 +20,13 @@ function Cell({ cell }) {
   );
 }
 
-function HistoryGrid({ evaluations, periods, parameters }) {
-  const [showAll, setShowAll] = useState(false);
+function HistoryGrid({
+  evaluations,
+  periods,
+  parameters,
+  initialShowAll = false,
+}) {
+  const [showAll, setShowAll] = useState(initialShowAll);
 
   const history = useMemo(
     () => buildHistory({ evaluations, periods, parameters }),

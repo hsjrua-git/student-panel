@@ -396,3 +396,28 @@ tr.inactive {
 .lock {
   font-size: 0.85rem;
 }
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+.pref-group {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border: 0;
+  padding: 0;
+}
+
+.pref-group legend {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  padding: 0;
+}
+
+.status-line {
+  min-height: 1.5rem;
+}

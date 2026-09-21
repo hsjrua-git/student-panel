@@ -19,6 +19,7 @@ const RULES = [
 const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/evaluations\/bulk$/,
   /^\/api\/users(\/|$)/,
+  /^\/api\/preferences$/,
 ];
 
 export function normalisePath(url) {

@@ -10,6 +10,12 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
+const SORTS = {
+  newest: 'created_at DESC, id',
+  oldest: 'created_at ASC, id',
+  name: 'lower(full_name), id',
+  code: 'student_code, id',
+};
 
 const STUDENT_COLUMNS = `
   id,
@@ -69,6 +75,10 @@ router.get('/', async (req, res) => {
     toPositiveInt(req.query.pageSize, DEFAULT_PAGE_SIZE),
     MAX_PAGE_SIZE
   );
+  const sort = req.query.sort ?? 'newest';
+  if (typeof sort !== 'string' || !Object.hasOwn(SORTS, sort)) {
+    return res.status(400).json({ error: 'Unknown sort order.' });
+  }
 
   const conditions = ['deleted_at IS NULL'];
   const values = [];
@@ -96,7 +106,7 @@ router.get('/', async (req, res) => {
     `SELECT ${STUDENT_COLUMNS}
      FROM students
      WHERE ${where}
-     ORDER BY created_at DESC, id
+     ORDER BY ${SORTS[sort]}
      LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
     [...values, pageSize, (page - 1) * pageSize]
   );

@@ -23,6 +23,7 @@ function Layout() {
           <span>
             {user.fullName} ({user.role})
           </span>
+          <NavLink to="/preferences">Preferences</NavLink>
           <NavLink to="/change-password">Change password</NavLink>
           <button
             type="button"

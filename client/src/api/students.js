@@ -1,9 +1,15 @@
 import { request } from './http.js';
 
-export function listStudents({ search = '', page = 1, pageSize = 25 } = {}) {
+export function listStudents({
+  search = '',
+  page = 1,
+  pageSize = 25,
+  sort = 'newest',
+} = {}) {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
+    sort,
   });
   if (search) params.set('search', search);
   return request(`/api/students?${params}`);

@@ -1,16 +1,19 @@
 import { useEffect } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listStudents } from '../api/students.js';
-import StudentRow from './StudentRow.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
-
-const PAGE_SIZE = 25;
+import { usePreferences } from '../preferences/PreferencesContext.jsx';
+import StudentRow from './StudentRow.jsx';
 
 function StudentsTable({ search, page, onPageChange }) {
   const { can } = useAuth();
+  const { preferences } = usePreferences();
+  const pageSize = preferences.studentsPageSize;
+  const sort = preferences.studentsSort;
+
   const { data, isPending, isError, error, isPlaceholderData } = useQuery({
-    queryKey: ['students', { search, page }],
-    queryFn: () => listStudents({ search, page, pageSize: PAGE_SIZE }),
+    queryKey: ['students', { search, page, pageSize, sort }],
+    queryFn: () => listStudents({ search, page, pageSize, sort }),
     placeholderData: keepPreviousData,
   });
 
@@ -39,9 +42,9 @@ function StudentsTable({ search, page, onPageChange }) {
       <table className={isPlaceholderData ? 'stale' : undefined}>
         <thead>
           <tr>
-            <th>Code</th>
+            {preferences.studentsShowCode && <th>Code</th>}
             <th>Full name</th>
-            <th>Added</th>
+            {preferences.studentsShowAdded && <th>Added</th>}
             {can('staff') && <th>Actions</th>}
           </tr>
         </thead>

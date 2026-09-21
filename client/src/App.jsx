@@ -11,6 +11,7 @@ import StudentDetailPage from './pages/StudentDetailPage.jsx';
 import StudentsPage from './pages/StudentsPage.jsx';
 import AuditPage from './pages/AuditPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
+import PreferencesPage from './pages/PreferencesPage.jsx';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/evaluate" element={<EvaluatePage />} />
           <Route path="/parameters" element={<ParametersPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/preferences" element={<PreferencesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route path="*" element={<NotFoundPage />} />

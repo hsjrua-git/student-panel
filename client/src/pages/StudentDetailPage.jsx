@@ -9,6 +9,8 @@ import ByPeriodView from '../components/ByPeriodView.jsx';
 import HistoryGrid from '../components/HistoryGrid.jsx';
 import { formatStudentCode } from '../lib/format.js';
 import { usePeriods } from '../lib/usePeriods.js';
+import { visibleParameters } from '../lib/prefs.js';
+import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -18,7 +20,8 @@ const TABS = [
 
 function StudentDetailPage() {
   const { id } = useParams();
-  const [tab, setTab] = useState('overview');
+  const { preferences } = usePreferences();
+  const [tab, setTab] = useState(preferences.studentDefaultTab);
 
   const studentQuery = useQuery({
     queryKey: ['student', id],
@@ -106,12 +109,22 @@ function StudentDetailPage() {
       />
     );
   } else {
+    const shown = visibleParameters(parameters, preferences.hiddenParameterIds);
     content = (
-      <HistoryGrid
-        evaluations={evaluations}
-        periods={periods.periods}
-        parameters={parameters}
-      />
+      <>
+        <HistoryGrid
+          evaluations={evaluations}
+          periods={periods.periods}
+          parameters={shown}
+          initialShowAll={preferences.studentShowAllPeriods}
+        />
+        {shown.length < parameters.length && (
+          <p className="hint">
+            Some parameters are hidden in this overview. Change this in{' '}
+            <Link to="/preferences">Preferences</Link>.
+          </p>
+        )}
+      </>
     );
   }
 

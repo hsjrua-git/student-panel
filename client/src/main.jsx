@@ -8,8 +8,12 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query';
 import { AuthProvider } from './auth/AuthContext.jsx';
+import { applyRememberedTheme } from './lib/theme.js';
+import { PreferencesProvider } from './preferences/PreferencesContext.jsx';
 import './index.css';
 import App from './App.jsx';
+
+applyRememberedTheme();
 
 function signOutOn401(error) {
   if (error?.status === 401) {
@@ -33,7 +37,9 @@ createRoot(document.getElementById('root')).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <PreferencesProvider>
+            <App />
+          </PreferencesProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
