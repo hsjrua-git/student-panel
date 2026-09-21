@@ -41,3 +41,11 @@ export function buildEntries(drafts, parametersById) {
   }
   return { entries, errors };
 }
+export function cellAccess(lock, canOverride) {
+  if (!lock || !lock.isLocked) return 'open';
+  return canOverride ? 'override' : 'locked';
+}
+
+export function lockedDraftKeys(drafts, locks) {
+  return Object.keys(drafts).filter((key) => locks[key]?.isLocked === true);
+}

@@ -49,7 +49,10 @@ export function describeAudit(entry) {
       return `Set the period start date to ${result.anchorDate ?? request.anchorDate ?? '?'}`;
     case 'scores.save': {
       const count = details.count ?? 0;
-      return `Saved ${count} score${count === 1 ? '' : 's'} in Period ${details.periodNumber ?? '?'}`;
+      const base = `Saved ${count} score${count === 1 ? '' : 's'} in Period ${details.periodNumber ?? '?'}`;
+      return details.overrideReason
+        ? `${base}, including locked scores changed with an override: "${details.overrideReason}"`
+        : base;
     }
     case 'auth.login':
       return 'Signed in';

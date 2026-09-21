@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildEntries, cellKey, parseCell, savedText } from '../src/lib/cells.js';
+import {
+  buildEntries,
+  cellAccess,
+  cellKey,
+  lockedDraftKeys,
+  parseCell,
+  savedText,
+} from '../src/lib/cells.js';
 
 const speed = { minValue: 0, maxValue: 10 };
 const open = { minValue: null, maxValue: null };
@@ -50,4 +57,21 @@ test('saved values are shown as plain text', () => {
   assert.equal(savedText(6.5), '6.5');
   assert.equal(savedText(undefined), '');
   assert.equal(savedText(null), '');
+});
+test('locked cells are read-only for everyone except administrators', () => {
+  const locked = { isLocked: true, lockedAt: '2026-10-01T10:00:00Z' };
+  const open = { isLocked: false, lockedAt: '2026-10-08T10:00:00Z' };
+  assert.equal(cellAccess(undefined, false), 'open');
+  assert.equal(cellAccess(open, false), 'open');
+  assert.equal(cellAccess(locked, false), 'locked');
+  assert.equal(cellAccess(locked, true), 'override');
+});
+
+test('finds which drafted cells are locked', () => {
+  const locks = { 'a:p': { isLocked: true }, 'b:p': { isLocked: false } };
+  assert.deepEqual(
+    lockedDraftKeys({ 'a:p': '5', 'b:p': '6', 'c:p': '7' }, locks),
+    ['a:p']
+  );
+  assert.deepEqual(lockedDraftKeys({}, locks), []);
 });

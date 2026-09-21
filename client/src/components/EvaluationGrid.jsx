@@ -1,8 +1,12 @@
 import { useEffect } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listStudents } from '../api/students.js';
-import { cellKey, savedText } from '../lib/cells.js';
-import { formatRange, formatStudentCode } from '../lib/format.js';
+import { cellAccess, cellKey, savedText } from '../lib/cells.js';
+import {
+  formatDateTime,
+  formatRange,
+  formatStudentCode,
+} from '../lib/format.js';
 
 const GRID_PAGE_SIZE = 50;
 
@@ -13,12 +17,24 @@ function rangeHint(parameter) {
     .join(' · ');
 }
 
+function lockTitle(lock, access) {
+  if (!lock) return undefined;
+  if (lock.isLocked) {
+    return access === 'override'
+      ? `Locked since ${formatDateTime(lock.lockedAt)}. Changing it needs a written reason.`
+      : `Locked since ${formatDateTime(lock.lockedAt)}. Only an administrator can change it.`;
+  }
+  return `Can be changed until ${formatDateTime(lock.lockedAt)}`;
+}
+
 function EvaluationGrid({
   parameters,
   saved,
+  locks,
   drafts,
   cellErrors,
   onCellChange,
+  canOverride,
   search,
   page,
   onPageChange,
@@ -86,26 +102,40 @@ function EvaluationGrid({
                   const original = savedText(saved[key]);
                   const shown = drafts[key] ?? original;
                   const message = cellErrors[key];
+                  const lock = locks[key];
+                  const access = cellAccess(lock, canOverride);
                   const classes = [
                     'cell',
                     key in drafts ? 'changed' : '',
                     message ? 'invalid' : '',
+                    access !== 'open' ? 'locked' : '',
                   ]
                     .filter(Boolean)
                     .join(' ');
 
                   return (
                     <td key={parameter.id}>
-                      <input
-                        className={classes}
-                        inputMode="decimal"
-                        value={shown}
-                        onChange={(event) =>
-                          onCellChange(key, event.target.value, original)
-                        }
-                        aria-label={`${parameter.name} for ${student.fullName}`}
-                        autoComplete="off"
-                      />
+                      <div className="cell-wrap">
+                        <input
+                          className={classes}
+                          inputMode="decimal"
+                          value={shown}
+                          disabled={access === 'locked'}
+                          title={lockTitle(lock, access)}
+                          onChange={(event) =>
+                            onCellChange(key, event.target.value, original)
+                          }
+                          aria-label={`${parameter.name} for ${student.fullName}${
+                            lock?.isLocked ? ' (locked)' : ''
+                          }`}
+                          autoComplete="off"
+                        />
+                        {access !== 'open' && (
+                          <span className="lock" aria-hidden="true">
+                            🔒
+                          </span>
+                        )}
+                      </div>
                       {message && <div className="error small">{message}</div>}
                     </td>
                   );

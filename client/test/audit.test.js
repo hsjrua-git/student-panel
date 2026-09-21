@@ -127,3 +127,17 @@ test('describes user updates with several changes', () => {
     'Updated user "teacher1": reactivated'
   );
 });
+
+test('describes locked-score overrides', () => {
+  assert.equal(
+    describeAudit({
+      action: 'scores.save',
+      details: {
+        count: 1,
+        periodNumber: 12,
+        overrideReason: 'Typo corrected after review',
+      },
+    }),
+    'Saved 1 score in Period 12, including locked scores changed with an override: "Typo corrected after review"'
+  );
+});

@@ -378,3 +378,21 @@ table.audit-changes {
 tr.inactive {
   opacity: 0.6;
 }
+.cell-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cell.locked {
+  background: #8882;
+}
+
+.cell:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.lock {
+  font-size: 0.85rem;
+}

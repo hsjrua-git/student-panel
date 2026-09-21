@@ -2,19 +2,26 @@ import { Router } from 'express';
 import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
 import { isUuid } from '../lib/ids.js';
+import {
+  findLockedChanges,
+  lockDaysFor,
+  parseOverrideReason,
+} from '../lib/locks.js';
 import { periodForDate, todayIso } from '../lib/periods.js';
 import {
   MAX_PERIOD,
   isValidPeriodNumber,
   parametersUsedInPeriod,
 } from '../lib/parameterUse.js';
+import { hasAtLeast } from '../lib/roles.js';
 import { findProblems, validateShape } from '../lib/evaluationCheck.js';
 
 const router = Router();
 
 router.get('/evaluations', async (req, res) => {
   const { studentId, parameterId, periodNumber } = req.query;
-  const conditions = ['value IS NOT NULL'];
+  const includeCleared = req.query.includeCleared === '1';
+  const conditions = includeCleared ? [] : ['value IS NOT NULL'];
   const values = [];
 
   if (studentId !== undefined) {
@@ -50,11 +57,13 @@ router.get('/evaluations', async (req, res) => {
   }
 
   const result = await pool.query(
-    `SELECT student_id    AS "studentId",
-            parameter_id  AS "parameterId",
-            period_number AS "periodNumber",
-            value::float8 AS value,
-            updated_at    AS "updatedAt"
+    `SELECT student_id          AS "studentId",
+            parameter_id        AS "parameterId",
+            period_number       AS "periodNumber",
+            value::float8       AS value,
+            updated_at          AS "updatedAt",
+            locks_at            AS "lockedAt",
+            (locks_at <= now()) AS "isLocked"
      FROM evaluations
      WHERE ${conditions.join(' AND ')}
      ORDER BY period_number, student_id, parameter_id
@@ -65,7 +74,11 @@ router.get('/evaluations', async (req, res) => {
 });
 
 router.put('/evaluations/bulk', async (req, res) => {
-  const { periodNumber, entries } = req.body ?? {};
+  const {
+    periodNumber,
+    entries,
+    overrideReason: reasonInput,
+  } = req.body ?? {};
 
   if (!isValidPeriodNumber(periodNumber)) {
     return res.status(400).json({
@@ -133,12 +146,11 @@ router.put('/evaluations/bulk', async (req, res) => {
   const studentsById = new Map(
     studentsResult.rows.map((student) => [student.id, student])
   );
-  const knownStudentIds = new Set(studentsById.keys());
 
   const problems = findProblems({
     entries,
     usedParameters,
-    knownStudentIds,
+    knownStudentIds: new Set(studentsById.keys()),
     periodNumber,
   });
   if (problems.length > 0) {
@@ -148,27 +160,70 @@ router.put('/evaluations/bulk', async (req, res) => {
     });
   }
 
+  const lockDays = lockDaysFor({ periodNumber, currentPeriod: current });
   const changes = [];
+  let overrideReason = null;
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const existing = await client.query(
-      `SELECT student_id   AS "studentId",
-              parameter_id AS "parameterId",
-              value::float8 AS value
+    const existingResult = await client.query(
+      `SELECT student_id          AS "studentId",
+              parameter_id        AS "parameterId",
+              value::float8       AS value,
+              locks_at            AS "lockedAt",
+              (locks_at <= now()) AS "isLocked"
        FROM evaluations
-       WHERE period_number = $1 AND student_id = ANY($2::uuid[])`,
+       WHERE period_number = $1 AND student_id = ANY($2::uuid[])
+       ORDER BY student_id, parameter_id
+       FOR UPDATE`,
       [periodNumber, studentIds]
     );
-    const before = new Map(
-      existing.rows.map((row) => [
+    const existing = new Map(
+      existingResult.rows.map((row) => [
         `${row.studentId}:${row.parameterId}`,
-        row.value,
+        row,
       ])
     );
 
+    const lockedChanges = findLockedChanges({ entries, existing });
+    const overriddenKeys = new Set(
+      lockedChanges.map((item) => `${item.studentId}:${item.parameterId}`)
+    );
+
+    if (lockedChanges.length > 0) {
+      const lockedProblems = (message) =>
+        lockedChanges.map((item) => ({
+          index: item.index,
+          studentId: item.studentId,
+          parameterId: item.parameterId,
+          message,
+        }));
+
+      if (!hasAtLeast(req.user.role, 'admin')) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          error: 'Some scores are locked. Nothing was saved.',
+          code: 'LOCKED',
+          problems: lockedProblems('Locked. Only an administrator can change it.'),
+        });
+      }
+
+      const reason = parseOverrideReason(reasonInput);
+      if (reason.error) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: reason.error,
+          code: 'OVERRIDE_REASON_REQUIRED',
+          problems: lockedProblems('Locked. Changing it needs a written reason.'),
+        });
+      }
+      overrideReason = reason.value;
+    }
+
     for (const entry of entries) {
+      const key = `${entry.studentId}:${entry.parameterId}`;
       const result =
         entry.value === null
           ? await client.query(
@@ -180,12 +235,18 @@ router.put('/evaluations/bulk', async (req, res) => {
             )
           : await client.query(
               `INSERT INTO evaluations
-                 (student_id, parameter_id, period_number, value)
-               VALUES ($1, $2, $3, $4)
+                 (student_id, parameter_id, period_number, value, locks_at)
+               VALUES ($1, $2, $3, $4, now() + make_interval(days => $5))
                ON CONFLICT (student_id, parameter_id, period_number)
                DO UPDATE SET value = EXCLUDED.value, updated_at = now()
                WHERE evaluations.value IS DISTINCT FROM EXCLUDED.value`,
-              [entry.studentId, entry.parameterId, periodNumber, entry.value]
+              [
+                entry.studentId,
+                entry.parameterId,
+                periodNumber,
+                entry.value,
+                lockDays,
+              ]
             );
 
       if (result.rowCount > 0) {
@@ -196,8 +257,9 @@ router.put('/evaluations/bulk', async (req, res) => {
           studentCode: student.studentCode,
           parameterId: entry.parameterId,
           parameter: usedParameters.get(entry.parameterId).name,
-          from: before.get(`${entry.studentId}:${entry.parameterId}`) ?? null,
+          from: existing.get(key)?.value ?? null,
           to: entry.value,
+          override: overriddenKeys.has(key),
         });
       }
     }
@@ -209,7 +271,12 @@ router.put('/evaluations/bulk', async (req, res) => {
         action: 'scores.save',
         entityType: 'period',
         entityId: String(periodNumber),
-        details: { periodNumber, count: changes.length, changes },
+        details: {
+          periodNumber,
+          count: changes.length,
+          changes,
+          ...(overrideReason ? { overrideReason } : {}),
+        },
       });
     }
 

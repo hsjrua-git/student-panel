@@ -6,13 +6,13 @@ import {
   listPeriodParameters,
   saveEvaluations,
 } from '../api/evaluations.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 import EvaluationGrid from '../components/EvaluationGrid.jsx';
+import PeriodParametersPanel from '../components/PeriodParametersPanel.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
-import { buildEntries, cellKey } from '../lib/cells.js';
+import { buildEntries, cellKey, lockedDraftKeys } from '../lib/cells.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { usePeriods } from '../lib/usePeriods.js';
-import PeriodParametersPanel from '../components/PeriodParametersPanel.jsx';
-import { useAuth } from '../auth/AuthContext.jsx';
 
 function EvaluatePage() {
   const queryClient = useQueryClient();
@@ -49,6 +49,16 @@ function EvaluatePage() {
       ),
     [savedQuery.data]
   );
+  const locks = useMemo(
+    () =>
+      Object.fromEntries(
+        (savedQuery.data ?? []).map((item) => [
+          cellKey(item.studentId, item.parameterId),
+          { isLocked: item.isLocked, lockedAt: item.lockedAt },
+        ])
+      ),
+    [savedQuery.data]
+  );
   const parametersById = useMemo(
     () => new Map((parametersQuery.data ?? []).map((p) => [p.id, p])),
     [parametersQuery.data]
@@ -67,6 +77,7 @@ function EvaluatePage() {
   });
 
   const draftCount = Object.keys(drafts).length;
+  const lockedCount = lockedDraftKeys(drafts, locks).length;
   const hasLiveErrors = Object.keys(liveErrors).length > 0;
 
   const serverErrors = Object.fromEntries(
@@ -114,7 +125,18 @@ function EvaluatePage() {
   function handleSave() {
     const { entries, errors } = buildEntries(drafts, parametersById);
     if (Object.keys(errors).length > 0 || entries.length === 0) return;
-    mutation.mutate({ periodNumber, entries });
+
+    let overrideReason;
+    if (lockedCount > 0) {
+      const answer = window.prompt(
+        `${lockedCount} of your changes are to locked scores. ` +
+          'Enter the reason for changing them (5 to 300 characters). ' +
+          'It is recorded in the audit log.'
+      );
+      if (answer === null) return;
+      overrideReason = answer;
+    }
+    mutation.mutate({ periodNumber, entries, overrideReason });
   }
 
   function handleDiscard() {
@@ -138,7 +160,6 @@ function EvaluatePage() {
       </main>
     );
   }
-
   if (periodsQuery.isPending) {
     return (
       <main>
@@ -180,7 +201,9 @@ function EvaluatePage() {
   if (mutation.isPending) {
     saveLabel = 'Saving...';
   } else if (draftCount > 0) {
-    saveLabel = `Save ${draftCount} change${draftCount === 1 ? '' : 's'}`;
+    saveLabel =
+      `Save ${draftCount} change${draftCount === 1 ? '' : 's'}` +
+      (lockedCount > 0 ? ` (${lockedCount} locked)` : '');
   }
 
   return (
@@ -225,6 +248,14 @@ function EvaluatePage() {
         </button>
       </div>
 
+      <p className="hint">
+        A score can be changed for 7 days after it is first saved (1 day if it
+        was entered late). After that it is locked
+        {can('admin')
+          ? ' (🔒). You can still change it, with a written reason.'
+          : ' (🔒) and only an administrator can change it.'}
+      </p>
+
       {hasLiveErrors && (
         <p className="error">Fix the red cells before saving.</p>
       )}
@@ -242,9 +273,11 @@ function EvaluatePage() {
         <EvaluationGrid
           parameters={parametersQuery.data}
           saved={saved}
+          locks={locks}
           drafts={drafts}
           cellErrors={cellErrors}
           onCellChange={handleCellChange}
+          canOverride={can('admin')}
           search={search}
           page={page}
           onPageChange={setPage}

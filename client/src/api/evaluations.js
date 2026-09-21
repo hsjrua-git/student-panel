@@ -6,14 +6,20 @@ export async function listPeriodParameters(periodNumber) {
 }
 
 export async function listEvaluations({ periodNumber }) {
-  const data = await request(`/api/evaluations?periodNumber=${periodNumber}`);
+  const data = await request(
+    `/api/evaluations?periodNumber=${periodNumber}&includeCleared=1`
+  );
   return data.evaluations;
 }
 
-export function saveEvaluations({ periodNumber, entries }) {
+export function saveEvaluations({ periodNumber, entries, overrideReason }) {
   return request('/api/evaluations/bulk', {
     method: 'PUT',
-    body: JSON.stringify({ periodNumber, entries }),
+    body: JSON.stringify({
+      periodNumber,
+      entries,
+      ...(overrideReason ? { overrideReason } : {}),
+    }),
   });
 }
 

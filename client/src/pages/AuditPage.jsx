@@ -19,6 +19,7 @@ function Details({ entry }) {
               <th>Parameter</th>
               <th className="num">From</th>
               <th className="num">To</th>
+              <th>Note</th>
             </tr>
           </thead>
           <tbody>
@@ -30,6 +31,7 @@ function Details({ entry }) {
                 <td>{change.parameter}</td>
                 <td className="num">{change.from ?? '—'}</td>
                 <td className="num">{change.to ?? 'cleared'}</td>
+                <td>{change.override ? 'Locked, overridden' : ''}</td>
               </tr>
             ))}
           </tbody>
