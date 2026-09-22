@@ -13,6 +13,7 @@ import AuditPage from './pages/AuditPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import PreferencesPage from './pages/PreferencesPage.jsx';
 import ResultsPage from './pages/ResultsPage.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
 
 function App() {
   return (
@@ -20,7 +21,8 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/students" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/students" element={<StudentsPage />} />
           <Route path="/students/:id" element={<StudentDetailPage />} />
           <Route path="/evaluate" element={<EvaluatePage />} />

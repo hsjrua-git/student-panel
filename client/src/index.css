@@ -479,3 +479,55 @@ input.invalid {
 .summary-line {
   margin: 1rem 0 0.5rem;
 }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.stat-card {
+  border: 1px solid #8884;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.param-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.param-card {
+  border: 1px solid #8884;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.param-card h3 {
+  margin: 0 0 0.25rem;
+}
+
+.param-card h4 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.unmeasured li {
+  padding: 0.25rem 0;
+  border-top: 1px solid #8883;
+}

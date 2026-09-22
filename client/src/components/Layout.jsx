@@ -10,6 +10,7 @@ function Layout() {
         <nav>
           {!user.mustChangePassword && (
             <>
+              <NavLink to="/dashboard">Dashboard</NavLink>
               <NavLink to="/students">Students</NavLink>
               <NavLink to="/results">Results</NavLink>
               {can('staff') && <NavLink to="/evaluate">Evaluate</NavLink>}

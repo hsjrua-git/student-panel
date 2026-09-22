@@ -14,6 +14,7 @@ import usersRouter from './routes/users.js';
 import preferencesRouter from './routes/preferences.js';
 import resultsRouter from './routes/results.js';
 import savedViewsRouter from './routes/savedViews.js';
+import dashboardRouter from './routes/dashboard.js';
 
 const secret = process.env.SESSION_SECRET;
 if (!secret || secret.length < 32) {
@@ -76,6 +77,7 @@ app.use(
   preferencesRouter
 );
 app.use('/api/results', authorize({ GET: 'viewer' }), resultsRouter);
+app.use('/api/dashboard', authorize({ GET: 'viewer' }), dashboardRouter);
 app.use(
   '/api/saved-views',
   authorize({ GET: 'viewer', POST: 'viewer', PUT: 'viewer', DELETE: 'viewer' }),
