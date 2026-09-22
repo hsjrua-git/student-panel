@@ -12,6 +12,8 @@ import { usePeriods } from '../lib/usePeriods.js';
 import { visibleParameters } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 import ExportButton from '../components/ExportButton.jsx';
+import StudentFieldsSection from '../components/StudentFieldsSection.jsx';
+import StudentGroupsSection from '../components/StudentGroupsSection.jsx';
 import { historyCsvRows } from '../lib/exports.js';
 
 const TABS = [
@@ -149,6 +151,9 @@ function StudentDetailPage() {
           }
         />
       </p>
+
+      <StudentFieldsSection student={student} />
+      <StudentGroupsSection student={student} />
 
       <section>
         <h2>History</h2>

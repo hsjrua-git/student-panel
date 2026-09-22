@@ -8,6 +8,9 @@ export const CATEGORY_OPTIONS = [
   { value: 'parameter_change', label: 'Parameter changes' },
   { value: 'settings', label: 'Settings' },
   { value: 'user', label: 'Users' },
+  { value: 'role', label: 'Roles' },
+  { value: 'group', label: 'Groups' },
+  { value: 'field', label: 'Custom fields' },
   { value: 'auth', label: 'Sign-in and passwords' },
   { value: 'api', label: 'Other changes' },
 ];
@@ -82,6 +85,32 @@ export function describeAudit(entry) {
     }
     case 'user.password_reset':
       return `Reset the password of "${details.username ?? '?'}"`;
+    case 'role.create':
+      return `Created role "${details.name ?? '?'}"`;
+    case 'role.update':
+      return details.renamedFrom
+        ? `Renamed role "${details.renamedFrom}" to "${details.name ?? '?'}"`
+        : `Updated role "${details.name ?? '?'}"`;
+    case 'role.delete':
+      return `Deleted role "${details.name ?? '?'}"`;
+    case 'group.create':
+      return `Created group "${details.name ?? '?'}"`;
+    case 'group.update':
+      return `Updated group "${details.name ?? '?'}"`;
+    case 'group.archive':
+      return `Archived group "${details.name ?? '?'}"`;
+    case 'group.members': {
+      const parts = [];
+      if (details.added) parts.push(`added ${details.added}`);
+      if (details.removed) parts.push(`removed ${details.removed}`);
+      return `Group "${details.name ?? '?'}" members: ${parts.join(', ') || 'no change'}`;
+    }
+    case 'field.create':
+      return `Added custom field "${details.label ?? '?'}"`;
+    case 'field.update':
+      return `Updated custom field "${details.label ?? '?'}"`;
+    case 'field.archive':
+      return `Archived custom field "${details.label ?? '?'}"`;
     case 'student.import': {
       const count = details.count ?? 0;
       const skipped = details.skipped ?? 0;

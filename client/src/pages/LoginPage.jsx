@@ -50,7 +50,11 @@ function LoginPage() {
         <button type="submit" disabled={login.isPending}>
           {login.isPending ? 'Signing in...' : 'Sign in'}
         </button>
-        {login.isError && <p className="error">{login.error.message}</p>}
+        {login.isError && (
+          <p className="error" role="alert">
+            {login.error.message}
+          </p>
+        )}
       </form>
     </main>
   );

@@ -13,10 +13,12 @@ function ParametersPage() {
         A parameter is something you evaluate, like Speed or Rhythm. Which
         parameters each period uses comes from the change history at the
         bottom.
-        {can('admin') ? '' : ' Only administrators can change them.'}
+        {can('parameters.manage')
+          ? ''
+          : ' Only people who can manage parameters can change them.'}
       </p>
 
-      {can('admin') && (
+      {can('parameters.manage') && (
         <section>
           <h2>Add a parameter</h2>
           <ParameterForm />

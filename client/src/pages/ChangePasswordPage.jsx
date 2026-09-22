@@ -78,12 +78,18 @@ function ChangePasswordPage() {
         <button type="submit" disabled={changePassword.isPending}>
           {changePassword.isPending ? 'Saving...' : 'Change password'}
         </button>
-        {problem && <p className="error">{problem}</p>}
+        {problem && (
+          <p className="error" role="alert">
+            {problem}
+          </p>
+        )}
         {changePassword.isError && (
-          <p className="error">{changePassword.error.message}</p>
+          <p className="error" role="alert">
+            {changePassword.error.message}
+          </p>
         )}
         {changePassword.isSuccess && !user.mustChangePassword && (
-          <p className="success">
+          <p className="success" role="status">
             Password changed. Your other sessions were signed out.
           </p>
         )}

@@ -4,6 +4,7 @@ import session from 'express-session';
 import pool from './db/pool.js';
 import { attachUser, authorize, requireLogin } from './middleware/auth.js';
 import { auditRequests } from './middleware/audit.js';
+import { createCsrf } from './middleware/csrf.js';
 import auditRouter from './routes/audit.js';
 import authRouter from './routes/auth.js';
 import evaluationsRouter from './routes/evaluations.js';
@@ -15,8 +16,14 @@ import preferencesRouter from './routes/preferences.js';
 import resultsRouter from './routes/results.js';
 import savedViewsRouter from './routes/savedViews.js';
 import dashboardRouter from './routes/dashboard.js';
+import rolesRouter from './routes/roles.js';
+import groupsRouter from './routes/groups.js';
+import fieldDefinitionsRouter from './routes/fieldDefinitions.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const secret = process.env.SESSION_SECRET;
 if (!secret || secret.length < 32) {
@@ -27,19 +34,103 @@ if (!secret || secret.length < 32) {
   process.exit(1);
 }
 
+// Whether the session cookie carries the Secure flag (only ever sent over
+// HTTPS). Behind a TLS-terminating reverse proxy, 'auto' does the right thing
+// because we trust one proxy hop and read X-Forwarded-Proto. Set
+// SESSION_COOKIE_SECURE=true to force it on (recommended once you always serve
+// over HTTPS — it stops a misconfigured proxy from ever downgrading the cookie
+// to plain HTTP), or =false only for a deliberately HTTP-only LAN box.
+function readCookieSecure() {
+  const raw = (process.env.SESSION_COOKIE_SECURE ?? 'auto').trim().toLowerCase();
+  if (raw === 'auto' || raw === '') return 'auto';
+  if (raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  console.error(
+    `SESSION_COOKIE_SECURE must be 'auto', 'true' or 'false' (got "${raw}").`
+  );
+  process.exit(1);
+}
+const cookieSecure = readCookieSecure();
+
+// Whether to enforce the CSRF Origin/Referer check. It must be OFF in
+// development, where the Vite dev server (a different origin, e.g. :5173)
+// proxies /api here — a legitimately cross-origin request that the check would
+// otherwise reject, blocking login. The double-submit token still runs in every
+// mode, so development keeps CSRF protection either way. Default 'auto' enables
+// it only when NODE_ENV=production; CSRF_CHECK_ORIGIN=true/false forces it.
+function readCheckOrigin() {
+  const raw = (process.env.CSRF_CHECK_ORIGIN ?? 'auto').trim().toLowerCase();
+  if (raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  return process.env.NODE_ENV === 'production';
+}
+const enforceCsrfOrigin = readCheckOrigin();
+
+// How many proxy hops to trust for X-Forwarded-* headers. Default OFF: when the
+// app is exposed directly on the LAN (no proxy), trusting those headers would
+// let any client spoof its IP (polluting the audit log) or claim HTTPS. Set
+// TRUST_PROXY=1 when you put it behind ONE reverse proxy (see the deploy docs);
+// a number is a hop count, 'true'/'false' toggle it, and any other string is
+// passed through to Express (e.g. 'loopback' or a CIDR).
+function readTrustProxy() {
+  const raw = (process.env.TRUST_PROXY ?? '').trim();
+  const lower = raw.toLowerCase();
+  if (lower === '' || lower === 'false' || lower === '0') return false;
+  if (lower === 'true') return true;
+  const hops = Number(raw);
+  if (Number.isInteger(hops) && hops >= 0) return hops;
+  return raw;
+}
+
 const PgSession = connectPgSimple(session);
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+app.set('trust proxy', readTrustProxy());
+// Content-Security-Policy. The built client bundles all of its own JS/CSS —
+// nothing is loaded from a CDN — so scripts can stay strict ('self', no inline,
+// no eval), which is the important defence against injected <script>. Styles
+// allow 'unsafe-inline' because React (and recharts) set element style
+// attributes at runtime, which there is no static way to hash from a prebuilt
+// index.html; this is the standard, low-risk trade-off for a bundled SPA.
+// In development the HTML is served by the Vite dev server, not this process,
+// so these directives only ever apply to the production build served here.
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        fontSrc: ["'self'"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
   })
 );
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+// In production the built React app (client/dist) is served by this same
+// process, so there is only one thing to run. In development you instead run
+// the Vite dev server, which proxies /api here, and this block is skipped.
+const clientDist = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../client/dist'
+);
+const serveClient = fs.existsSync(path.join(clientDist, 'index.html'));
+if (serveClient) {
+  // Hashed asset files can be cached hard; index.html must not be (it points
+  // at the current hashes), so it is sent by the SPA fallback with no cache.
+  app.use(express.static(clientDist, { index: false, maxAge: '1h' }));
+}
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
@@ -56,44 +147,101 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: 'auto',
+      secure: cookieSecure,
       maxAge: 8 * 60 * 60 * 1000,
     },
   })
 );
 app.use('/api', attachUser);
+
+// CSRF: hand out the token cookie to everyone (so it exists before login), and
+// run the Origin check early enough to also cover the login route. The
+// double-submit token check is mounted after requireLogin below, so an
+// unauthenticated mutation still fails as a plain 401.
+const csrf = createCsrf({ secure: cookieSecure, enforceOrigin: enforceCsrfOrigin });
+app.use('/api', csrf.issue);
+app.use('/api', csrf.checkOrigin);
+
 app.use('/api', auditRequests);
 
 app.use('/api/auth', authRouter);
 app.use('/api', requireLogin);
+app.use('/api', csrf.verifyToken);
 
-app.use('/api/students/import', authorize({ POST: 'admin' }));
+app.use('/api/students/import', authorize({ POST: 'data.import' }));
 
 app.use(
   '/api/students',
-  authorize({ GET: 'viewer', POST: 'staff', PATCH: 'staff', DELETE: 'admin' }),
+  authorize({
+    GET: 'students.view',
+    POST: 'students.create',
+    PATCH: 'students.edit',
+    DELETE: 'students.delete',
+  }),
   studentsRouter
 );
-app.use('/api/parameters', authorize({ GET: 'viewer', POST: 'admin', PATCH: 'admin' }));
+app.use(
+  '/api/parameters',
+  authorize({ GET: 'parameters.view', POST: 'parameters.manage', PATCH: 'parameters.manage' })
+);
 app.use(
   '/api/parameter-changes',
-  authorize({ GET: 'viewer', POST: 'admin', DELETE: 'admin' })
+  authorize({ GET: 'parameters.view', POST: 'parameters.manage', DELETE: 'parameters.manage' })
 );
-app.use('/api/periods', authorize({ GET: 'viewer' }));
-app.use('/api/settings', authorize({ GET: 'viewer', PUT: 'admin' }));
-app.use('/api/evaluations', authorize({ GET: 'viewer', PUT: 'staff' }));
-app.use('/api/audit', authorize({ GET: 'admin' }), auditRouter);
-app.use('/api/users', authorize({ GET: 'admin', POST: 'admin', PATCH: 'admin' }), usersRouter);
+// The period calendar and reading settings carry no dedicated key — any
+// signed-in user needs them for the app to function. `true` means just login.
+app.use('/api/periods', authorize({ GET: true }));
+app.use('/api/settings', authorize({ GET: true, PUT: 'settings.manage' }));
+app.use('/api/evaluations', authorize({ GET: 'scores.view', PUT: 'scores.enter' }));
+app.use('/api/audit', authorize({ GET: 'audit.view' }), auditRouter);
+app.use(
+  '/api/users',
+  authorize({ GET: 'users.manage', POST: 'users.manage', PATCH: 'users.manage' }),
+  usersRouter
+);
+// The role list is readable by anyone who can manage users (to assign roles)
+// or manage roles. Writes are gated inside the router by roles.manage.
+app.use(
+  '/api/roles',
+  authorize({
+    GET: true,
+    POST: 'roles.manage',
+    PATCH: 'roles.manage',
+    DELETE: 'roles.manage',
+  }),
+  rolesRouter
+);
+app.use(
+  '/api/groups',
+  authorize({
+    GET: 'students.view',
+    POST: 'groups.manage',
+    PATCH: 'groups.manage',
+    PUT: 'groups.assign',
+    DELETE: 'groups.manage',
+  }),
+  groupsRouter
+);
+app.use(
+  '/api/field-definitions',
+  authorize({
+    GET: 'students.view',
+    POST: 'fields.manage',
+    PATCH: 'fields.manage',
+    DELETE: 'fields.manage',
+  }),
+  fieldDefinitionsRouter
+);
 app.use(
   '/api/preferences',
-  authorize({ GET: 'viewer', PUT: 'viewer', DELETE: 'viewer' }),
+  authorize({ GET: true, PUT: true, DELETE: true }),
   preferencesRouter
 );
-app.use('/api/results', authorize({ GET: 'viewer' }), resultsRouter);
-app.use('/api/dashboard', authorize({ GET: 'viewer' }), dashboardRouter);
+app.use('/api/results', authorize({ GET: 'scores.view' }), resultsRouter);
+app.use('/api/dashboard', authorize({ GET: 'dashboard.view' }), dashboardRouter);
 app.use(
   '/api/saved-views',
-  authorize({ GET: 'viewer', POST: 'viewer', PUT: 'viewer', DELETE: 'viewer' }),
+  authorize({ GET: true, POST: true, PUT: true, DELETE: true }),
   savedViewsRouter
 );
 
@@ -105,6 +253,15 @@ app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
 });
 
+// Anything that is not an API call is a client-side route: hand back the app
+// shell and let React Router take over. Unknown non-GET requests fall through.
+if (serveClient) {
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
+
 app.use((err, req, res, next) => {
   const status = err.status || 500;
   if (status >= 500) console.error(err);
@@ -114,6 +271,10 @@ app.use((err, req, res, next) => {
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+// Bind to all interfaces by default so other machines on the LAN can reach it.
+// Set HOST=127.0.0.1 in .env to keep it to this computer only.
+const host = process.env.HOST || '0.0.0.0';
+app.listen(port, host, () => {
+  const shown = host === '0.0.0.0' ? 'this machine on your network' : host;
+  console.log(`Server running on port ${port} (${shown})`);
 });

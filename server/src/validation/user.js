@@ -1,4 +1,4 @@
-import { ROLES, isRole } from '../lib/roles.js';
+import { isUuid } from '../lib/ids.js';
 
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,32}$/;
 
@@ -28,14 +28,14 @@ export function parseNewUser(body) {
   if (username.error) return { error: username.error };
   const fullName = parseFullName(body?.fullName);
   if (fullName.error) return { error: fullName.error };
-  if (!isRole(body?.role)) {
-    return { error: `Role must be one of: ${ROLES.join(', ')}.` };
+  if (!isUuid(body?.roleId)) {
+    return { error: 'Choose a role.' };
   }
   return {
     values: {
       username: username.value,
       fullName: fullName.value,
-      role: body.role,
+      roleId: body.roleId,
     },
   };
 }
@@ -50,11 +50,11 @@ export function parseUserUpdate(body) {
     if (name.error) return { error: name.error };
     values.fullName = name.value;
   }
-  if ('role' in input) {
-    if (!isRole(input.role)) {
-      return { error: `Role must be one of: ${ROLES.join(', ')}.` };
+  if ('roleId' in input) {
+    if (!isUuid(input.roleId)) {
+      return { error: 'Choose a role.' };
     }
-    values.role = input.role;
+    values.roleId = input.roleId;
   }
   if ('isActive' in input) {
     if (typeof input.isActive !== 'boolean') {

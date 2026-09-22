@@ -1,14 +1,22 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { resetUserPassword, updateUser } from '../api/users.js';
+import { listRoles } from '../api/roles.js';
 import { formatDateTime } from '../lib/format.js';
-import { ROLE_OPTIONS, roleLabel } from '../lib/roleLabels.js';
+import { roleLabel } from '../lib/roleLabels.js';
 
 function UserRow({ user, isSelf, onNotice }) {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState(user.fullName);
-  const [role, setRole] = useState(user.role);
+  const [roleId, setRoleId] = useState(user.roleId);
+
+  const rolesQuery = useQuery({
+    queryKey: ['roles'],
+    queryFn: listRoles,
+    enabled: isEditing,
+  });
+  const roles = rolesQuery.data ?? [];
 
   function refresh() {
     queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -36,7 +44,7 @@ function UserRow({ user, isSelf, onNotice }) {
 
   function startEditing() {
     setFullName(user.fullName);
-    setRole(user.role);
+    setRoleId(user.roleId);
     update.reset();
     setIsEditing(true);
   }
@@ -46,7 +54,7 @@ function UserRow({ user, isSelf, onNotice }) {
     if (fullName.trim().replace(/\s+/g, ' ') !== user.fullName) {
       fields.fullName = fullName;
     }
-    if (role !== user.role) fields.role = role;
+    if (roleId !== user.roleId) fields.roleId = roleId;
 
     if (Object.keys(fields).length === 0) {
       setIsEditing(false);
@@ -94,14 +102,18 @@ function UserRow({ user, isSelf, onNotice }) {
       <td>
         {isEditing ? (
           <select
-            value={role}
-            onChange={(event) => setRole(event.target.value)}
+            value={roleId}
+            onChange={(event) => setRoleId(event.target.value)}
             disabled={isSelf}
             aria-label={`Role of ${user.username}`}
           >
-            {ROLE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            {/* Keep the current role visible even before the list loads. */}
+            {roles.length === 0 && (
+              <option value={user.roleId}>{user.role}</option>
+            )}
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
               </option>
             ))}
           </select>

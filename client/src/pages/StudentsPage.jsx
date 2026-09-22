@@ -1,18 +1,37 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { fetchAllStudents } from '../api/students.js';
+import { listStudents } from '../api/students.js';
+import { listFieldDefinitions } from '../api/fields.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ExportButton from '../components/ExportButton.jsx';
+import GroupFilter from '../components/GroupFilter.jsx';
 import StudentForm from '../components/StudentForm.jsx';
 import StudentsTable from '../components/StudentsTable.jsx';
 import { studentsCsvRows } from '../lib/exports.js';
 import { toIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 
+// Pull every student on the current filter, for CSV export.
+async function fetchFilteredStudents(groupId) {
+  const all = [];
+  for (let page = 1; page <= 50; page++) {
+    const data = await listStudents({
+      page,
+      pageSize: 100,
+      sort: 'name',
+      groupId: groupId || null,
+    });
+    all.push(...data.students);
+    if (all.length >= data.total || data.students.length === 0) break;
+  }
+  return all;
+}
+
 function StudentsPage() {
   const { can } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [page, setPage] = useState(1);
+  const [groupId, setGroupId] = useState('');
   const search = useDebouncedValue(searchText.trim(), 300);
 
   function handleSearchChange(event) {
@@ -20,16 +39,25 @@ function StudentsPage() {
     setPage(1);
   }
 
+  function handleGroupChange(value) {
+    setGroupId(value);
+    setPage(1);
+  }
+
   return (
     <main>
       <h1>Students</h1>
-      {can('staff') && (
+      {can('students.create') && (
         <section>
           <h2>Add a student</h2>
           <StudentForm />
-          <p>
-            <Link to="/students/import">Import many students from a CSV file…</Link>
-          </p>
+          {can('data.import') && (
+            <p>
+              <Link to="/students/import">
+                Import many students from a CSV file…
+              </Link>
+            </p>
+          )}
         </section>
       )}
       <section>
@@ -43,13 +71,25 @@ function StudentsPage() {
             placeholder="Search by name or code"
             aria-label="Search students"
           />
+          <GroupFilter value={groupId} onChange={handleGroupChange} />
           <ExportButton
-            label="Export all students (CSV)"
+            label="Export students (CSV)"
             filename={`students-${toIsoDate(new Date())}.csv`}
-            buildRows={async () => studentsCsvRows(await fetchAllStudents())}
+            buildRows={async () => {
+              const [students, fields] = await Promise.all([
+                fetchFilteredStudents(groupId),
+                listFieldDefinitions(),
+              ]);
+              return studentsCsvRows(students, fields);
+            }}
           />
         </div>
-        <StudentsTable search={search} page={page} onPageChange={setPage} />
+        <StudentsTable
+          search={search}
+          page={page}
+          onPageChange={setPage}
+          groupId={groupId || null}
+        />
       </section>
     </main>
   );

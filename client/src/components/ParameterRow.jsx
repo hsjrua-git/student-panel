@@ -123,7 +123,7 @@ function ParameterRow({ parameter }) {
       <td>{parameter.name}</td>
       <td>{parameter.unit ?? '—'}</td>
       <td>{formatRange(parameter)}</td>
-      {can('admin') && (
+      {can('parameters.manage') && (
         <td className="actions">
           <button type="button" onClick={startEditing}>
             Edit

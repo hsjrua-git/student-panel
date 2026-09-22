@@ -26,7 +26,7 @@ function ParametersTable() {
             <th>Name</th>
             <th>Unit</th>
             <th>Range</th>
-            {can('admin') && <th>Actions</th>}
+            {can('parameters.manage') && <th>Actions</th>}
           </tr>
         </thead>
         <tbody>

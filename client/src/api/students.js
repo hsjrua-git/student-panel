@@ -5,6 +5,7 @@ export function listStudents({
   page = 1,
   pageSize = 25,
   sort = 'newest',
+  groupId = null,
 } = {}) {
   const params = new URLSearchParams({
     page: String(page),
@@ -12,13 +13,15 @@ export function listStudents({
     sort,
   });
   if (search) params.set('search', search);
+  if (groupId) params.set('groupId', groupId);
   return request(`/api/students?${params}`);
 }
 
-export function createStudent(fullName) {
+export function createStudent(fullName, extra) {
+  const body = extra ? { fullName, extra } : { fullName };
   return request('/api/students', {
     method: 'POST',
-    body: JSON.stringify({ fullName }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -26,6 +29,14 @@ export function renameStudent(id, fullName) {
   return request(`/api/students/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ fullName }),
+  });
+}
+
+// Update arbitrary student fields (full name and/or custom fields in `extra`).
+export function updateStudent(id, fields) {
+  return request(`/api/students/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
   });
 }
 

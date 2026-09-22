@@ -10,6 +10,9 @@ const CATEGORIES = [
   'settings',
   'scores',
   'user',
+  'role',
+  'group',
+  'field',
   'auth',
   'api',
 ];

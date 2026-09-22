@@ -1,15 +1,33 @@
 import { buildHistory, visibleRows } from './history.js';
 import { changeOf } from './resultsView.js';
 
-export function studentsCsvRows(students) {
-  return [
-    ['Student code', 'Full name', 'Added (UTC date)'],
-    ...students.map((student) => [
+// A custom-field value as it should read in a CSV cell.
+function fieldCsvValue(definition, raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  if (definition.fieldType === 'yes_no') {
+    if (raw === true) return 'Yes';
+    if (raw === false) return 'No';
+    return null;
+  }
+  return raw;
+}
+
+export function studentsCsvRows(students, fields = []) {
+  const header = ['Student code', 'Full name', 'Added (UTC date)'];
+  for (const field of fields) header.push(field.label);
+
+  const body = students.map((student) => {
+    const cells = [
       student.studentCode,
       student.fullName,
       student.createdAt.slice(0, 10),
-    ]),
-  ];
+    ];
+    for (const field of fields) {
+      cells.push(fieldCsvValue(field, student.extra?.[field.id]));
+    }
+    return cells;
+  });
+  return [header, ...body];
 }
 
 export function createdStudentsCsvRows(created) {

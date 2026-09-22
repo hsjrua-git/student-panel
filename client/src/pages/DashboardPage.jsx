@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { getTrends } from '../api/dashboard.js';
 import { getResults } from '../api/results.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import GroupFilter from '../components/GroupFilter.jsx';
 import HeadlineCards from '../components/HeadlineCards.jsx';
 import ParameterCard from '../components/ParameterCard.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
@@ -22,16 +23,17 @@ function DashboardPage() {
   const periodsQuery = usePeriods();
   const periods = periodsQuery.data;
   const [chosen, setChosen] = useState(null);
+  const [groupId, setGroupId] = useState('');
   const periodNumber = chosen ?? periods?.current ?? null;
 
   const resultsQuery = useQuery({
-    queryKey: ['results', periodNumber],
-    queryFn: () => getResults(periodNumber),
+    queryKey: ['results', periodNumber, groupId],
+    queryFn: () => getResults(periodNumber, groupId || null),
     enabled: periodNumber !== null,
   });
   const trendsQuery = useQuery({
-    queryKey: ['trends'],
-    queryFn: getTrends,
+    queryKey: ['trends', groupId],
+    queryFn: () => getTrends(groupId || null),
   });
 
   const results = resultsQuery.data;
@@ -60,7 +62,7 @@ function DashboardPage() {
     return (
       <main>
         <h1>Dashboard</h1>
-        {can('admin') ? (
+        {can('settings.manage') ? (
           <p>
             Set the period start date first, on the{' '}
             <Link to="/settings">Settings</Link> page.
@@ -88,12 +90,15 @@ function DashboardPage() {
     <main className="wide">
       <h1>Dashboard</h1>
 
-      <PeriodPicker
-        periods={periods}
-        value={periodNumber}
-        onChange={setChosen}
-      />
-      {can('staff') && periodNumber === periods.current && (
+      <div className="toolbar">
+        <PeriodPicker
+          periods={periods}
+          value={periodNumber}
+          onChange={setChosen}
+        />
+        <GroupFilter value={groupId} onChange={setGroupId} />
+      </div>
+      {can('scores.enter') && periodNumber === periods.current && (
         <p>
           <Link to="/evaluate">Enter scores for this period</Link>
         </p>

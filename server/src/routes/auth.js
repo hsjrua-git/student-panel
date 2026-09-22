@@ -7,7 +7,7 @@ import {
   validateNewPassword,
   verifyPassword,
 } from '../lib/passwords.js';
-import { USER_COLUMNS } from '../lib/users.js';
+import { USER_COLUMNS, attachPermissions } from '../lib/users.js';
 import { requireLogin } from '../middleware/auth.js';
 
 const router = Router();
@@ -69,6 +69,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   ]);
 
   const { passwordHash, ...user } = found;
+  await attachPermissions(user);
   res.json({ user });
 });
 

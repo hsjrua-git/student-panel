@@ -7,6 +7,8 @@ import {
 } from '../lib/parameterUse.js';
 import { periodDates, periodForDate, todayIso } from '../lib/periods.js';
 import { MAX_RESULT_STUDENTS, buildResults } from '../lib/results.js';
+import { descendantGroupIds } from '../lib/groups.js';
+import { isUuid } from '../lib/ids.js';
 
 const router = Router();
 
@@ -19,6 +21,20 @@ router.get('/', async (req, res) => {
     });
   }
   const periodNumber = Number(raw);
+
+  const { groupId } = req.query;
+  if (groupId !== undefined && !isUuid(groupId)) {
+    return res.status(400).json({ error: 'groupId must be a valid ID.' });
+  }
+  // Build an optional "student belongs to this group tree" SQL condition.
+  let groupFilter = '';
+  const groupValues = [];
+  if (groupId !== undefined) {
+    const groupIds = await descendantGroupIds(pool, groupId);
+    groupValues.push(groupIds);
+    groupFilter = ` AND id IN (SELECT student_id FROM student_group_members
+                    WHERE group_id = ANY($1::uuid[]))`;
+  }
 
   const anchorResult = await pool.query(
     'SELECT value FROM settings WHERE key = $1',
@@ -64,13 +80,15 @@ router.get('/', async (req, res) => {
               full_name    AS "fullName",
               student_code AS "studentCode"
        FROM students
-       WHERE deleted_at IS NULL
+       WHERE deleted_at IS NULL${groupFilter}
        ORDER BY lower(full_name), id
-       LIMIT $1`,
-      [MAX_RESULT_STUDENTS]
+       LIMIT $${groupValues.length + 1}`,
+      [...groupValues, MAX_RESULT_STUDENTS]
     ),
     pool.query(
-      'SELECT count(*)::int AS total FROM students WHERE deleted_at IS NULL'
+      `SELECT count(*)::int AS total FROM students
+       WHERE deleted_at IS NULL${groupFilter}`,
+      groupValues
     ),
     pool.query(
       `SELECT student_id    AS "studentId",

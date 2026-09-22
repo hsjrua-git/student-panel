@@ -74,6 +74,15 @@ function CellView({ cell, info, canOverride }) {
       </div>
     );
   }
+  // Blind-entry role: the server redacts the existing value, so we can only
+  // show what is about to be written, not a before → after diff.
+  if (info.status === 'save') {
+    return (
+      <div>
+        <strong>{info.to}</strong> <span className="chg">save</span>
+      </div>
+    );
+  }
   return (
     <div className={canOverride ? undefined : 'error'}>
       🔒 {info.from ?? '—'} → <strong>{info.to}</strong>
@@ -128,7 +137,7 @@ function ImportScoresPage() {
   const studentsQuery = useQuery({
     queryKey: ['students-all'],
     queryFn: fetchAllStudents,
-    enabled: can('staff'),
+    enabled: can('scores.enter'),
   });
 
   const check = useMutation({ mutationFn: saveEvaluations });
@@ -253,7 +262,7 @@ function ImportScoresPage() {
     run.reset();
   }
 
-  const canOverride = can('admin');
+  const canOverride = can('scores.override');
   const plan = preview
     ? planImport({ built: preview.built, server: preview.server, canOverride })
     : null;
@@ -291,11 +300,11 @@ function ImportScoresPage() {
     );
   }
 
-  if (!can('staff')) {
+  if (!can('scores.enter')) {
     return (
       <main>
         <h1>Import scores</h1>
-        <p>Only staff and administrators can import scores.</p>
+        <p>You do not have permission to import scores.</p>
       </main>
     );
   }
@@ -398,11 +407,22 @@ function ImportScoresPage() {
             </p>
           )}
 
-          <input type="file" accept=".csv,.txt,text/csv" onChange={handleFile} />
-          {parseError && <p className="error">{parseError}</p>}
+          <input
+            type="file"
+            accept=".csv,.txt,text/csv"
+            aria-label="Choose a CSV file of scores to import"
+            onChange={handleFile}
+          />
+          {parseError && (
+            <p className="error" role="alert">
+              {parseError}
+            </p>
+          )}
           {rows.length > 0 && studentsQuery.isPending && <p>Loading students...</p>}
           {studentsQuery.isError && (
-            <p className="error">{studentsQuery.error.message}</p>
+            <p className="error" role="alert">
+              {studentsQuery.error.message}
+            </p>
           )}
 
           {rows.length > 0 && (
@@ -547,7 +567,11 @@ function ImportScoresPage() {
               >
                 {check.isPending ? 'Checking...' : 'Check file'}
               </button>
-              {check.isError && <p className="error">{check.error.message}</p>}
+              {check.isError && (
+                <p className="error" role="alert">
+                  {check.error.message}
+                </p>
+              )}
             </>
           )}
         </>
@@ -566,9 +590,16 @@ function ImportScoresPage() {
           </h2>
           <p className="summary-line">
             <strong>{plan.send.length} will be saved</strong>
-            {' '}({server.counts.new} new, {server.counts.change} changed
-            {plan.lockedOverride > 0 && `, ${plan.lockedOverride} locked`}) ·{' '}
-            {plan.unchanged} already the same · {plan.problemCount} problems
+            {server.redacted ? (
+              plan.lockedOverride > 0 ? ` (${plan.lockedOverride} locked)` : ''
+            ) : (
+              <>
+                {' '}({server.counts.new} new, {server.counts.change} changed
+                {plan.lockedOverride > 0 && `, ${plan.lockedOverride} locked`})
+                {' '}· {plan.unchanged} already the same
+              </>
+            )}
+            {' '}· {plan.problemCount} problems
           </p>
 
           {plan.problemCount > 0 && (
@@ -663,7 +694,9 @@ function ImportScoresPage() {
           </div>
           {run.isError && (
             <>
-              <p className="error">{run.error.message}</p>
+              <p className="error" role="alert">
+                {run.error.message}
+              </p>
               <p className="hint">
                 Something changed since the check. Go back and check the file
                 again to see the current state.
@@ -675,7 +708,7 @@ function ImportScoresPage() {
 
       {stage === 'done' && done && (
         <>
-          <p className="success">
+          <p className="success" role="status">
             Saved. {done.changed} score{done.changed === 1 ? '' : 's'} changed
             {done.unchanged > 0 && `, ${done.unchanged} already the same`}
             {done.skipped > 0 &&

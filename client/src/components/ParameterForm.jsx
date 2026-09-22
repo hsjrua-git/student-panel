@@ -120,10 +120,18 @@ function ParameterForm() {
         {mutation.isPending ? 'Adding...' : 'Add parameter'}
       </button>
 
-      {problem && <p className="error">{problem}</p>}
-      {mutation.isError && <p className="error">{mutation.error.message}</p>}
+      {problem && (
+        <p className="error" role="alert">
+          {problem}
+        </p>
+      )}
+      {mutation.isError && (
+        <p className="error" role="alert">
+          {mutation.error.message}
+        </p>
+      )}
       {mutation.isSuccess && (
-        <p className="success">
+        <p className="success" role="status">
           Added {mutation.data.name}, used from Period{' '}
           {mutation.variables.startPeriod} on.
         </p>

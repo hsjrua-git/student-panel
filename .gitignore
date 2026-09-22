@@ -1,2 +1,28 @@
+# Dependencies
 node_modules/
+
+# Secrets / local env (keep the example)
 .env
+.env.*
+!.env.example
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Stray root stubs — the real manifests live in client/ and server/
+/package.json
+/package-lock.json
+
+# Scratch / working notes (not part of the project)
+/project.txt
+/to send.txt

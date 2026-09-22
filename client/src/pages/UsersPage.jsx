@@ -13,14 +13,14 @@ function UsersPage() {
   const query = useQuery({
     queryKey: ['users'],
     queryFn: listUsers,
-    enabled: can('admin'),
+    enabled: can('users.manage'),
   });
 
-  if (!can('admin')) {
+  if (!can('users.manage')) {
     return (
       <main>
         <h1>Users</h1>
-        <p>Only administrators can manage users.</p>
+        <p>You do not have permission to manage users.</p>
       </main>
     );
   }

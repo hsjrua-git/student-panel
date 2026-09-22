@@ -53,7 +53,55 @@ test('counts summarise the preview', () => {
     change: 1,
     unchanged: 1,
     locked: 1,
+    save: 0,
     problems: 2,
+  });
+});
+
+test('a blind-entry preview redacts existing values and never reveals them', () => {
+  // scores.enter without scores.view: canViewScores is false.
+  const cells = previewCells({
+    entries: [
+      entry('s1', 8), // s1 has 7 → would be a change
+      entry('s1', 7), // equals existing → would be unchanged
+      entry('s2', 6), // s2 is locked
+      entry('s3', 4), // s3 is empty → would be new
+    ],
+    existing,
+    problemIndexes: new Set(),
+    canViewScores: false,
+  });
+
+  // Every non-locked cell collapses to the neutral 'save'; locked stays locked.
+  assert.deepEqual(
+    cells.map((cell) => cell.status),
+    ['save', 'save', 'locked', 'save']
+  );
+  // The existing value is never sent back, for any cell.
+  assert.ok(cells.every((cell) => cell.from === null));
+  // Not even the lock timestamp leaks (it would hint a value exists).
+  assert.ok(cells.every((cell) => !('lockedAt' in cell)));
+  // The typed value the user is about to write is still echoed for confirmation.
+  assert.deepEqual(
+    cells.map((cell) => cell.to),
+    [8, 7, 6, 4]
+  );
+});
+
+test('redacted counts bucket writes under save, not new/change/unchanged', () => {
+  const cells = previewCells({
+    entries: [entry('s1', 8), entry('s3', 4), entry('s2', 6)],
+    existing,
+    problemIndexes: new Set(),
+    canViewScores: false,
+  });
+  assert.deepEqual(previewCounts(cells, []), {
+    new: 0,
+    change: 0,
+    unchanged: 0,
+    locked: 1,
+    save: 2,
+    problems: 0,
   });
 });
 

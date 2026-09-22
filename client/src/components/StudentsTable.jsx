@@ -5,15 +5,15 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 import StudentRow from './StudentRow.jsx';
 
-function StudentsTable({ search, page, onPageChange }) {
+function StudentsTable({ search, page, onPageChange, groupId = null }) {
   const { can } = useAuth();
   const { preferences } = usePreferences();
   const pageSize = preferences.studentsPageSize;
   const sort = preferences.studentsSort;
 
   const { data, isPending, isError, error, isPlaceholderData } = useQuery({
-    queryKey: ['students', { search, page, pageSize, sort }],
-    queryFn: () => listStudents({ search, page, pageSize, sort }),
+    queryKey: ['students', { search, page, pageSize, sort, groupId }],
+    queryFn: () => listStudents({ search, page, pageSize, sort, groupId }),
     placeholderData: keepPreviousData,
   });
 
@@ -45,7 +45,9 @@ function StudentsTable({ search, page, onPageChange }) {
             {preferences.studentsShowCode && <th>Code</th>}
             <th>Full name</th>
             {preferences.studentsShowAdded && <th>Added</th>}
-            {can('staff') && <th>Actions</th>}
+            {(can('students.edit') || can('students.delete')) && (
+              <th>Actions</th>
+            )}
           </tr>
         </thead>
         <tbody>

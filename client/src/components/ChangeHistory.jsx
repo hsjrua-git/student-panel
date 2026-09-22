@@ -30,7 +30,7 @@ function ChangeRow({ change }) {
       <td>{change.parameterName}</td>
       <td>{describeChange(change)}</td>
       <td>{formatDateTime(change.createdAt)}</td>
-      {can('admin') && (
+      {can('parameters.manage') && (
         <td className="actions">
           <button type="button" onClick={handleUndo} disabled={undo.isPending}>
             {undo.isPending ? 'Undoing...' : 'Undo'}
@@ -67,7 +67,7 @@ function ChangeHistory() {
             <th>Parameter</th>
             <th>Change</th>
             <th>Recorded</th>
-            {can('admin') && <th>Actions</th>}
+            {can('parameters.manage') && <th>Actions</th>}
           </tr>
         </thead>
         <tbody>

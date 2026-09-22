@@ -1,20 +1,29 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createUser } from '../api/users.js';
-import { ROLE_OPTIONS } from '../lib/roleLabels.js';
+import { listRoles } from '../api/roles.js';
 
 function UserForm({ onNotice }) {
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState('staff');
+  const [roleId, setRoleId] = useState('');
+
+  const rolesQuery = useQuery({ queryKey: ['roles'], queryFn: listRoles });
+  const roles = rolesQuery.data ?? [];
+
+  // The effective selection is the user's explicit pick, or — until they touch
+  // the dropdown — the first role in the list. Deriving it during render (rather
+  // than defaulting via an effect) avoids an extra render pass and the
+  // set-state-in-effect anti-pattern.
+  const selectedRoleId = roleId || roles[0]?.id || '';
 
   const mutation = useMutation({
     mutationFn: createUser,
     onSuccess: (data) => {
       setUsername('');
       setFullName('');
-      setRole('staff');
+      setRoleId('');
       onNotice({
         kind: 'created',
         username: data.user.username,
@@ -26,7 +35,7 @@ function UserForm({ onNotice }) {
 
   function handleSubmit(event) {
     event.preventDefault();
-    mutation.mutate({ username, fullName, role });
+    mutation.mutate({ username, fullName, roleId: selectedRoleId });
   }
 
   return (
@@ -53,19 +62,26 @@ function UserForm({ onNotice }) {
         </label>
         <label>
           Role
-          <select value={role} onChange={(event) => setRole(event.target.value)}>
-            {ROLE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+          <select
+            value={selectedRoleId}
+            onChange={(event) => setRoleId(event.target.value)}
+          >
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
               </option>
             ))}
           </select>
         </label>
       </div>
-      <button type="submit" disabled={mutation.isPending}>
+      <button type="submit" disabled={mutation.isPending || selectedRoleId === ''}>
         {mutation.isPending ? 'Creating...' : 'Create account'}
       </button>
-      {mutation.isError && <p className="error">{mutation.error.message}</p>}
+      {mutation.isError && (
+        <p className="error" role="alert">
+          {mutation.error.message}
+        </p>
+      )}
     </form>
   );
 }

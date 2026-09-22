@@ -13,8 +13,12 @@ import {
   isValidPeriodNumber,
   parametersUsedInPeriod,
 } from '../lib/parameterUse.js';
-import { hasAtLeast } from '../lib/roles.js';
-import { findProblems, validateShape } from '../lib/evaluationCheck.js';
+import { userCan } from '../middleware/auth.js';
+import {
+  findProblems,
+  normalizeComment,
+  validateShape,
+} from '../lib/evaluationCheck.js';
 import { previewCells, previewCounts } from '../lib/scorePreview.js';
 
 const router = Router();
@@ -22,7 +26,9 @@ const router = Router();
 router.get('/evaluations', async (req, res) => {
   const { studentId, parameterId, periodNumber } = req.query;
   const includeCleared = req.query.includeCleared === '1';
-  const conditions = includeCleared ? [] : ['value IS NOT NULL'];
+  const conditions = includeCleared
+    ? []
+    : ['(value IS NOT NULL OR comment IS NOT NULL)'];
   const values = [];
 
   if (studentId !== undefined) {
@@ -62,6 +68,7 @@ router.get('/evaluations', async (req, res) => {
             parameter_id        AS "parameterId",
             period_number       AS "periodNumber",
             value::float8       AS value,
+            comment,
             updated_at          AS "updatedAt",
             locks_at            AS "lockedAt",
             (locks_at <= now()) AS "isLocked"
@@ -97,6 +104,10 @@ router.put('/evaluations/bulk', async (req, res) => {
   const shapeError = validateShape(entries);
   if (shapeError) {
     return res.status(400).json({ error: shapeError });
+  }
+  // Normalise any notes now so every later comparison uses the clean value.
+  for (const entry of entries) {
+    if ('comment' in entry) entry.comment = normalizeComment(entry.comment);
   }
 
   const anchorResult = await pool.query(
@@ -168,6 +179,7 @@ router.put('/evaluations/bulk', async (req, res) => {
       `SELECT student_id          AS "studentId",
               parameter_id        AS "parameterId",
               value::float8       AS value,
+              comment,
               locks_at            AS "lockedAt",
               (locks_at <= now()) AS "isLocked"
        FROM evaluations
@@ -180,10 +192,15 @@ router.put('/evaluations/bulk', async (req, res) => {
         row,
       ])
     );
+    // A blind-entry role (scores.enter but not scores.view) gets a redacted
+    // preview: it may confirm what it is about to write, but never reads the
+    // existing scores back. See previewCells + lib/permissions.js.
+    const canViewScores = userCan(req, 'scores.view');
     const cells = previewCells({
       entries,
       existing: existingMap,
       problemIndexes: new Set(problems.map((problem) => problem.index)),
+      canViewScores,
     });
     return res.json({
       dryRun: true,
@@ -191,6 +208,7 @@ router.put('/evaluations/bulk', async (req, res) => {
       cells,
       problems,
       counts: previewCounts(cells, problems),
+      ...(canViewScores ? {} : { redacted: true }),
     });
   }
 
@@ -213,6 +231,7 @@ router.put('/evaluations/bulk', async (req, res) => {
       `SELECT student_id          AS "studentId",
               parameter_id        AS "parameterId",
               value::float8       AS value,
+              comment,
               locks_at            AS "lockedAt",
               (locks_at <= now()) AS "isLocked"
        FROM evaluations
@@ -242,7 +261,7 @@ router.put('/evaluations/bulk', async (req, res) => {
           message,
         }));
 
-      if (!hasAtLeast(req.user.role, 'admin')) {
+      if (!userCan(req, 'scores.override')) {
         await client.query('ROLLBACK');
         return res.status(409).json({
           error: 'Some scores are locked. Nothing was saved.',
@@ -265,41 +284,57 @@ router.put('/evaluations/bulk', async (req, res) => {
 
     for (const entry of entries) {
       const key = `${entry.studentId}:${entry.parameterId}`;
-      const result =
-        entry.value === null
-          ? await client.query(
-              `UPDATE evaluations
-               SET value = NULL, updated_at = now()
-               WHERE student_id = $1 AND parameter_id = $2
-                 AND period_number = $3 AND value IS NOT NULL`,
-              [entry.studentId, entry.parameterId, periodNumber]
-            )
-          : await client.query(
-              `INSERT INTO evaluations
-                 (student_id, parameter_id, period_number, value, locks_at)
-               VALUES ($1, $2, $3, $4, now() + make_interval(days => $5))
-               ON CONFLICT (student_id, parameter_id, period_number)
-               DO UPDATE SET value = EXCLUDED.value, updated_at = now()
-               WHERE evaluations.value IS DISTINCT FROM EXCLUDED.value`,
-              [
-                entry.studentId,
-                entry.parameterId,
-                periodNumber,
-                entry.value,
-                lockDays,
-              ]
-            );
+      const row = existing.get(key);
+      const hasComment = 'comment' in entry;
+      const newValue = entry.value ?? null;
+      // If the entry does not carry a note, leave the existing note untouched.
+      const newComment = hasComment ? (entry.comment ?? null) : row?.comment ?? null;
+      const hasContent = newValue !== null || newComment !== null;
+
+      const result = !hasContent
+        ? await client.query(
+            `UPDATE evaluations
+             SET value = NULL, comment = NULL, updated_at = now()
+             WHERE student_id = $1 AND parameter_id = $2
+               AND period_number = $3
+               AND (value IS NOT NULL OR comment IS NOT NULL)`,
+            [entry.studentId, entry.parameterId, periodNumber]
+          )
+        : await client.query(
+            `INSERT INTO evaluations
+               (student_id, parameter_id, period_number, value, comment, locks_at)
+             VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6))
+             ON CONFLICT (student_id, parameter_id, period_number)
+             DO UPDATE SET value = EXCLUDED.value,
+                           comment = EXCLUDED.comment,
+                           updated_at = now()
+             WHERE evaluations.value IS DISTINCT FROM EXCLUDED.value
+                OR evaluations.comment IS DISTINCT FROM EXCLUDED.comment`,
+            [
+              entry.studentId,
+              entry.parameterId,
+              periodNumber,
+              newValue,
+              newComment,
+              lockDays,
+            ]
+          );
 
       if (result.rowCount > 0) {
         const student = studentsById.get(entry.studentId);
+        const fromValue = row?.value ?? null;
+        const fromComment = row?.comment ?? null;
         changes.push({
           studentId: entry.studentId,
           student: student.fullName,
           studentCode: student.studentCode,
           parameterId: entry.parameterId,
           parameter: usedParameters.get(entry.parameterId).name,
-          from: existing.get(key)?.value ?? null,
-          to: entry.value,
+          from: fromValue,
+          to: newValue,
+          ...(fromComment !== newComment
+            ? { note: { from: fromComment, to: newComment } }
+            : {}),
           override: overriddenKeys.has(key),
         });
       }

@@ -69,9 +69,21 @@ function AnchorForm({ savedAnchor }) {
           {mutation.isPending ? 'Saving...' : 'Save'}
         </button>
       </div>
-      {problem && <p className="error">{problem}</p>}
-      {mutation.isError && <p className="error">{mutation.error.message}</p>}
-      {mutation.isSuccess && <p className="success">Saved.</p>}
+      {problem && (
+        <p className="error" role="alert">
+          {problem}
+        </p>
+      )}
+      {mutation.isError && (
+        <p className="error" role="alert">
+          {mutation.error.message}
+        </p>
+      )}
+      {mutation.isSuccess && (
+        <p className="success" role="status">
+          Saved.
+        </p>
+      )}
     </form>
   );
 }
@@ -93,7 +105,9 @@ function SettingsPage() {
         {isPending && <p>Loading...</p>}
         {isError && <p className="error">{error.message}</p>}
         {data && <PeriodSummary data={data} />}
-        {data && can('admin') && <AnchorForm savedAnchor={data.anchorDate} />}
+        {data && can('settings.manage') && (
+          <AnchorForm savedAnchor={data.anchorDate} />
+        )}
         <p className="hint">
           The start date can only be changed until the first score is saved,
           because changing it would move every saved score to a different week.

@@ -7,9 +7,9 @@ import {
   QueryClient,
   QueryClientProvider,
 } from '@tanstack/react-query';
-import { AuthProvider } from './auth/AuthContext.jsx';
+import { AuthProvider } from './auth/AuthProvider.jsx';
 import { applyRememberedTheme } from './lib/theme.js';
-import { PreferencesProvider } from './preferences/PreferencesContext.jsx';
+import { PreferencesProvider } from './preferences/PreferencesProvider.jsx';
 import './index.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -27,6 +27,16 @@ const queryClient = new QueryClient({
   mutationCache: new MutationCache({ onError: signOutOn401 }),
   defaultOptions: {
     queries: {
+      // Treat fetched data as fresh for 30s. Without this, react-query's default
+      // staleTime of 0 refetches on every component mount and every window
+      // refocus — a lot of needless traffic for data that changes slowly. After
+      // a mutation we still invalidate the affected keys explicitly, so edits
+      // show up immediately regardless of staleTime.
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      // A tab-switch shouldn't re-hit the server for data that is still fresh;
+      // staleTime already gates this, and explicit invalidation covers writes.
+      refetchOnWindowFocus: false,
       retry: (failureCount, error) =>
         error?.status === undefined && failureCount < 1,
     },
@@ -37,13 +47,13 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <PreferencesProvider>
-            <App />
-          </PreferencesProvider>
-        </AuthProvider>
-      </BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>
+            <PreferencesProvider>
+              <App />
+            </PreferencesProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </ErrorBoundary>
     </QueryClientProvider>
   </StrictMode>

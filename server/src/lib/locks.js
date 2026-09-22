@@ -12,7 +12,13 @@ export function findLockedChanges({ entries, existing }) {
   entries.forEach((entry, index) => {
     const row = existing.get(`${entry.studentId}:${entry.parameterId}`);
     if (!row || !row.isLocked) return;
-    if (entry.value === row.value) return;
+    const valueChanged = entry.value !== row.value;
+    // Only weigh the note if the entry actually carries one (CSV import does
+    // not touch notes, so it must not look like a note was cleared).
+    const commentChanged =
+      'comment' in entry &&
+      (entry.comment ?? null) !== (row.comment ?? null);
+    if (!valueChanged && !commentChanged) return;
     locked.push({
       index,
       studentId: entry.studentId,

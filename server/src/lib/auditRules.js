@@ -22,6 +22,9 @@ const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/preferences$/,
   /^\/api\/saved-views(\/|$)/,
   /^\/api\/students\/import$/,
+  /^\/api\/roles(\/|$)/,
+  /^\/api\/groups(\/|$)/,
+  /^\/api\/field-definitions(\/|$)/,
 ];
 
 export function normalisePath(url) {

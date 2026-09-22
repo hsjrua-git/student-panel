@@ -1,20 +1,36 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createStudent } from '../api/students.js';
+import { listFieldDefinitions } from '../api/fields.js';
 import { formatStudentCode } from '../lib/format.js';
+import StudentFieldInputs from './StudentFieldInputs.jsx';
+import { cleanExtra } from '../lib/studentFields.js';
 
 function StudentForm() {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState('');
+  const [fieldValues, setFieldValues] = useState({});
   const [problem, setProblem] = useState(null);
 
+  const fieldsQuery = useQuery({
+    queryKey: ['field-definitions'],
+    queryFn: () => listFieldDefinitions(),
+  });
+  const definitions = fieldsQuery.data ?? [];
+
   const mutation = useMutation({
-    mutationFn: createStudent,
+    mutationFn: ({ name, extra }) => createStudent(name, extra),
     onSuccess: () => {
       setFullName('');
+      setFieldValues({});
       queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
+
+  function handleFieldChange(id, value) {
+    if (!mutation.isIdle) mutation.reset();
+    setFieldValues((current) => ({ ...current, [id]: value }));
+  }
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -25,7 +41,8 @@ function StudentForm() {
       return;
     }
     setProblem(null);
-    mutation.mutate(name);
+    const extra = cleanExtra(definitions, fieldValues);
+    mutation.mutate({ name, extra: Object.keys(extra).length ? extra : undefined });
   }
 
   return (
@@ -45,10 +62,26 @@ function StudentForm() {
         </button>
       </div>
 
-      {problem && <p className="error">{problem}</p>}
-      {mutation.isError && <p className="error">{mutation.error.message}</p>}
+      <StudentFieldInputs
+        definitions={definitions}
+        values={fieldValues}
+        onChange={handleFieldChange}
+        disabled={mutation.isPending}
+        idPrefix="new-student"
+      />
+
+      {problem && (
+        <p className="error" role="alert">
+          {problem}
+        </p>
+      )}
+      {mutation.isError && (
+        <p className="error" role="alert">
+          {mutation.error.message}
+        </p>
+      )}
       {mutation.isSuccess && (
-        <p className="success">
+        <p className="success" role="status">
           Added {mutation.data.fullName} with code{' '}
           <strong>{formatStudentCode(mutation.data.studentCode)}</strong>
         </p>

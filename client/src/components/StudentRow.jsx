@@ -80,12 +80,14 @@ function StudentRow({ student }) {
       {preferences.studentsShowAdded && (
         <td>{formatDateTime(student.createdAt)}</td>
       )}
-      {can('staff') && (
+      {(can('students.edit') || can('students.delete')) && (
         <td className="actions">
-          <button type="button" onClick={startEditing} disabled={isEditing}>
-            Rename
-          </button>
-          {can('admin') && (
+          {can('students.edit') && (
+            <button type="button" onClick={startEditing} disabled={isEditing}>
+              Rename
+            </button>
+          )}
+          {can('students.delete') && (
             <button
               type="button"
               onClick={handleDelete}

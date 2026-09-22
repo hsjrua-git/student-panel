@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import {
@@ -8,9 +8,15 @@ import {
 } from '../api/evaluations.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EvaluationGrid from '../components/EvaluationGrid.jsx';
+import GroupFilter from '../components/GroupFilter.jsx';
 import PeriodParametersPanel from '../components/PeriodParametersPanel.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
-import { buildEntries, cellKey, lockedDraftKeys } from '../lib/cells.js';
+import {
+  buildEntries,
+  buildSavePayload,
+  cellKey,
+  lockedDraftKeys,
+} from '../lib/cells.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { usePeriods } from '../lib/usePeriods.js';
 
@@ -22,8 +28,10 @@ function EvaluatePage() {
 
   const [chosenPeriod, setChosenPeriod] = useState(null);
   const [drafts, setDrafts] = useState({});
+  const [noteDrafts, setNoteDrafts] = useState({});
   const [searchText, setSearchText] = useState('');
   const [page, setPage] = useState(1);
+  const [groupId, setGroupId] = useState('');
   const search = useDebouncedValue(searchText.trim(), 300);
 
   const periodNumber = chosenPeriod ?? periods?.current ?? null;
@@ -46,6 +54,18 @@ function EvaluatePage() {
           cellKey(item.studentId, item.parameterId),
           item.value,
         ])
+      ),
+    [savedQuery.data]
+  );
+  const savedNotes = useMemo(
+    () =>
+      Object.fromEntries(
+        (savedQuery.data ?? [])
+          .filter((item) => item.comment != null)
+          .map((item) => [
+            cellKey(item.studentId, item.parameterId),
+            item.comment,
+          ])
       ),
     [savedQuery.data]
   );
@@ -73,11 +93,23 @@ function EvaluatePage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
       setDrafts({});
+      setNoteDrafts({});
     },
   });
+  // Read the mutation through a ref so the cell/note change handlers can stay
+  // referentially stable (see useCallback below); the memoized EvaluationRow
+  // relies on those callbacks not changing identity between keystrokes. The ref
+  // is synced in an effect (not during render) to satisfy the rules of refs.
+  const mutationRef = useRef(mutation);
+  useEffect(() => {
+    mutationRef.current = mutation;
+  }, [mutation]);
 
-  const draftCount = Object.keys(drafts).length;
-  const lockedCount = lockedDraftKeys(drafts, locks).length;
+  const draftCount = new Set([
+    ...Object.keys(drafts),
+    ...Object.keys(noteDrafts),
+  ]).size;
+  const lockedCount = lockedDraftKeys(drafts, noteDrafts, locks).length;
   const hasLiveErrors = Object.keys(liveErrors).length > 0;
 
   const serverErrors = Object.fromEntries(
@@ -97,8 +129,8 @@ function EvaluatePage() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [draftCount]);
 
-  function handleCellChange(key, text, original) {
-    if (!mutation.isIdle) mutation.reset();
+  const handleCellChange = useCallback((key, text, original) => {
+    if (!mutationRef.current.isIdle) mutationRef.current.reset();
     setDrafts((current) => {
       const next = { ...current };
       if (text.trim() === original) {
@@ -108,7 +140,20 @@ function EvaluatePage() {
       }
       return next;
     });
-  }
+  }, []);
+
+  const handleNoteChange = useCallback((key, text, originalNote) => {
+    if (!mutationRef.current.isIdle) mutationRef.current.reset();
+    setNoteDrafts((current) => {
+      const next = { ...current };
+      if (text === originalNote) {
+        delete next[key];
+      } else {
+        next[key] = text;
+      }
+      return next;
+    });
+  }, []);
 
   function handlePeriodChange(next) {
     if (
@@ -119,11 +164,17 @@ function EvaluatePage() {
     }
     setChosenPeriod(next);
     setDrafts({});
+    setNoteDrafts({});
     mutation.reset();
   }
 
   function handleSave() {
-    const { entries, errors } = buildEntries(drafts, parametersById);
+    const { entries, errors } = buildSavePayload({
+      drafts,
+      noteDrafts,
+      savedValues: saved,
+      parametersById,
+    });
     if (Object.keys(errors).length > 0 || entries.length === 0) return;
 
     let overrideReason;
@@ -141,6 +192,7 @@ function EvaluatePage() {
 
   function handleDiscard() {
     setDrafts({});
+    setNoteDrafts({});
     mutation.reset();
   }
 
@@ -149,7 +201,12 @@ function EvaluatePage() {
     setPage(1);
   }
 
-  if (!can('staff')) {
+  function handleGroupChange(value) {
+    setGroupId(value);
+    setPage(1);
+  }
+
+  if (!can('scores.enter')) {
     return (
       <main>
         <h1>Evaluate</h1>
@@ -220,7 +277,7 @@ function EvaluatePage() {
         onChange={handlePeriodChange}
       />
 
-      {can('admin') && (
+      {can('parameters.manage') && (
         <PeriodParametersPanel
           periodNumber={periodNumber}
           disabled={draftCount > 0}
@@ -236,6 +293,7 @@ function EvaluatePage() {
           placeholder="Search students by name or code"
           aria-label="Search students"
         />
+        <GroupFilter value={groupId} onChange={handleGroupChange} />
         <button
           type="button"
           onClick={handleSave}
@@ -255,17 +313,23 @@ function EvaluatePage() {
       <p className="hint">
         A score can be changed for 7 days after it is first saved (1 day if it
         was entered late). After that it is locked
-        {can('admin')
+        {can('scores.override')
           ? ' (🔒). You can still change it, with a written reason.'
-          : ' (🔒) and only an administrator can change it.'}
+          : ' (🔒) and only someone who can override locks can change it.'}
       </p>
 
       {hasLiveErrors && (
-        <p className="error">Fix the red cells before saving.</p>
+        <p className="error" role="alert">
+          Fix the red cells before saving.
+        </p>
       )}
-      {mutation.isError && <p className="error">{mutation.error.message}</p>}
+      {mutation.isError && (
+        <p className="error" role="alert">
+          {mutation.error.message}
+        </p>
+      )}
       {mutation.isSuccess && (
-        <p className="success">
+        <p className="success" role="status">
           Saved. {mutation.data.changed} value
           {mutation.data.changed === 1 ? '' : 's'} changed.
         </p>
@@ -277,14 +341,18 @@ function EvaluatePage() {
         <EvaluationGrid
           parameters={parametersQuery.data}
           saved={saved}
+          savedNotes={savedNotes}
           locks={locks}
           drafts={drafts}
+          noteDrafts={noteDrafts}
           cellErrors={cellErrors}
           onCellChange={handleCellChange}
-          canOverride={can('admin')}
+          onNoteChange={handleNoteChange}
+          canOverride={can('scores.override')}
           search={search}
           page={page}
           onPageChange={setPage}
+          groupId={groupId || null}
         />
       )}
     </main>

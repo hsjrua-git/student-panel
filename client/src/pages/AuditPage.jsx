@@ -56,14 +56,14 @@ function AuditPage() {
     queryKey: ['audit', { category, actor, page }],
     queryFn: () => listAudit({ category, actor, page }),
     placeholderData: keepPreviousData,
-    enabled: can('admin'),
+    enabled: can('audit.view'),
   });
 
-  if (!can('admin')) {
+  if (!can('audit.view')) {
     return (
       <main>
         <h1>Audit log</h1>
-        <p>Only administrators can see the audit log.</p>
+        <p>You do not have permission to see the audit log.</p>
       </main>
     );
   }

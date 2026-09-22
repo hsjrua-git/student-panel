@@ -1,5 +1,7 @@
 import { request } from './http.js';
 
-export function getResults(periodNumber) {
-  return request(`/api/results?periodNumber=${periodNumber}`);
+export function getResults(periodNumber, groupId = null) {
+  const params = new URLSearchParams({ periodNumber: String(periodNumber) });
+  if (groupId) params.set('groupId', groupId);
+  return request(`/api/results?${params}`);
 }

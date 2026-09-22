@@ -43,12 +43,22 @@ function PreferencesPage() {
     status = <span>Saving...</span>;
   } else if (update.isError) {
     status = (
-      <span className="error">Could not save: {update.error.message}</span>
+      <span className="error" role="alert">
+        Could not save: {update.error.message}
+      </span>
     );
   } else if (reset.isError) {
-    status = <span className="error">Could not reset: {reset.error.message}</span>;
+    status = (
+      <span className="error" role="alert">
+        Could not reset: {reset.error.message}
+      </span>
+    );
   } else if (update.isSuccess || reset.isSuccess) {
-    status = <span className="success">Saved.</span>;
+    status = (
+      <span className="success" role="status">
+        Saved.
+      </span>
+    );
   }
 
   return (

@@ -10,6 +10,7 @@ import {
 } from '../api/savedViews.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import FilterEditor from '../components/FilterEditor.jsx';
+import GroupFilter from '../components/GroupFilter.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
 import ResultsTable from '../components/ResultsTable.jsx';
 import SavedViewsBar from '../components/SavedViewsBar.jsx';
@@ -38,6 +39,7 @@ function ResultsPage() {
 
   const [config, setConfig] = useState(() => withFilterKeys(defaultConfig()));
   const [activeView, setActiveView] = useState(null);
+  const [groupId, setGroupId] = useState('');
 
   const current = periods?.current ?? null;
   let periodNumber = current;
@@ -51,8 +53,8 @@ function ResultsPage() {
   }
 
   const resultsQuery = useQuery({
-    queryKey: ['results', periodNumber],
-    queryFn: () => getResults(periodNumber),
+    queryKey: ['results', periodNumber, groupId],
+    queryFn: () => getResults(periodNumber, groupId || null),
     enabled: periodNumber !== null,
   });
   const viewsQuery = useQuery({
@@ -194,7 +196,7 @@ function ResultsPage() {
     return (
       <main>
         <h1>Results</h1>
-        {can('admin') ? (
+        {can('settings.manage') ? (
           <p>
             Set the period start date first, on the{' '}
             <Link to="/settings">Settings</Link> page.
@@ -227,11 +229,14 @@ function ResultsPage() {
         a named view.
       </p>
 
-      <PeriodPicker
-        periods={periods}
-        value={periodNumber}
-        onChange={handlePeriodChange}
-      />
+      <div className="toolbar">
+        <PeriodPicker
+          periods={periods}
+          value={periodNumber}
+          onChange={handlePeriodChange}
+        />
+        <GroupFilter value={groupId} onChange={setGroupId} />
+      </div>
 
       <SavedViewsBar
         views={viewsQuery.data ?? EMPTY}

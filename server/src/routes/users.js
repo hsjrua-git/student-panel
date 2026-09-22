@@ -10,6 +10,12 @@ import { parseNewUser, parseUserUpdate } from '../validation/user.js';
 const router = Router();
 const UNIQUE_VIOLATION = '23505';
 
+// Permissions that must never vanish from every active account at once.
+const GUARDED_PERMISSIONS = [
+  { key: 'users.manage', label: 'manage users' },
+  { key: 'roles.manage', label: 'manage roles' },
+];
+
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
     return res.status(404).json({ error: 'User not found.' });
@@ -26,6 +32,31 @@ router.get('/', async (req, res) => {
   res.json({ users: result.rows });
 });
 
+async function roleExists(db, roleId) {
+  const result = await db.query('SELECT 1 FROM roles WHERE id = $1', [roleId]);
+  return result.rowCount > 0;
+}
+
+async function roleHasPermission(db, roleId, key) {
+  const result = await db.query(
+    'SELECT 1 FROM role_permissions WHERE role_id = $1 AND permission_key = $2',
+    [roleId, key]
+  );
+  return result.rowCount > 0;
+}
+
+async function countOtherActiveWithPermission(db, key, excludeUserId) {
+  const result = await db.query(
+    `SELECT count(*)::int AS count
+     FROM users u
+     JOIN role_permissions rp
+       ON rp.role_id = u.role_id AND rp.permission_key = $1
+     WHERE u.is_active AND u.id <> $2`,
+    [key, excludeUserId]
+  );
+  return result.rows[0].count;
+}
+
 router.post('/', async (req, res) => {
   const parsed = parseNewUser(req.body);
   if (parsed.error) {
@@ -36,6 +67,10 @@ router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    if (!(await roleExists(client, parsed.values.roleId))) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'That role no longer exists.' });
+    }
     const user = await createUser({
       ...parsed.values,
       password: temporaryPassword,
@@ -76,8 +111,9 @@ router.patch('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Lock every active account so the guard counts below are consistent.
     await client.query(
-      `SELECT id FROM users WHERE role = 'admin' AND is_active ORDER BY id FOR UPDATE`
+      `SELECT id FROM users WHERE is_active ORDER BY id FOR UPDATE`
     );
 
     const targetResult = await client.query(
@@ -90,14 +126,31 @@ router.patch('/:id', async (req, res) => {
     }
     const target = targetResult.rows[0];
 
-    const counted = await client.query(
-      `SELECT count(*)::int AS count FROM users WHERE role = 'admin' AND is_active`
-    );
+    if (parsed.values.roleId && !(await roleExists(client, parsed.values.roleId))) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'That role no longer exists.' });
+    }
+
+    const newRoleId = parsed.values.roleId ?? target.roleId;
+    const guards = [];
+    for (const guard of GUARDED_PERMISSIONS) {
+      guards.push({
+        key: guard.key,
+        label: guard.label,
+        othersActiveWithKey: await countOtherActiveWithPermission(
+          client,
+          guard.key,
+          target.id
+        ),
+        newRoleHasKey: await roleHasPermission(client, newRoleId, guard.key),
+      });
+    }
+
     const problem = checkUserChange({
       actorId: req.user.id,
       target,
       changes: parsed.values,
-      activeAdminCount: counted.rows[0].count,
+      guards,
     });
     if (problem) {
       await client.query('ROLLBACK');
@@ -106,7 +159,7 @@ router.patch('/:id', async (req, res) => {
 
     const columns = {
       fullName: 'full_name',
-      role: 'role',
+      roleId: 'role_id',
       isActive: 'is_active',
     };
     const entries = Object.entries(parsed.values);
@@ -125,10 +178,14 @@ router.patch('/:id', async (req, res) => {
     const user = updated.rows[0];
 
     const changes = {};
-    for (const key of Object.keys(parsed.values)) {
-      if (target[key] !== user[key]) {
-        changes[key] = { from: target[key], to: user[key] };
-      }
+    if ('fullName' in parsed.values && target.fullName !== user.fullName) {
+      changes.fullName = { from: target.fullName, to: user.fullName };
+    }
+    if ('roleId' in parsed.values && target.roleId !== user.roleId) {
+      changes.role = { from: target.role, to: user.role };
+    }
+    if ('isActive' in parsed.values && target.isActive !== user.isActive) {
+      changes.isActive = { from: target.isActive, to: user.isActive };
     }
 
     if (Object.keys(changes).length > 0) {

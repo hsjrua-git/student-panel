@@ -158,11 +158,11 @@ function ImportStudentsPage() {
     );
   }
 
-  if (!can('staff')) {
+  if (!can('data.import')) {
     return (
       <main>
         <h1>Import students</h1>
-        <p>Only staff and administrators can import students.</p>
+        <p>You do not have permission to import students.</p>
       </main>
     );
   }
@@ -184,8 +184,17 @@ function ImportStudentsPage() {
             Excel or LibreOffice, use "Save as" and pick CSV (UTF-8). Students
             get a random code when they are added.
           </p>
-          <input type="file" accept=".csv,.txt,text/csv" onChange={handleFile} />
-          {parseError && <p className="error">{parseError}</p>}
+          <input
+            type="file"
+            accept=".csv,.txt,text/csv"
+            aria-label="Choose a CSV file of student names to import"
+            onChange={handleFile}
+          />
+          {parseError && (
+            <p className="error" role="alert">
+              {parseError}
+            </p>
+          )}
 
           {rows.length > 0 && (
             <>
@@ -263,7 +272,11 @@ function ImportStudentsPage() {
               >
                 {check.isPending ? 'Checking...' : 'Check file'}
               </button>
-              {check.isError && <p className="error">{check.error.message}</p>}
+              {check.isError && (
+                <p className="error" role="alert">
+                  {check.error.message}
+                </p>
+              )}
             </>
           )}
         </>
@@ -331,14 +344,22 @@ function ImportStudentsPage() {
               Choose another file
             </button>
           </div>
-          {check.isError && <p className="error">{check.error.message}</p>}
-          {run.isError && <p className="error">{run.error.message}</p>}
+          {check.isError && (
+            <p className="error" role="alert">
+              {check.error.message}
+            </p>
+          )}
+          {run.isError && (
+            <p className="error" role="alert">
+              {run.error.message}
+            </p>
+          )}
         </>
       )}
 
       {stage === 'done' && done && (
         <>
-          <p className="success">
+          <p className="success" role="status">
             Added {done.created.length} student
             {done.created.length === 1 ? '' : 's'}
             {done.counts.skipped > 0 &&
