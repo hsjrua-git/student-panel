@@ -200,6 +200,27 @@ function PreferencesPage() {
       </section>
 
       <section>
+        <h2>Spreadsheet export</h2>
+        <div className="pref-group">
+          <label className="inline">
+            Separator between columns
+            <select
+              value={preferences.csvDelimiter}
+              onChange={(event) => change({ csvDelimiter: event.target.value })}
+            >
+              <option value=",">Comma ( , )</option>
+              <option value=";">Semicolon ( ; )</option>
+            </select>
+          </label>
+        </div>
+        <p className="hint">
+          If your spreadsheet opens an export with everything in one column,
+          switch to the other separator. Programs set up for regions that
+          write decimals with commas usually expect semicolons.
+        </p>
+      </section>
+
+      <section>
         <button type="button" onClick={handleReset} disabled={reset.isPending}>
           Reset all to defaults
         </button>

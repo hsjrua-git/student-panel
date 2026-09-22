@@ -531,3 +531,6 @@ input.invalid {
   padding: 0.25rem 0;
   border-top: 1px solid #8883;
 }
+tr.bad td {
+  color: #d33;
+}

@@ -92,3 +92,11 @@ test('saving personal settings is not written to the audit log', () => {
   assert.equal(classifyRequest('PUT', '/api/preferences', 200), null);
   assert.equal(classifyRequest('DELETE', '/api/preferences', 200), null);
 });
+test('the spreadsheet separator is a comma or a semicolon', () => {
+  assert.deepEqual(parsePreferencesUpdate({ csvDelimiter: ';' }), {
+    values: { csvDelimiter: ';' },
+  });
+  assert.ok(parsePreferencesUpdate({ csvDelimiter: '|' }).error);
+  assert.ok(parsePreferencesUpdate({ csvDelimiter: 5 }).error);
+  assert.equal(mergePreferences({}).csvDelimiter, ',');
+});

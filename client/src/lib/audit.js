@@ -78,6 +78,14 @@ export function describeAudit(entry) {
     }
     case 'user.password_reset':
       return `Reset the password of "${details.username ?? '?'}"`;
+    case 'student.import': {
+      const count = details.count ?? 0;
+      const skipped = details.skipped ?? 0;
+      const base = `Imported ${count} student${count === 1 ? '' : 's'} from a file`;
+      return skipped > 0
+        ? `${base} (${skipped} row${skipped === 1 ? '' : 's'} skipped)`
+        : base;
+    }
     default:
       return entry.action;
   }

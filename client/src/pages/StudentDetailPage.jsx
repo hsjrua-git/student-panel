@@ -11,6 +11,8 @@ import { formatStudentCode } from '../lib/format.js';
 import { usePeriods } from '../lib/usePeriods.js';
 import { visibleParameters } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
+import ExportButton from '../components/ExportButton.jsx';
+import { historyCsvRows } from '../lib/exports.js';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -133,6 +135,20 @@ function StudentDetailPage() {
       {backLink}
       <h1>{student.fullName}</h1>
       <p className="hint code">Code {formatStudentCode(student.studentCode)}</p>
+      <p>
+        <ExportButton
+          label="Export history (CSV)"
+          filename={`history-${student.studentCode}.csv`}
+          disabled={!periods.anchorDate || periods.current === null}
+          buildRows={() =>
+            historyCsvRows({
+              evaluations,
+              periods: periods.periods,
+              parameters,
+            })
+          }
+        />
+      </p>
 
       <section>
         <h2>History</h2>

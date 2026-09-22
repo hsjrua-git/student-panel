@@ -2,6 +2,13 @@ import { Router } from 'express';
 import pool from '../db/pool.js';
 import { generateStudentCode } from '../lib/studentCode.js';
 import { normalizeFullName } from '../validation/student.js';
+import { recordAudit } from '../lib/audit.js';
+import {
+  classifyImportRows,
+  importCounts,
+  nameKey,
+  validateImportBody,
+} from '../lib/studentImport.js';
 
 const router = Router();
 
@@ -168,6 +175,90 @@ router.get('/:id', async (req, res) => {
     return res.status(404).json({ error: 'Student not found.' });
   }
   res.json(result.rows[0]);
+});
+router.post('/import', async (req, res) => {
+  const parsed = validateImportBody(req.body);
+  if (parsed.error) {
+    return res.status(400).json({ error: parsed.error });
+  }
+  const { rows, allowDuplicateNames, dryRun } = parsed;
+
+  const existingResult = await pool.query(
+    `SELECT full_name    AS "fullName",
+            student_code AS "studentCode"
+     FROM students
+     WHERE deleted_at IS NULL`
+  );
+  const existing = new Map();
+  for (const student of existingResult.rows) {
+    const key = nameKey(student.fullName);
+    if (!existing.has(key)) existing.set(key, student.studentCode);
+  }
+
+  const classified = classifyImportRows({ rows, existing, allowDuplicateNames });
+  const counts = importCounts(classified);
+
+  if (dryRun) {
+    return res.json({ dryRun: true, rows: classified, counts });
+  }
+  if (counts.willImport === 0) {
+    return res.status(400).json({
+      error: 'There are no rows to import.',
+      rows: classified,
+      counts,
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const created = [];
+    for (const item of classified) {
+      if (!item.willImport) continue;
+
+      let student = null;
+      for (let attempt = 1; attempt <= 5 && student === null; attempt++) {
+        const inserted = await client.query(
+          `INSERT INTO students (student_code, full_name)
+           VALUES ($1, $2)
+           ON CONFLICT (student_code) DO NOTHING
+           RETURNING ${STUDENT_COLUMNS}`,
+          [generateStudentCode(), item.fullName]
+        );
+        student = inserted.rows[0] ?? null;
+      }
+      if (student === null) {
+        throw new Error('Could not create a unique student code.');
+      }
+      created.push({ row: item.row, ...student });
+    }
+
+    await recordAudit(client, {
+      userId: req.user.id,
+      actor: req.user.username,
+      action: 'student.import',
+      entityType: 'student',
+      details: {
+        count: created.length,
+        skipped: classified.length - created.length,
+        allowDuplicateNames,
+        students: created.slice(0, 50).map((student) => ({
+          fullName: student.fullName,
+          studentCode: student.studentCode,
+        })),
+        moreStudents: Math.max(0, created.length - 50),
+      },
+    });
+
+    await client.query('COMMIT');
+    res.status(201).json({ dryRun: false, created, rows: classified, counts });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 });
 
 export default router;

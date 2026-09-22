@@ -7,4 +7,5 @@ export const DEFAULT_PREFERENCES = {
   studentDefaultTab: 'overview',
   studentShowAllPeriods: false,
   hiddenParameterIds: [],
+  csvDelimiter: ',',
 };

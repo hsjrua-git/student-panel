@@ -36,3 +36,19 @@ export function deleteStudent(id) {
 export function getStudent(id) {
   return request(`/api/students/${id}`);
 }
+export async function fetchAllStudents() {
+  const all = [];
+  for (let page = 1; page <= 50; page++) {
+    const data = await listStudents({ page, pageSize: 100, sort: 'name' });
+    all.push(...data.students);
+    if (all.length >= data.total || data.students.length === 0) break;
+  }
+  return all;
+}
+
+export function importStudents({ rows, allowDuplicateNames, dryRun }) {
+  return request('/api/students/import', {
+    method: 'POST',
+    body: JSON.stringify({ rows, allowDuplicateNames, dryRun }),
+  });
+}

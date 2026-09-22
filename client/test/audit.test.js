@@ -141,3 +141,13 @@ test('describes locked-score overrides', () => {
     'Saved 1 score in Period 12, including locked scores changed with an override: "Typo corrected after review"'
   );
 });
+test('describes student imports', () => {
+  assert.equal(
+    describeAudit({ action: 'student.import', details: { count: 12, skipped: 0 } }),
+    'Imported 12 students from a file'
+  );
+  assert.equal(
+    describeAudit({ action: 'student.import', details: { count: 1, skipped: 3 } }),
+    'Imported 1 student from a file (3 rows skipped)'
+  );
+});
