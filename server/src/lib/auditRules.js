@@ -20,6 +20,7 @@ const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/evaluations\/bulk$/,
   /^\/api\/users(\/|$)/,
   /^\/api\/preferences$/,
+  /^\/api\/saved-views(\/|$)/,
 ];
 
 export function normalisePath(url) {

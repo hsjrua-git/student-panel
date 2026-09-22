@@ -11,6 +11,7 @@ function Layout() {
           {!user.mustChangePassword && (
             <>
               <NavLink to="/students">Students</NavLink>
+              <NavLink to="/results">Results</NavLink>
               {can('staff') && <NavLink to="/evaluate">Evaluate</NavLink>}
               <NavLink to="/parameters">Parameters</NavLink>
               <NavLink to="/settings">Settings</NavLink>

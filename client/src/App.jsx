@@ -12,6 +12,7 @@ import StudentsPage from './pages/StudentsPage.jsx';
 import AuditPage from './pages/AuditPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import PreferencesPage from './pages/PreferencesPage.jsx';
+import ResultsPage from './pages/ResultsPage.jsx';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/students/:id" element={<StudentDetailPage />} />
           <Route path="/evaluate" element={<EvaluatePage />} />
           <Route path="/parameters" element={<ParametersPage />} />
+          <Route path="/results" element={<ResultsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/preferences" element={<PreferencesPage />} />
           <Route path="/settings" element={<SettingsPage />} />

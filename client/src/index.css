@@ -421,3 +421,61 @@ tr.inactive {
 .status-line {
   min-height: 1.5rem;
 }
+.views-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.filter-row input[type='number'] {
+  width: 6rem;
+  flex: none;
+}
+
+input.invalid {
+  outline: 2px solid #d33;
+}
+
+.columns-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.results-table th button.sort {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+.results-table tfoot th,
+.results-table tfoot td {
+  font-size: 0.85rem;
+  border-top: 2px solid #8886;
+}
+
+.chg {
+  font-size: 0.8rem;
+  margin-left: 0.35rem;
+  opacity: 0.75;
+}
+
+.summary-line {
+  margin: 1rem 0 0.5rem;
+}
