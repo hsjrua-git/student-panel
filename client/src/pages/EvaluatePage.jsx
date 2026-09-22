@@ -210,6 +210,10 @@ function EvaluatePage() {
     <main className="wide">
       <h1>Evaluate</h1>
 
+      <p>
+        <Link to="/evaluate/import">Import scores from a CSV file…</Link>
+      </p>
+      
       <PeriodPicker
         periods={periods}
         value={periodNumber}

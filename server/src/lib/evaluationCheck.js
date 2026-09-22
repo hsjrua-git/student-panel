@@ -1,6 +1,6 @@
 import { isUuid } from './ids.js';
 
-export const MAX_ENTRIES = 2000;
+export const MAX_ENTRIES = 5000;
 const MAX_ABS_VALUE = 1_000_000_000;
 
 export function validateShape(entries) {

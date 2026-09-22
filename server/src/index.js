@@ -28,7 +28,7 @@ if (!secret || secret.length < 32) {
 const PgSession = connectPgSimple(session);
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });

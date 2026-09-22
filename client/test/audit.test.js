@@ -151,3 +151,19 @@ test('describes student imports', () => {
     'Imported 1 student from a file (3 rows skipped)'
   );
 });
+test('describes score imports', () => {
+  assert.equal(
+    describeAudit({
+      action: 'scores.save',
+      details: { count: 24, periodNumber: 12, source: 'import' },
+    }),
+    'Imported 24 scores from a file into Period 12'
+  );
+  assert.equal(
+    describeAudit({
+      action: 'scores.save',
+      details: { count: 1, periodNumber: 3, source: 'import' },
+    }),
+    'Imported 1 score from a file into Period 3'
+  );
+});

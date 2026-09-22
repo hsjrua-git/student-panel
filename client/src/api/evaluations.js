@@ -12,13 +12,21 @@ export async function listEvaluations({ periodNumber }) {
   return data.evaluations;
 }
 
-export function saveEvaluations({ periodNumber, entries, overrideReason }) {
+export function saveEvaluations({
+  periodNumber,
+  entries,
+  overrideReason,
+  dryRun,
+  source,
+}) {
   return request('/api/evaluations/bulk', {
     method: 'PUT',
     body: JSON.stringify({
       periodNumber,
       entries,
       ...(overrideReason ? { overrideReason } : {}),
+      ...(dryRun ? { dryRun: true } : {}),
+      ...(source ? { source } : {}),
     }),
   });
 }

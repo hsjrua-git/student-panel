@@ -15,6 +15,7 @@ import {
 } from '../lib/parameterUse.js';
 import { hasAtLeast } from '../lib/roles.js';
 import { findProblems, validateShape } from '../lib/evaluationCheck.js';
+import { previewCells, previewCounts } from '../lib/scorePreview.js';
 
 const router = Router();
 
@@ -78,8 +79,16 @@ router.put('/evaluations/bulk', async (req, res) => {
     periodNumber,
     entries,
     overrideReason: reasonInput,
+    dryRun = false,
+    source,
   } = req.body ?? {};
 
+  if (typeof dryRun !== 'boolean') {
+    return res.status(400).json({ error: 'dryRun must be true or false.' });
+  }
+  if (source !== undefined && source !== 'import') {
+    return res.status(400).json({ error: 'Unknown source.' });
+  }
   if (!isValidPeriodNumber(periodNumber)) {
     return res.status(400).json({
       error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
@@ -153,6 +162,38 @@ router.put('/evaluations/bulk', async (req, res) => {
     knownStudentIds: new Set(studentsById.keys()),
     periodNumber,
   });
+
+  if (dryRun) {
+    const existingResult = await pool.query(
+      `SELECT student_id          AS "studentId",
+              parameter_id        AS "parameterId",
+              value::float8       AS value,
+              locks_at            AS "lockedAt",
+              (locks_at <= now()) AS "isLocked"
+       FROM evaluations
+       WHERE period_number = $1 AND student_id = ANY($2::uuid[])`,
+      [periodNumber, studentIds]
+    );
+    const existingMap = new Map(
+      existingResult.rows.map((row) => [
+        `${row.studentId}:${row.parameterId}`,
+        row,
+      ])
+    );
+    const cells = previewCells({
+      entries,
+      existing: existingMap,
+      problemIndexes: new Set(problems.map((problem) => problem.index)),
+    });
+    return res.json({
+      dryRun: true,
+      periodNumber,
+      cells,
+      problems,
+      counts: previewCounts(cells, problems),
+    });
+  }
+
   if (problems.length > 0) {
     return res.status(400).json({
       error: 'Some entries are invalid. Nothing was saved.',
@@ -275,6 +316,7 @@ router.put('/evaluations/bulk', async (req, res) => {
           periodNumber,
           count: changes.length,
           changes,
+          ...(source === 'import' ? { source: 'import' } : {}),
           ...(overrideReason ? { overrideReason } : {}),
         },
       });

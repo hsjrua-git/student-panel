@@ -64,3 +64,13 @@ export function historyCsvRows({ evaluations, periods, parameters }) {
   ]);
   return [header, ...body];
 }
+export function scoreTemplateCsvRows({ students, parameters }) {
+  return [
+    ['Student code', 'Full name', ...parameters.map((parameter) => parameter.name)],
+    ...students.map((student) => [
+      student.studentCode,
+      student.fullName,
+      ...parameters.map(() => null),
+    ]),
+  ];
+}

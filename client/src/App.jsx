@@ -15,6 +15,7 @@ import PreferencesPage from './pages/PreferencesPage.jsx';
 import ResultsPage from './pages/ResultsPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ImportStudentsPage from './pages/ImportStudentsPage.jsx';
+import ImportScoresPage from './pages/ImportScoresPage.jsx';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="/parameters" element={<ParametersPage />} />
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/students/import" element={<ImportStudentsPage />} />
+          <Route path="/evaluate/import" element={<ImportScoresPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/preferences" element={<PreferencesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
