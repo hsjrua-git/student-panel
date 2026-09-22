@@ -6,6 +6,9 @@ function Layout() {
 
   return (
     <>
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
       <header className="topbar">
         <nav>
           {!user.mustChangePassword && (

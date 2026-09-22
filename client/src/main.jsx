@@ -12,6 +12,7 @@ import { applyRememberedTheme } from './lib/theme.js';
 import { PreferencesProvider } from './preferences/PreferencesContext.jsx';
 import './index.css';
 import App from './App.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 applyRememberedTheme();
 
@@ -35,6 +36,7 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
           <PreferencesProvider>
@@ -42,6 +44,7 @@ createRoot(document.getElementById('root')).render(
           </PreferencesProvider>
         </AuthProvider>
       </BrowserRouter>
+      </ErrorBoundary>
     </QueryClientProvider>
   </StrictMode>
 );

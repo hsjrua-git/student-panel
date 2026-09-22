@@ -15,6 +15,8 @@ import preferencesRouter from './routes/preferences.js';
 import resultsRouter from './routes/results.js';
 import savedViewsRouter from './routes/savedViews.js';
 import dashboardRouter from './routes/dashboard.js';
+import helmet from 'helmet';
+import morgan from 'morgan';
 
 const secret = process.env.SESSION_SECRET;
 if (!secret || secret.length < 32) {
@@ -28,7 +30,16 @@ if (!secret || secret.length < 32) {
 const PgSession = connectPgSimple(session);
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
@@ -55,6 +66,8 @@ app.use('/api', auditRequests);
 
 app.use('/api/auth', authRouter);
 app.use('/api', requireLogin);
+
+app.use('/api/students/import', authorize({ POST: 'admin' }));
 
 app.use(
   '/api/students',

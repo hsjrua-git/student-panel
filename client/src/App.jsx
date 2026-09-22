@@ -16,9 +16,12 @@ import ResultsPage from './pages/ResultsPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ImportStudentsPage from './pages/ImportStudentsPage.jsx';
 import ImportScoresPage from './pages/ImportScoresPage.jsx';
+import ConnectionBanner from './components/ConnectionBanner.jsx';
 
 function App() {
   return (
+  <>
+    <ConnectionBanner />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
@@ -41,6 +44,7 @@ function App() {
         </Route>
       </Route>
     </Routes>
+  </>
   );
 }
 
