@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Navigate, useLocation } from 'react-router';
+import { Navigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { firstAllowedPath } from '../lib/navigation.js';
 
 function LoginPage() {
-  const { user, isLoading, login } = useAuth();
-  const location = useLocation();
+  const { user, isLoading, login, can } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -16,8 +16,10 @@ function LoginPage() {
     );
   }
   if (user) {
-    const from = location.state?.from?.pathname ?? '/students';
-    return <Navigate to={from} replace />;
+    // Land on the first page this user's role can actually open (the dashboard
+    // when they can see it, otherwise the first permitted menu item). `replace`
+    // keeps /login out of history, so Back won't bounce to the sign-in screen.
+    return <Navigate to={firstAllowedPath(can)} replace />;
   }
 
   function handleSubmit(event) {

@@ -32,7 +32,9 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
       <p>
         {search
           ? `No students match "${search}".`
-          : 'No students yet. Add the first one above.'}
+          : can('students.create')
+            ? 'No students yet. Add the first one above.'
+            : 'No students yet.'}
       </p>
     );
   }

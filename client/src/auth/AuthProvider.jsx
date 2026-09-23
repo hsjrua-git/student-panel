@@ -13,6 +13,13 @@ export function AuthProvider({ children }) {
     queryKey: ['me'],
     queryFn: fetchMe,
     retry: false,
+    // Re-check who we are (and what we're allowed to do) whenever the user
+    // returns to the tab. The global default turns this off, but the identity
+    // query is the exception: if an admin changes this user's role or
+    // permissions, refetching on focus makes the sidebar, page access, and
+    // landing reflect it on the next glance instead of only after a full
+    // re-login. The route guard then bounces them off any page they just lost.
+    refetchOnWindowFocus: true,
   });
   const user = meQuery.data ?? null;
 

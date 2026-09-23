@@ -8,6 +8,7 @@ import {
   parametersUsedInPeriod,
 } from '../lib/parameterUse.js';
 import { isUuid } from '../lib/ids.js';
+import { requirePermission } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -310,31 +311,42 @@ router.delete('/parameter-changes/:id', async (req, res) => {
   res.status(204).end();
 });
 
-router.get('/periods/:number/parameters', async (req, res) => {
-  const periodNumber = Number(req.params.number);
+// The period's active parameters. This lives under the `/api/periods` prefix,
+// which is only gated at `GET: true` (every signed-in user needs the period
+// calendar), so without this explicit check any signed-in user — including a
+// Viewer denied `GET /api/parameters` — could read parameter definitions
+// through this route. Require `parameters.view` here so the two parameter-read
+// paths agree. Every legitimate caller (the Evaluate flow) holds `scores.enter`,
+// which has `parameters.view` as a prerequisite, so nothing breaks.
+router.get(
+  '/periods/:number/parameters',
+  requirePermission('parameters.view'),
+  async (req, res) => {
+    const periodNumber = Number(req.params.number);
 
-  const [changesResult, parametersResult] = await Promise.all([
-    pool.query(
-      `SELECT parameter_id  AS "parameterId",
+    const [changesResult, parametersResult] = await Promise.all([
+      pool.query(
+        `SELECT parameter_id  AS "parameterId",
               period_number AS "periodNumber",
               scope,
               action
        FROM parameter_changes`
-    ),
-    pool.query(
-      `SELECT ${PARAMETER_COLUMNS}
+      ),
+      pool.query(
+        `SELECT ${PARAMETER_COLUMNS}
        FROM parameters
        ORDER BY sort_order, lower(name)`
-    ),
-  ]);
+      ),
+    ]);
 
-  const usedIds = new Set(parametersUsedInPeriod(changesResult.rows, periodNumber));
-  res.json({
-    periodNumber,
-    parameters: parametersResult.rows.filter((parameter) =>
-      usedIds.has(parameter.id)
-    ),
-  });
-});
+    const usedIds = new Set(parametersUsedInPeriod(changesResult.rows, periodNumber));
+    res.json({
+      periodNumber,
+      parameters: parametersResult.rows.filter((parameter) =>
+        usedIds.has(parameter.id)
+      ),
+    });
+  }
+);
 
 export default router;

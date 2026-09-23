@@ -68,6 +68,12 @@ Two independently-installed packages:
 
 First-time setup and the full walkthrough live in `README.md`. Quick reference:
 
+**Automated installer** (repo root): `setup.bat`/`setup.ps1` (Windows) and
+`bash setup.sh` (Linux/macOS) bootstrap prerequisites and hand off to the
+cross-platform orchestrator `scripts/setup.mjs` (checks Node/psql, creates the
+DB + `server/.env` with generated secrets, installs deps, migrates, creates the
+first admin, builds the client, starts the server, opens the browser). Re-runnable.
+
 **Server** (run from `server/`):
 - `npm install`
 - `npm run migrate` — apply pending SQL migrations (transactional, tracked in
@@ -77,6 +83,10 @@ First-time setup and the full walkthrough live in `README.md`. Quick reference:
 - `npm run create-user -- <username> "<Full Name>" [RoleName]` — make a user
   (prints a one-time temporary password).
 - `npm run seed-sample` — seed sample data (dev only).
+- `npm run reset-data` — dry run: show current row counts and what a reset would
+  wipe. `npm run reset-data -- confirm` wipes to a fresh state (seeded roles +
+  the Administrator account only; schema kept). Refuses if no active admin
+  would remain.
 - `npm test` — server unit tests (`node --test`). The integration suite
   (`test/permissions.test.js`) is **skipped** here unless `RUN_INTEGRATION=1`.
 - `npm run test-permissions` — the integration suite (sets `RUN_INTEGRATION=1`);

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { listParameters } from '../api/parameters.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 import { toggleHidden } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
@@ -23,9 +24,17 @@ const TABS = [
 
 function PreferencesPage() {
   const { preferences, update, reset } = usePreferences();
+  const { can } = useAuth();
+  // The "hide parameters from the overview" control only makes sense for a role
+  // that can actually see parameters; without parameters.view the query would
+  // 403. Gate both the fetch and the section on the permission.
+  const canViewParameters = can('parameters.view');
+  const canEnterScores = can('scores.enter');
+  const canExport = can('data.export');
   const parametersQuery = useQuery({
     queryKey: ['parameters'],
     queryFn: listParameters,
+    enabled: canViewParameters,
   });
 
   function change(changes) {
@@ -142,7 +151,9 @@ function PreferencesPage() {
             Show the "Added" column
           </label>
         </div>
-        <p className="hint">The sort order also applies on the Evaluate page.</p>
+        {canEnterScores && (
+          <p className="hint">The sort order also applies on the Evaluate page.</p>
+        )}
       </section>
 
       <section>
@@ -175,60 +186,66 @@ function PreferencesPage() {
           </label>
         </div>
 
-        <h3>Parameters shown in the overview</h3>
-        {parametersQuery.isPending && <p>Loading...</p>}
-        {parametersQuery.isError && (
-          <p className="error">{parametersQuery.error.message}</p>
+        {canViewParameters && (
+          <>
+            <h3>Parameters shown in the overview</h3>
+            {parametersQuery.isPending && <p>Loading...</p>}
+            {parametersQuery.isError && (
+              <p className="error">{parametersQuery.error.message}</p>
+            )}
+            {parametersQuery.data && parametersQuery.data.length === 0 && (
+              <p>No parameters yet.</p>
+            )}
+            <div className="pref-group">
+              {parametersQuery.data?.map((parameter) => (
+                <label key={parameter.id} className="inline">
+                  <input
+                    type="checkbox"
+                    checked={!preferences.hiddenParameterIds.includes(parameter.id)}
+                    onChange={(event) =>
+                      change({
+                        hiddenParameterIds: toggleHidden(
+                          preferences.hiddenParameterIds,
+                          parameter.id,
+                          event.target.checked
+                        ),
+                      })
+                    }
+                  />
+                  {parameter.name}
+                </label>
+              ))}
+            </div>
+            <p className="hint">
+              Hidden parameters still appear in the "By period" and "By parameter"
+              views.
+            </p>
+          </>
         )}
-        {parametersQuery.data && parametersQuery.data.length === 0 && (
-          <p>No parameters yet.</p>
-        )}
-        <div className="pref-group">
-          {parametersQuery.data?.map((parameter) => (
-            <label key={parameter.id} className="inline">
-              <input
-                type="checkbox"
-                checked={!preferences.hiddenParameterIds.includes(parameter.id)}
-                onChange={(event) =>
-                  change({
-                    hiddenParameterIds: toggleHidden(
-                      preferences.hiddenParameterIds,
-                      parameter.id,
-                      event.target.checked
-                    ),
-                  })
-                }
-              />
-              {parameter.name}
-            </label>
-          ))}
-        </div>
-        <p className="hint">
-          Hidden parameters still appear in the "By period" and "By parameter"
-          views.
-        </p>
       </section>
 
-      <section>
-        <h2>Spreadsheet export</h2>
-        <div className="pref-group">
-          <label className="inline">
-            Separator between columns
-            <select
-              value={preferences.csvDelimiter}
-              onChange={(event) => change({ csvDelimiter: event.target.value })}
-            >
-              <option value=",">Comma ( , )</option>
-              <option value=";">Semicolon ( ; )</option>
-            </select>
-          </label>
-        </div>
-        <p className="hint">
-          If your spreadsheet opens an export with everything in one column,
-          switch to the other separator. Programs set up for regions that
-          write decimals with commas usually expect semicolons.
-        </p>
-      </section>
+      {canExport && (
+        <section>
+          <h2>Spreadsheet export</h2>
+          <div className="pref-group">
+            <label className="inline">
+              Separator between columns
+              <select
+                value={preferences.csvDelimiter}
+                onChange={(event) => change({ csvDelimiter: event.target.value })}
+              >
+                <option value=",">Comma ( , )</option>
+                <option value=";">Semicolon ( ; )</option>
+              </select>
+            </label>
+          </div>
+          <p className="hint">
+            If your spreadsheet opens an export with everything in one column,
+            switch to the other separator. Programs set up for regions that
+            write decimals with commas usually expect semicolons.
+          </p>
+        </section>
+      )}
 
       <section>
         <button type="button" onClick={handleReset} disabled={reset.isPending}>

@@ -10,6 +10,8 @@
     "migrate": "node --env-file=.env src/db/migrate.js",
     "create-user": "node --env-file=.env src/scripts/createUser.js",
     "seed-sample": "node --env-file=.env src/scripts/seedSample.js",
+    "reset-data": "node --env-file=.env src/scripts/resetData.js",
+    "verify-pglite": "node src/db/verifyPglite.mjs",
     "test-permissions": "RUN_INTEGRATION=1 node --env-file=.env --test test/permissions.test.js"
   },
   "keywords": [],

@@ -131,25 +131,46 @@ router.patch('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const existing = await client.query(
-      `SELECT r.id, r.name, r.description, r.is_system AS "isSystem",
-              COALESCE(
-                array_agg(rp.permission_key)
-                  FILTER (WHERE rp.permission_key IS NOT NULL),
-                '{}'
-              ) AS permissions
-       FROM roles r
-       LEFT JOIN role_permissions rp ON rp.role_id = r.id
-       WHERE r.id = $1
-       GROUP BY r.id
-       FOR UPDATE OF r`,
+    // Lock the role row first. We deliberately do NOT aggregate its
+    // permissions in the same statement: PostgreSQL forbids FOR UPDATE
+    // together with GROUP BY. Lock the single row, then read its permissions
+    // in a follow-up query (same transaction, so the view is consistent).
+    const locked = await client.query(
+      `SELECT id, name, description, is_system AS "isSystem"
+       FROM roles
+       WHERE id = $1
+       FOR UPDATE`,
       [req.params.id]
     );
-    if (existing.rowCount === 0) {
+    if (locked.rowCount === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Role not found.' });
     }
-    const role = existing.rows[0];
+    const permsResult = await client.query(
+      `SELECT COALESCE(
+                array_agg(permission_key)
+                  FILTER (WHERE permission_key IS NOT NULL),
+                '{}'
+              ) AS permissions
+       FROM role_permissions
+       WHERE role_id = $1`,
+      [req.params.id]
+    );
+    const role = {
+      ...locked.rows[0],
+      permissions: permsResult.rows[0].permissions,
+    };
+
+    // The built-in Administrator role is fully locked: it is the one system
+    // role that can manage roles, so letting anyone rename it or trim its
+    // permissions is how an installation locks itself out. Identify it by that
+    // capability rather than by name (names of other roles can change).
+    if (role.isSystem && role.permissions.includes('roles.manage')) {
+      await client.query('ROLLBACK');
+      return res
+        .status(403)
+        .json({ error: 'The Administrator role cannot be modified.' });
+    }
 
     let newPermissions = role.permissions;
     if ('permissions' in parsed.values) {
