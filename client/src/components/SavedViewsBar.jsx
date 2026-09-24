@@ -28,23 +28,38 @@ function SavedViewsBar({
             ))}
           </select>
         </label>
-        <button type="button" onClick={onSaveAs} disabled={busy}>
+        <button
+          type="button"
+          className={activeId ? undefined : 'primary'}
+          onClick={onSaveAs}
+          disabled={busy}
+        >
           Save as new…
         </button>
         {activeId && (
           <>
-            <button type="button" onClick={onUpdate} disabled={busy || !dirty}>
+            <button
+              type="button"
+              className="primary"
+              onClick={onUpdate}
+              disabled={busy || !dirty}
+            >
               Update view
             </button>
             <button type="button" onClick={onRename} disabled={busy}>
               Rename…
             </button>
-            <button type="button" onClick={onDelete} disabled={busy}>
+            <button
+              type="button"
+              className="danger"
+              onClick={onDelete}
+              disabled={busy}
+            >
               Delete view
             </button>
           </>
         )}
-        <button type="button" onClick={onReset}>
+        <button type="button" className="quiet" onClick={onReset}>
           Reset
         </button>
         {activeId && dirty && <span className="hint">Changed since saved</span>}

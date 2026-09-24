@@ -48,7 +48,7 @@ function StudentGroupsSection({ student }) {
 
   if (memberOfQuery.isError) {
     return (
-      <section>
+      <section className="section-card">
         <h2>Groups</h2>
         <p className="error">{memberOfQuery.error.message}</p>
       </section>
@@ -58,28 +58,29 @@ function StudentGroupsSection({ student }) {
   const busy = add.isPending || remove.isPending;
 
   return (
-    <section>
+    <section className="section-card">
       <h2>Groups</h2>
       {memberOf.length === 0 ? (
         <p className="hint">Not in any group.</p>
       ) : (
-        <ul className="plain-list">
+        <span className="chip-row">
           {memberOf.map((group) => (
-            <li key={group.id}>
+            <span key={group.id} className="chip brand">
               {group.name}
               {canAssign && (
                 <button
                   type="button"
-                  className="link"
+                  className="chip-remove"
                   onClick={() => remove.mutate(group.id)}
                   disabled={busy}
+                  aria-label={`Remove from ${group.name}`}
                 >
-                  Remove
+                  ×
                 </button>
               )}
-            </li>
+            </span>
           ))}
-        </ul>
+        </span>
       )}
 
       {canAssign && available.length > 0 && (

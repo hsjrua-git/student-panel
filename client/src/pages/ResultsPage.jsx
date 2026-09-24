@@ -9,6 +9,7 @@ import {
   updateSavedView,
 } from '../api/savedViews.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import FilterEditor from '../components/FilterEditor.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
@@ -180,15 +181,22 @@ function ResultsPage() {
 
   if (periodsQuery.isPending) {
     return (
-      <main>
-        <p>Loading...</p>
+      <main aria-busy="true">
+        <div className="page-loading" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <p>Loading…</p>
+        </div>
       </main>
     );
   }
   if (periodsQuery.isError) {
     return (
       <main>
-        <p className="error">{periodsQuery.error.message}</p>
+        <EmptyState
+          tone="danger"
+          title="Couldn't load results"
+          description={periodsQuery.error.message}
+        />
       </main>
     );
   }
@@ -196,14 +204,20 @@ function ResultsPage() {
     return (
       <main>
         <h1>Results</h1>
-        {can('settings.manage') ? (
-          <p>
-            Set the period start date first, on the{' '}
-            <Link to="/settings">Settings</Link> page.
-          </p>
-        ) : (
-          <p>An administrator needs to set the period start date first.</p>
-        )}
+        <EmptyState
+          title="Set up the calendar"
+          description={
+            can('settings.manage')
+              ? 'Set the period start date first, then results will appear here.'
+              : 'An administrator needs to set the period start date first.'
+          }
+        >
+          {can('settings.manage') && (
+            <p>
+              <Link to="/settings">Go to Settings</Link>
+            </p>
+          )}
+        </EmptyState>
       </main>
     );
   }
@@ -211,7 +225,10 @@ function ResultsPage() {
     return (
       <main>
         <h1>Results</h1>
-        <p>Period 1 has not started yet.</p>
+        <EmptyState
+          title="Period 1 hasn't started"
+          description="Once the first period begins, results will appear here."
+        />
       </main>
     );
   }
@@ -315,8 +332,8 @@ function ResultsPage() {
         </details>
       )}
 
-      <section>
-        <h2>Filters</h2>
+      <section className="section-card">
+        <h2 className="group-title">Filters</h2>
         <FilterEditor
           filters={config.filters}
           parameters={parameters}
@@ -324,19 +341,30 @@ function ResultsPage() {
         />
       </section>
 
-      {resultsQuery.isPending && <p>Loading...</p>}
+      {resultsQuery.isPending && <p className="hint">Loading…</p>}
       {resultsQuery.isError && (
         <p className="error">{resultsQuery.error.message}</p>
       )}
 
       {data && (
-        <section>
+        <section className="section-card">
           <p className="summary-line">
             Period {data.periodNumber} ({formatIsoDate(data.startDate)} –{' '}
             {formatIsoDate(data.endDate)}) · Showing {view.rows.length} of{' '}
             {students.length} students
-            {filterTexts.length > 0 && <> · Filters: {filterTexts.join('; ')}</>}
           </p>
+          {filterTexts.length > 0 && (
+            <span className="chip-row">
+              {filterTexts.map((text, index) => (
+                <span
+                  key={config.filters[index]?.key ?? index}
+                  className="chip brand"
+                >
+                  {text}
+                </span>
+              ))}
+            </span>
+          )}
           {data.truncated && (
             <p className="hint">
               Only the first {students.length} of {data.total} students are
@@ -358,7 +386,11 @@ function ResultsPage() {
           ) : view.rows.length === 0 ? (
             <p>
               No students match.{' '}
-              <button type="button" onClick={() => patch({ filters: [], search: '' })}>
+              <button
+                type="button"
+                className="quiet"
+                onClick={() => patch({ filters: [], search: '' })}
+              >
                 Clear filters and search
               </button>
             </p>

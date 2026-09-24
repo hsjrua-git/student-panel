@@ -50,7 +50,7 @@ function StudentFieldsSection({ student }) {
   }
 
   return (
-    <section>
+    <section className="section-card">
       <h2>Details</h2>
       {isEditing ? (
         <form onSubmit={handleSubmit}>

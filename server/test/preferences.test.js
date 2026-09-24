@@ -70,6 +70,21 @@ test('updates with unknown settings or bad values are refused', () => {
   assert.ok(parsePreferencesUpdate('theme').error);
 });
 
+test('the palette must be one of the known presets', () => {
+  assert.deepEqual(parsePreferencesUpdate({ palette: 'midnight' }), {
+    values: { palette: 'midnight' },
+  });
+  assert.deepEqual(parsePreferencesUpdate({ palette: 'aurora' }), {
+    values: { palette: 'aurora' },
+  });
+  assert.deepEqual(parsePreferencesUpdate({ palette: 'gradebook' }), {
+    values: { palette: 'gradebook' },
+  });
+  assert.ok(parsePreferencesUpdate({ palette: 'indigo' }).error);
+  assert.ok(parsePreferencesUpdate({ palette: 5 }).error);
+  assert.equal(mergePreferences({}).palette, 'aurora');
+});
+
 test('hidden parameter lists are validated', () => {
   assert.deepEqual(parsePreferencesUpdate({ hiddenParameterIds: [ID1, ID2] }), {
     values: { hiddenParameterIds: [ID1, ID2] },

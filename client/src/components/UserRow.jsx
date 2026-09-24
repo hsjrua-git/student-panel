@@ -122,7 +122,9 @@ function UserRow({ user, isSelf, onNotice }) {
         )}
       </td>
       <td>
-        {user.isActive ? 'Active' : 'Inactive'}
+        <span className={user.isActive ? 'badge ok' : 'badge'}>
+          {user.isActive ? 'Active' : 'Inactive'}
+        </span>
         {user.mustChangePassword && (
           <div className="hint">Must change password</div>
         )}
@@ -156,6 +158,7 @@ function UserRow({ user, isSelf, onNotice }) {
                 </button>
                 <button
                   type="button"
+                  className={user.isActive ? 'danger' : undefined}
                   onClick={handleToggleActive}
                   disabled={update.isPending}
                 >

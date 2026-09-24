@@ -7,6 +7,7 @@ import {
 } from '../api/evaluations.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import PeriodPicker from './PeriodPicker.jsx';
+import { LockIcon, NoteFilledIcon, NoteIcon } from './icons.jsx';
 import {
   buildEntries,
   buildSavePayload,
@@ -206,7 +207,7 @@ function StudentEvaluateSection({ student }) {
   }
 
   return (
-    <section>
+    <section className="section-card">
       <h2>Evaluate</h2>
 
       {periodsQuery.isPending && <p>Loading...</p>}
@@ -250,8 +251,8 @@ function StudentEvaluateSection({ student }) {
             A score can be changed for 7 days after it is first saved (1 day if
             it was entered late). After that it is locked
             {canOverride
-              ? ' (🔒). You can still change it, with a written reason.'
-              : ' (🔒) and only someone who can override locks can change it.'}
+              ? '. You can still change it, with a written reason.'
+              : ' and only someone who can override locks can change it.'}
           </p>
 
           {hasLiveErrors && (
@@ -375,7 +376,7 @@ function EvaluateTable({
                     />
                     {access !== 'open' && (
                       <span className="lock" aria-hidden="true">
-                        🔒
+                        <LockIcon />
                       </span>
                     )}
                   </div>
@@ -392,7 +393,7 @@ function EvaluateTable({
                     title={hasNote ? shownNote : 'Add a note'}
                     onClick={() => onOpenNoteChange(isNoteOpen ? null : key)}
                   >
-                    {hasNote ? '📝' : '🗒'}
+                    {hasNote ? <NoteFilledIcon /> : <NoteIcon />}
                   </button>
                   {isNoteOpen && (
                     <textarea

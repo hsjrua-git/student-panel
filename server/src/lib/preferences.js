@@ -1,6 +1,7 @@
 import { isUuid } from './ids.js';
 
 export const THEMES = ['system', 'light', 'dark'];
+export const PALETTES = ['aurora', 'gradebook', 'midnight', 'ember', 'meadow'];
 export const PAGE_SIZES = [10, 25, 50, 100];
 export const SORTS = ['newest', 'oldest', 'name', 'code'];
 export const TABS = ['overview', 'period', 'parameter'];
@@ -9,6 +10,7 @@ const MAX_HIDDEN = 200;
 
 export const DEFAULT_PREFERENCES = {
   theme: 'system',
+  palette: 'aurora',
   studentsPageSize: 25,
   studentsSort: 'newest',
   studentsShowCode: true,
@@ -21,6 +23,7 @@ export const DEFAULT_PREFERENCES = {
 
 const CHECKS = {
   theme: (value) => THEMES.includes(value),
+  palette: (value) => PALETTES.includes(value),
   studentsPageSize: (value) => PAGE_SIZES.includes(value),
   studentsSort: (value) => SORTS.includes(value),
   studentsShowCode: (value) => typeof value === 'boolean',

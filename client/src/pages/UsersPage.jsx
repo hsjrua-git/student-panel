@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listUsers } from '../api/users.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import TemporaryPasswordNotice from '../components/TemporaryPasswordNotice.jsx';
 import UserForm from '../components/UserForm.jsx';
 import UserRow from '../components/UserRow.jsx';
@@ -19,8 +20,10 @@ function UsersPage() {
   if (!can('users.manage')) {
     return (
       <main>
-        <h1>Users</h1>
-        <p>You do not have permission to manage users.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to manage users."
+        />
       </main>
     );
   }
@@ -40,14 +43,14 @@ function UsersPage() {
         />
       )}
 
-      <section>
+      <section className="section-card">
         <h2>Add a user</h2>
         <UserForm onNotice={setNotice} />
       </section>
 
-      <section>
+      <section className="section-card">
         <h2>All users</h2>
-        {query.isPending && <p>Loading...</p>}
+        {query.isPending && <p className="hint">Loading…</p>}
         {query.isError && <p className="error">{query.error.message}</p>}
         {query.data && (
           <div className="table-wrap">

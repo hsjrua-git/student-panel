@@ -41,23 +41,25 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
 
   return (
     <>
-      <table className={isPlaceholderData ? 'stale' : undefined}>
-        <thead>
-          <tr>
-            {preferences.studentsShowCode && <th>Code</th>}
-            <th>Full name</th>
-            {preferences.studentsShowAdded && <th>Added</th>}
-            {(can('students.edit') || can('students.delete')) && (
-              <th>Actions</th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {data.students.map((student) => (
-            <StudentRow key={student.id} student={student} />
-          ))}
-        </tbody>
-      </table>
+      <div className={`table-wrap${isPlaceholderData ? ' stale' : ''}`}>
+        <table>
+          <thead>
+            <tr>
+              {preferences.studentsShowCode && <th>Code</th>}
+              <th>Full name</th>
+              {preferences.studentsShowAdded && <th>Added</th>}
+              {(can('students.edit') || can('students.delete')) && (
+                <th>Actions</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {data.students.map((student) => (
+              <StudentRow key={student.id} student={student} />
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="pager">
         <button

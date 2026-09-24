@@ -46,21 +46,23 @@ function StudentsPage() {
 
   return (
     <main>
-      <h1>Students</h1>
+      <div className="page-head">
+        <h1>Students</h1>
+        {can('data.import') && (
+          <div className="page-head-actions">
+            <Link className="btn" to="/students/import">
+              Import from CSV
+            </Link>
+          </div>
+        )}
+      </div>
       {can('students.create') && (
-        <section>
+        <section className="section-card">
           <h2>Add a student</h2>
           <StudentForm />
-          {can('data.import') && (
-            <p>
-              <Link to="/students/import">
-                Import many students from a CSV file…
-              </Link>
-            </p>
-          )}
         </section>
       )}
-      <section>
+      <section className="section-card">
         <h2>All students</h2>
         <div className="toolbar">
           <input

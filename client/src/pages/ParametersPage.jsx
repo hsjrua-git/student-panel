@@ -1,5 +1,6 @@
 import { useAuth } from '../auth/AuthContext.jsx';
 import ChangeHistory from '../components/ChangeHistory.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import ParameterForm from '../components/ParameterForm.jsx';
 import ParametersTable from '../components/ParametersTable.jsx';
 
@@ -14,7 +15,10 @@ function ParametersPage() {
     return (
       <main>
         <h1>Parameters</h1>
-        <p>You do not have permission to manage parameters.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to manage parameters."
+        />
       </main>
     );
   }
@@ -27,17 +31,17 @@ function ParametersPage() {
         parameters each period uses comes from the change history at the bottom.
       </p>
 
-      <section>
+      <section className="section-card">
         <h2>Add a parameter</h2>
         <ParameterForm />
       </section>
 
-      <section>
+      <section className="section-card">
         <h2>All parameters</h2>
         <ParametersTable />
       </section>
 
-      <section>
+      <section className="section-card">
         <h2>Change history</h2>
         <ChangeHistory />
       </section>

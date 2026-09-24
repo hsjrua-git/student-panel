@@ -1,12 +1,15 @@
 // Shown by <Suspense> while a lazily-loaded page's code chunk is downloading.
-// role="status" + aria-live so screen readers announce the wait; the visible
-// text is deliberately plain to match the app's other loading states.
+// role="status" + aria-live so screen readers announce the wait; a small brand
+// spinner over a centered column reads as a deliberate loading state rather than
+// a bare line. The spin is disabled under prefers-reduced-motion (see index.css),
+// leaving a static ring plus the polite "Loading…" text.
 function PageLoader() {
   return (
     <main aria-busy="true">
-      <p role="status" aria-live="polite">
-        Loading…
-      </p>
+      <div className="page-loading" role="status" aria-live="polite">
+        <span className="spinner" aria-hidden="true" />
+        <p>Loading…</p>
+      </div>
     </main>
   );
 }

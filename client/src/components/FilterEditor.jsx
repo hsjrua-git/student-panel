@@ -76,7 +76,7 @@ function FilterRow({ filter, parameters, onChange, onRemove }) {
           onChange={handleValueChange}
         />
       )}
-      <button type="button" onClick={onRemove}>
+      <button type="button" className="quiet" onClick={onRemove}>
         Remove
       </button>
     </div>
@@ -109,7 +109,7 @@ function FilterEditor({ filters, parameters, onChange }) {
           onRemove={() => onChange(filters.filter((_, i) => i !== index))}
         />
       ))}
-      <button type="button" onClick={add} disabled={!canAdd}>
+      <button type="button" className="primary" onClick={add} disabled={!canAdd}>
         Add filter
       </button>
       {filters.length >= MAX_FILTERS && (

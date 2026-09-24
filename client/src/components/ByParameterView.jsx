@@ -1,19 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { CHART_TOOLTIP } from '../lib/chartTheme.js';
 import { formatChange, formatShortIsoDate } from '../lib/format.js';
 import { buildHistory } from '../lib/history.js';
 import { parameterView } from '../lib/views.js';
 
 function ByParameterView({ evaluations, periods, parameters }) {
   const [chosenId, setChosenId] = useState(null);
+  const gradientId = useId();
 
   const list = periods.periods;
   const columns = useMemo(
@@ -79,14 +81,23 @@ function ByParameterView({ evaluations, periods, parameters }) {
 
           <div className="chart-box">
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart
+              <AreaChart
                 data={chartData}
                 margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
               >
-                <CartesianGrid
-                  stroke="rgba(128,128,128,0.3)"
-                  strokeDasharray="3 3"
-                />
+                <defs>
+                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      style={{ stopColor: 'var(--brand)', stopOpacity: 0.26 }}
+                    />
+                    <stop
+                      offset="100%"
+                      style={{ stopColor: 'var(--brand)', stopOpacity: 0 }}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="label"
                   tick={{ fill: 'currentColor', fontSize: 12 }}
@@ -96,17 +107,19 @@ function ByParameterView({ evaluations, periods, parameters }) {
                   tick={{ fill: 'currentColor', fontSize: 12 }}
                   width={40}
                 />
-                <Tooltip />
-                <Line
+                <Tooltip {...CHART_TOOLTIP} cursor={{ strokeDasharray: '3 3' }} />
+                <Area
                   type="linear"
                   dataKey="value"
                   name={parameter.name}
-                  stroke="#4f46e5"
                   strokeWidth={2}
+                  fill={`url(#${gradientId})`}
+                  fillOpacity={1}
                   dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
                   connectNulls={false}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 

@@ -18,19 +18,24 @@ function isSaturday(isoDate) {
 
 function PeriodSummary({ data }) {
   if (!data.anchorDate) {
-    return <p>No start date is set yet. Pick one below to begin.</p>;
+    return <p className="hint">No start date is set yet. Pick one below to begin.</p>;
   }
   if (data.current === null) {
-    return <p>Period 1 starts on {formatIsoDate(data.anchorDate)}.</p>;
+    return <p className="hint">Period 1 starts on {formatIsoDate(data.anchorDate)}.</p>;
   }
   const currentPeriod = data.periods[data.periods.length - 1];
   return (
-    <p>
-      Today is {formatIsoDate(data.today)}. The current period is{' '}
-      <strong>Period {data.current}</strong> (
-      {formatIsoDate(currentPeriod.startDate)} to{' '}
-      {formatIsoDate(currentPeriod.endDate)}).
-    </p>
+    <>
+      <div className="stat-card kpi-callout">
+        <div className="stat-label">Current period</div>
+        <div className="stat-value">Period {data.current}</div>
+        <div className="hint">
+          {formatIsoDate(currentPeriod.startDate)} –{' '}
+          {formatIsoDate(currentPeriod.endDate)}
+        </div>
+      </div>
+      <p className="hint">Today is {formatIsoDate(data.today)}.</p>
+    </>
   );
 }
 
@@ -95,14 +100,14 @@ function SettingsPage() {
   return (
     <main>
       <h1>Settings</h1>
-      <section>
+      <section className="section-card">
         <h2>Periods</h2>
         <p>
           Evaluations are grouped into periods. Each period is one week, from
           Saturday to Friday, numbered from Period 1. Period 1 starts on the
           date below.
         </p>
-        {isPending && <p>Loading...</p>}
+        {isPending && <p className="hint">Loading…</p>}
         {isError && <p className="error">{error.message}</p>}
         {data && <PeriodSummary data={data} />}
         {data && can('settings.manage') && (

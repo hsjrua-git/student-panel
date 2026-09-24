@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listAudit } from '../api/audit.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import { CATEGORY_OPTIONS, describeAudit } from '../lib/audit.js';
 import { formatDateTime, formatStudentCode } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
@@ -62,8 +63,10 @@ function AuditPage() {
   if (!can('audit.view')) {
     return (
       <main>
-        <h1>Audit log</h1>
-        <p>You do not have permission to see the audit log.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to see the audit log."
+        />
       </main>
     );
   }
@@ -108,11 +111,16 @@ function AuditPage() {
         </button>
       </div>
 
-      {query.isPending && <p>Loading...</p>}
+      {query.isPending && <p className="hint">Loading…</p>}
       {query.isError && <p className="error">{query.error.message}</p>}
-      {data && data.entries.length === 0 && <p>Nothing recorded yet.</p>}
+      {data && data.entries.length === 0 && (
+        <EmptyState
+          title="Nothing to show"
+          description="No audit entries match your filters yet."
+        />
+      )}
       {data && data.entries.length > 0 && (
-        <>
+        <section className="section-card">
           <div className="table-wrap">
             <table className={query.isPlaceholderData ? 'stale' : undefined}>
               <thead>
@@ -159,7 +167,7 @@ function AuditPage() {
               Next
             </button>
           </div>
-        </>
+        </section>
       )}
     </main>
   );

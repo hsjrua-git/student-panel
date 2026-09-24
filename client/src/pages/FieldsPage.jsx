@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import {
   archiveFieldDefinition,
   createFieldDefinition,
@@ -175,8 +176,10 @@ function FieldsPage() {
   if (!can('fields.manage')) {
     return (
       <main>
-        <h1>Custom fields</h1>
-        <p>You do not have permission to manage custom fields.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to manage custom fields."
+        />
       </main>
     );
   }
@@ -190,16 +193,18 @@ function FieldsPage() {
         see them.
       </p>
 
-      <section>
+      <section className="section-card">
         <h2>Add a field</h2>
         <NewFieldForm />
       </section>
 
-      <section>
+      <section className="section-card">
         <h2>Fields</h2>
-        {query.isPending && <p>Loading…</p>}
+        {query.isPending && <p className="hint">Loading…</p>}
         {query.isError && <p className="error">{query.error.message}</p>}
-        {query.data && query.data.length === 0 && <p>No custom fields yet.</p>}
+        {query.data && query.data.length === 0 && (
+          <p className="hint">No custom fields yet.</p>
+        )}
         {query.data && query.data.length > 0 && (
           <div className="table-wrap">
             <table>

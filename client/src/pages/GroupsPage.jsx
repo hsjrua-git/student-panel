@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import {
   archiveGroup,
   createGroup,
@@ -55,7 +56,7 @@ function MemberPanel({ group, onClose }) {
   const memberIds = new Set((membersQuery.data ?? []).map((s) => s.id));
 
   return (
-    <section className="group-members">
+    <section className="group-members section-card">
       <div className="toolbar">
         <h2>Members of {group.name}</h2>
         <button type="button" onClick={onClose}>
@@ -66,8 +67,10 @@ function MemberPanel({ group, onClose }) {
       <div className="two-col">
         <div>
           <h3>In this group</h3>
-          {membersQuery.isPending && <p>Loading…</p>}
-          {membersQuery.data?.length === 0 && <p>No students yet.</p>}
+          {membersQuery.isPending && <p className="hint">Loading…</p>}
+          {membersQuery.data?.length === 0 && (
+            <p className="hint">No students yet.</p>
+          )}
           <ul className="plain-list">
             {membersQuery.data?.map((student) => (
               <li key={student.id}>
@@ -75,6 +78,7 @@ function MemberPanel({ group, onClose }) {
                 <code className="hint">{student.studentCode}</code>
                 <button
                   type="button"
+                  className="quiet"
                   onClick={() => change.mutate({ remove: [student.id] })}
                   disabled={change.isPending}
                 >
@@ -104,6 +108,7 @@ function MemberPanel({ group, onClose }) {
                   <code className="hint">{student.studentCode}</code>
                   <button
                     type="button"
+                    className="quiet"
                     onClick={() => change.mutate({ add: [student.id] })}
                     disabled={change.isPending}
                   >
@@ -308,8 +313,10 @@ function GroupsPage() {
   if (!can('groups.manage')) {
     return (
       <main>
-        <h1>Groups</h1>
-        <p>You do not have permission to manage groups.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to manage groups."
+        />
       </main>
     );
   }
@@ -322,18 +329,20 @@ function GroupsPage() {
         group includes everyone in its subgroups too.
       </p>
 
-      <section>
+      <section className="section-card">
         <h2>Add a group</h2>
         <NewGroupForm groups={tree} />
       </section>
 
-      <section>
+      <section className="section-card">
         <h2>Groups</h2>
-        {groupsQuery.isPending && <p>Loading…</p>}
+        {groupsQuery.isPending && <p className="hint">Loading…</p>}
         {groupsQuery.isError && (
           <p className="error">{groupsQuery.error.message}</p>
         )}
-        {groupsQuery.data && tree.length === 0 && <p>No groups yet.</p>}
+        {groupsQuery.data && tree.length === 0 && (
+          <p className="hint">No groups yet.</p>
+        )}
         {tree.length > 0 && (
           <div className="table-wrap">
             <table>

@@ -80,7 +80,13 @@ function ResultsTable({
                       value
                     )}
                     {change !== null && (
-                      <span className="chg">{formatChange(change)}</span>
+                      <span
+                        className={`chg${
+                          change > 0 ? ' up' : change < 0 ? ' down' : ''
+                        }`}
+                      >
+                        {formatChange(change)}
+                      </span>
                     )}
                   </td>
                 );

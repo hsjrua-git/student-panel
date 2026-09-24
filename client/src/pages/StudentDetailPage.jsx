@@ -7,6 +7,7 @@ import { getStudent } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ByParameterView from '../components/ByParameterView.jsx';
 import ByPeriodView from '../components/ByPeriodView.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import HistoryGrid from '../components/HistoryGrid.jsx';
 import { formatStudentCode } from '../lib/format.js';
 import { usePeriods } from '../lib/usePeriods.js';
@@ -67,8 +68,11 @@ function StudentDetailPage() {
     return (
       <main>
         {backLink}
-        <h1>Student not found</h1>
-        <p>This student does not exist or was deleted.</p>
+        <EmptyState
+          tone="warn"
+          title="Student not found"
+          description="This student does not exist or was deleted."
+        />
       </main>
     );
   }
@@ -85,15 +89,22 @@ function StudentDetailPage() {
     return (
       <main>
         {backLink}
-        <p className="error">{failed.error.message}</p>
+        <EmptyState
+          tone="danger"
+          title="Couldn't load this student"
+          description={failed.error.message}
+        />
       </main>
     );
   }
   if (queries.some((query) => query.isPending)) {
     return (
-      <main>
+      <main aria-busy="true">
         {backLink}
-        <p>Loading...</p>
+        <div className="page-loading" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <p>Loading…</p>
+        </div>
       </main>
     );
   }
@@ -154,31 +165,37 @@ function StudentDetailPage() {
   return (
     <main className="wide">
       {backLink}
-      <h1>{student.fullName}</h1>
-      <p className="hint code">Code {formatStudentCode(student.studentCode)}</p>
-      {can('data.export') && canViewHistory && (
-        <p>
-          <ExportButton
-            label="Export history (CSV)"
-            filename={`history-${student.studentCode}.csv`}
-            disabled={!periods.anchorDate || periods.current === null}
-            buildRows={() =>
-              historyCsvRows({
-                evaluations,
-                periods: periods.periods,
-                parameters,
-              })
-            }
-          />
-        </p>
-      )}
+      <div className="page-head">
+        <div>
+          <h1>{student.fullName}</h1>
+          <p className="hint code">
+            Code {formatStudentCode(student.studentCode)}
+          </p>
+        </div>
+        {can('data.export') && canViewHistory && (
+          <div className="page-head-actions">
+            <ExportButton
+              label="Export history (CSV)"
+              filename={`history-${student.studentCode}.csv`}
+              disabled={!periods.anchorDate || periods.current === null}
+              buildRows={() =>
+                historyCsvRows({
+                  evaluations,
+                  periods: periods.periods,
+                  parameters,
+                })
+              }
+            />
+          </div>
+        )}
+      </div>
 
       <StudentFieldsSection student={student} />
       <StudentGroupsSection student={student} />
       <StudentEvaluateSection student={student} />
 
       {canViewHistory && (
-        <section>
+        <section className="section-card">
           <h2>History</h2>
           <div className="tabs" role="tablist" aria-label="History views">
             {TABS.map((item) => (

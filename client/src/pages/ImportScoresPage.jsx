@@ -6,8 +6,11 @@ import { listPeriodParameters, saveEvaluations } from '../api/evaluations.js';
 import { listParameters } from '../api/parameters.js';
 import { fetchAllStudents } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import ExportButton from '../components/ExportButton.jsx';
+import ImportSteps from '../components/ImportSteps.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
+import { LockIcon, UploadIcon } from '../components/icons.jsx';
 import { scoreTemplateCsvRows } from '../lib/exports.js';
 import { formatIsoDate, formatStudentCode } from '../lib/format.js';
 import { prepareRows } from '../lib/importNames.js';
@@ -85,7 +88,10 @@ function CellView({ cell, info, canOverride }) {
   }
   return (
     <div className={canOverride ? undefined : 'error'}>
-      🔒 {info.from ?? '—'} → <strong>{info.to}</strong>
+      <span className="lock" aria-hidden="true">
+        <LockIcon />
+      </span>{' '}
+      {info.from ?? '—'} → <strong>{info.to}</strong>
       <div className="small">
         {canOverride
           ? 'Locked. Needs a reason.'
@@ -303,38 +309,51 @@ function ImportScoresPage() {
   if (!can('scores.enter')) {
     return (
       <main>
-        <h1>Import scores</h1>
-        <p>You do not have permission to import scores.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to import scores."
+        />
       </main>
     );
   }
   if (periodsQuery.isPending) {
     return (
-      <main>
-        <p>Loading...</p>
+      <main aria-busy="true">
+        <div className="page-loading" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <p>Loading…</p>
+        </div>
       </main>
     );
   }
   if (periodsQuery.isError) {
     return (
       <main>
-        <p className="error">{periodsQuery.error.message}</p>
+        <EmptyState
+          tone="danger"
+          title="Couldn't load the period calendar"
+          description={periodsQuery.error.message}
+        />
       </main>
     );
   }
   if (!periods.anchorDate) {
     return (
       <main>
-        <h1>Import scores</h1>
-        <p>An administrator needs to set the period start date first.</p>
+        <EmptyState
+          title="No period calendar yet"
+          description="An administrator needs to set the period start date first."
+        />
       </main>
     );
   }
   if (periods.current === null) {
     return (
       <main>
-        <h1>Import scores</h1>
-        <p>Period 1 has not started yet.</p>
+        <EmptyState
+          title="No active period"
+          description="Period 1 has not started yet."
+        />
       </main>
     );
   }
@@ -372,6 +391,10 @@ function ImportScoresPage() {
         <Link to="/evaluate">← Back to Evaluate</Link>
       </p>
       <h1>Import scores</h1>
+      <ImportSteps
+        steps={['Choose a file', 'Review', 'Done']}
+        current={stage === 'choose' ? 0 : stage === 'preview' ? 1 : 2}
+      />
 
       {stage === 'choose' && (
         <>
@@ -407,18 +430,25 @@ function ImportScoresPage() {
             </p>
           )}
 
-          <input
-            type="file"
-            accept=".csv,.txt,text/csv"
-            aria-label="Choose a CSV file of scores to import"
-            onChange={handleFile}
-          />
+          <div className="drop-zone">
+            <span className="drop-zone-mark">
+              <UploadIcon />
+            </span>
+            <input
+              type="file"
+              accept=".csv,.txt,text/csv"
+              aria-label="Choose a CSV file of scores to import"
+              onChange={handleFile}
+            />
+          </div>
           {parseError && (
             <p className="error" role="alert">
               {parseError}
             </p>
           )}
-          {rows.length > 0 && studentsQuery.isPending && <p>Loading students...</p>}
+          {rows.length > 0 && studentsQuery.isPending && (
+            <p className="hint">Loading students…</p>
+          )}
           {studentsQuery.isError && (
             <p className="error" role="alert">
               {studentsQuery.error.message}
@@ -426,7 +456,7 @@ function ImportScoresPage() {
           )}
 
           {rows.length > 0 && (
-            <>
+            <section className="section-card">
               <h2>{fileName}</h2>
               <div className="table-wrap">
                 <table>
@@ -572,13 +602,13 @@ function ImportScoresPage() {
                   {check.error.message}
                 </p>
               )}
-            </>
+            </section>
           )}
         </>
       )}
 
       {stage === 'preview' && preview && plan && (
-        <>
+        <section className="section-card">
           <h2>
             {fileName}, Period {periodNumber}
             {period && (
@@ -703,11 +733,11 @@ function ImportScoresPage() {
               </p>
             </>
           )}
-        </>
+        </section>
       )}
 
       {stage === 'done' && done && (
-        <>
+        <section className="section-card">
           <p className="success" role="status">
             Saved. {done.changed} score{done.changed === 1 ? '' : 's'} changed
             {done.unchanged > 0 && `, ${done.unchanged} already the same`}
@@ -722,7 +752,7 @@ function ImportScoresPage() {
               Import another file
             </button>
           </div>
-        </>
+        </section>
       )}
     </main>
   );

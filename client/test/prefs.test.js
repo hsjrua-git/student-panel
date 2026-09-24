@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { toggleHidden, visibleParameters } from '../src/lib/prefs.js';
-import { normalizeTheme } from '../src/lib/theme.js';
+import { normalizePalette, normalizeTheme } from '../src/lib/theme.js';
 
 test('themes are normalised to a known value', () => {
   assert.equal(normalizeTheme('dark'), 'dark');
@@ -10,6 +10,16 @@ test('themes are normalised to a known value', () => {
   assert.equal(normalizeTheme('blue'), 'system');
   assert.equal(normalizeTheme(null), 'system');
   assert.equal(normalizeTheme(undefined), 'system');
+});
+
+test('palettes are normalised to a known value, falling back to gradebook', () => {
+  assert.equal(normalizePalette('midnight'), 'midnight');
+  assert.equal(normalizePalette('ember'), 'ember');
+  assert.equal(normalizePalette('meadow'), 'meadow');
+  assert.equal(normalizePalette('gradebook'), 'gradebook');
+  assert.equal(normalizePalette('indigo'), 'gradebook');
+  assert.equal(normalizePalette(null), 'gradebook');
+  assert.equal(normalizePalette(undefined), 'gradebook');
 });
 
 test('hidden parameters are left out of the visible list', () => {

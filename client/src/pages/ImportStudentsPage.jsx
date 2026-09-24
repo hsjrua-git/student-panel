@@ -4,7 +4,10 @@ import Papa from 'papaparse';
 import { Link } from 'react-router';
 import { importStudents } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import ExportButton from '../components/ExportButton.jsx';
+import ImportSteps from '../components/ImportSteps.jsx';
+import { UploadIcon } from '../components/icons.jsx';
 import { createdStudentsCsvRows } from '../lib/exports.js';
 import { formatStudentCode, toIsoDate } from '../lib/format.js';
 import {
@@ -161,8 +164,10 @@ function ImportStudentsPage() {
   if (!can('data.import')) {
     return (
       <main>
-        <h1>Import students</h1>
-        <p>You do not have permission to import students.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to import students."
+        />
       </main>
     );
   }
@@ -176,6 +181,10 @@ function ImportStudentsPage() {
         <Link to="/students">← Back to students</Link>
       </p>
       <h1>Import students</h1>
+      <ImportSteps
+        steps={['Choose a file', 'Review', 'Done']}
+        current={stage === 'choose' ? 0 : stage === 'preview' ? 1 : 2}
+      />
 
       {stage === 'choose' && (
         <>
@@ -184,12 +193,17 @@ function ImportStudentsPage() {
             Excel or LibreOffice, use "Save as" and pick CSV (UTF-8). Students
             get a random code when they are added.
           </p>
-          <input
-            type="file"
-            accept=".csv,.txt,text/csv"
-            aria-label="Choose a CSV file of student names to import"
-            onChange={handleFile}
-          />
+          <div className="drop-zone">
+            <span className="drop-zone-mark">
+              <UploadIcon />
+            </span>
+            <input
+              type="file"
+              accept=".csv,.txt,text/csv"
+              aria-label="Choose a CSV file of student names to import"
+              onChange={handleFile}
+            />
+          </div>
           {parseError && (
             <p className="error" role="alert">
               {parseError}
@@ -197,7 +211,7 @@ function ImportStudentsPage() {
           )}
 
           {rows.length > 0 && (
-            <>
+            <section className="section-card">
               <h2>{fileName}</h2>
               <div className="table-wrap">
                 <table>
@@ -277,13 +291,13 @@ function ImportStudentsPage() {
                   {check.error.message}
                 </p>
               )}
-            </>
+            </section>
           )}
         </>
       )}
 
       {stage === 'preview' && result && (
-        <>
+        <section className="section-card">
           <h2>{fileName}</h2>
           <p className="summary-line">
             {result.counts.total} rows checked:{' '}
@@ -354,11 +368,11 @@ function ImportStudentsPage() {
               {run.error.message}
             </p>
           )}
-        </>
+        </section>
       )}
 
       {stage === 'done' && done && (
-        <>
+        <section className="section-card">
           <p className="success" role="status">
             Added {done.created.length} student
             {done.created.length === 1 ? '' : 's'}
@@ -407,7 +421,7 @@ function ImportStudentsPage() {
               </tbody>
             </table>
           </div>
-        </>
+        </section>
       )}
     </main>
   );

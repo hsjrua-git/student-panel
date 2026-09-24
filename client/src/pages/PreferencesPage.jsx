@@ -9,6 +9,63 @@ const THEMES = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
 ];
+const PALETTES = [
+  {
+    value: 'aurora',
+    label: 'Aurora',
+    preview: {
+      paper: '#e7e9fb',
+      surface: '#ffffff',
+      line: '#e4e6f5',
+      spine: '#141329',
+      brand: '#5850ec',
+    },
+  },
+  {
+    value: 'gradebook',
+    label: 'Gradebook',
+    preview: {
+      paper: '#f4f5fb',
+      surface: '#ffffff',
+      line: '#e2e5f0',
+      spine: '#141b2e',
+      brand: '#4f46e5',
+    },
+  },
+  {
+    value: 'midnight',
+    label: 'Midnight',
+    preview: {
+      paper: '#eef2fb',
+      surface: '#ffffff',
+      line: '#dae2f2',
+      spine: '#0e1730',
+      brand: '#2563eb',
+    },
+  },
+  {
+    value: 'ember',
+    label: 'Ember',
+    preview: {
+      paper: '#faf6f1',
+      surface: '#fffdfb',
+      line: '#ece1d4',
+      spine: '#1f1a15',
+      brand: '#c2410c',
+    },
+  },
+  {
+    value: 'meadow',
+    label: 'Meadow',
+    preview: {
+      paper: '#f2f8f4',
+      surface: '#ffffff',
+      line: '#dbeae1',
+      spine: '#0e241b',
+      brand: '#047857',
+    },
+  },
+];
 const PAGE_SIZES = [10, 25, 50, 100];
 const SORTS = [
   { value: 'newest', label: 'Newest first' },
@@ -81,25 +138,69 @@ function PreferencesPage() {
         {status}
       </p>
 
-      <section>
+      <section className="section-card">
         <h2>Appearance</h2>
+        <p className="hint">
+          Choose light or dark, then pick a palette that recolors the whole app.
+        </p>
         <fieldset className="pref-group">
           <legend>Theme</legend>
-          {THEMES.map((option) => (
-            <label key={option.value} className="inline">
-              <input
-                type="radio"
-                name="theme"
-                checked={preferences.theme === option.value}
-                onChange={() => change({ theme: option.value })}
-              />
-              {option.label}
-            </label>
-          ))}
+          <div className="segmented" role="radiogroup" aria-label="Theme">
+            {THEMES.map((option) => (
+              <label key={option.value}>
+                <input
+                  type="radio"
+                  name="theme"
+                  checked={preferences.theme === option.value}
+                  onChange={() => change({ theme: option.value })}
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="pref-group">
+          <legend>Palette</legend>
+          <div className="palette-swatches">
+            {PALETTES.map((option) => (
+              <label key={option.value} className="palette-option">
+                <input
+                  type="radio"
+                  name="palette"
+                  checked={(preferences.palette ?? 'aurora') === option.value}
+                  onChange={() => change({ palette: option.value })}
+                />
+                <span
+                  className="palette-preview"
+                  style={{
+                    '--pv-paper': option.preview.paper,
+                    '--pv-surface': option.preview.surface,
+                    '--pv-line': option.preview.line,
+                    '--pv-spine': option.preview.spine,
+                    '--pv-brand': option.preview.brand,
+                  }}
+                  aria-hidden="true"
+                >
+                  <span className="palette-preview-spine" />
+                  <span className="palette-preview-body">
+                    <span className="palette-preview-bar" />
+                    <span className="palette-preview-bar short" />
+                    <span className="palette-preview-dot" />
+                  </span>
+                </span>
+                <span className="palette-name">{option.label}</span>
+              </label>
+            ))}
+          </div>
+          <p className="hint">
+            Recolors the whole interface — the sidebar, surfaces, and highlight
+            color. Each palette has a light and a dark version, so the theme
+            setting above still applies.
+          </p>
         </fieldset>
       </section>
 
-      <section>
+      <section className="section-card">
         <h2>Students list</h2>
         <div className="pref-group">
           <label className="inline">
@@ -156,7 +257,7 @@ function PreferencesPage() {
         )}
       </section>
 
-      <section>
+      <section className="section-card">
         <h2>Student page</h2>
         <div className="pref-group">
           <label className="inline">
@@ -189,12 +290,12 @@ function PreferencesPage() {
         {canViewParameters && (
           <>
             <h3>Parameters shown in the overview</h3>
-            {parametersQuery.isPending && <p>Loading...</p>}
+            {parametersQuery.isPending && <p className="hint">Loading…</p>}
             {parametersQuery.isError && (
               <p className="error">{parametersQuery.error.message}</p>
             )}
             {parametersQuery.data && parametersQuery.data.length === 0 && (
-              <p>No parameters yet.</p>
+              <p className="hint">No parameters yet.</p>
             )}
             <div className="pref-group">
               {parametersQuery.data?.map((parameter) => (
@@ -225,7 +326,7 @@ function PreferencesPage() {
       </section>
 
       {canExport && (
-        <section>
+        <section className="section-card">
           <h2>Spreadsheet export</h2>
           <div className="pref-group">
             <label className="inline">
@@ -247,7 +348,12 @@ function PreferencesPage() {
         </section>
       )}
 
-      <section>
+      <section className="section-card">
+        <h2>Reset preferences</h2>
+        <p className="hint">
+          Put every preference above back to its default. This only affects your
+          own settings.
+        </p>
         <button type="button" onClick={handleReset} disabled={reset.isPending}>
           Reset all to defaults
         </button>

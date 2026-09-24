@@ -13,9 +13,19 @@ function UnmeasuredList({ items }) {
       <ul className="plain-list unmeasured">
         {items.slice(0, SHOWN).map((item) => (
           <li key={item.id}>
-            <Link to={`/students/${item.id}`}>{item.fullName}</Link>{' '}
-            <span className="hint code">{formatStudentCode(item.studentCode)}</span>
-            {' — '}missing {item.missing.join(', ')}
+            <div className="unmeasured-head">
+              <Link to={`/students/${item.id}`}>{item.fullName}</Link>{' '}
+              <span className="hint code">
+                {formatStudentCode(item.studentCode)}
+              </span>
+            </div>
+            <span className="chip-row">
+              {item.missing.map((name) => (
+                <span key={name} className="chip warn">
+                  {name}
+                </span>
+              ))}
+            </span>
           </li>
         ))}
       </ul>

@@ -90,6 +90,7 @@ function StudentRow({ student }) {
           {can('students.delete') && (
             <button
               type="button"
+              className="danger"
               onClick={handleDelete}
               disabled={remove.isPending}
             >

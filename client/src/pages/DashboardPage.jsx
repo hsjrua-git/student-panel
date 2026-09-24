@@ -6,6 +6,7 @@ import { getResults } from '../api/results.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
 import HeadlineCards from '../components/HeadlineCards.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import ParameterCard from '../components/ParameterCard.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
 import UnmeasuredList from '../components/UnmeasuredList.jsx';
@@ -46,15 +47,22 @@ function DashboardPage() {
 
   if (periodsQuery.isPending) {
     return (
-      <main>
-        <p>Loading...</p>
+      <main aria-busy="true">
+        <div className="page-loading" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <p>Loading…</p>
+        </div>
       </main>
     );
   }
   if (periodsQuery.isError) {
     return (
       <main>
-        <p className="error">{periodsQuery.error.message}</p>
+        <EmptyState
+          tone="danger"
+          title="Couldn't load the dashboard"
+          description={periodsQuery.error.message}
+        />
       </main>
     );
   }
@@ -63,12 +71,19 @@ function DashboardPage() {
       <main>
         <h1>Dashboard</h1>
         {can('settings.manage') ? (
-          <p>
-            Set the period start date first, on the{' '}
-            <Link to="/settings">Settings</Link> page.
-          </p>
+          <EmptyState
+            title="Set up the calendar"
+            description="Set the period start date to begin tracking scores."
+          >
+            <p>
+              <Link to="/settings">Go to Settings</Link>
+            </p>
+          </EmptyState>
         ) : (
-          <p>An administrator needs to set the period start date first.</p>
+          <EmptyState
+            title="Not set up yet"
+            description="An administrator needs to set the period start date first."
+          />
         )}
       </main>
     );
@@ -77,7 +92,10 @@ function DashboardPage() {
     return (
       <main>
         <h1>Dashboard</h1>
-        <p>Period 1 has not started yet.</p>
+        <EmptyState
+          title="Period 1 hasn't started"
+          description="Once the first period begins, results will show up here."
+        />
       </main>
     );
   }
@@ -88,7 +106,16 @@ function DashboardPage() {
 
   return (
     <main className="wide">
-      <h1>Dashboard</h1>
+      <div className="page-head">
+        <h1>Dashboard</h1>
+        {can('scores.enter') && periodNumber === periods.current && (
+          <div className="page-head-actions">
+            <Link className="btn primary" to="/evaluate">
+              Enter scores
+            </Link>
+          </div>
+        )}
+      </div>
 
       <div className="toolbar">
         <PeriodPicker
@@ -98,13 +125,8 @@ function DashboardPage() {
         />
         <GroupFilter value={groupId} onChange={setGroupId} />
       </div>
-      {can('scores.enter') && periodNumber === periods.current && (
-        <p>
-          <Link to="/evaluate">Enter scores for this period</Link>
-        </p>
-      )}
 
-      {resultsQuery.isPending && <p>Loading...</p>}
+      {resultsQuery.isPending && <p className="hint">Loading…</p>}
       {resultsQuery.isError && (
         <p className="error">{resultsQuery.error.message}</p>
       )}
@@ -123,12 +145,21 @@ function DashboardPage() {
           )}
 
           {results.students.length === 0 ? (
-            <p>No students yet.</p>
+            <EmptyState
+              title="No students yet"
+              description="Add students to start entering and reviewing scores."
+            >
+              {can('students.create') && (
+                <p>
+                  <Link to="/students">Go to Students</Link>
+                </p>
+              )}
+            </EmptyState>
           ) : results.parameters.length === 0 ? (
-            <p>
-              No parameters were used in this period, and no scores were
-              entered.
-            </p>
+            <EmptyState
+              title="Nothing measured this period"
+              description="No parameters were used in this period, and no scores were entered yet."
+            />
           ) : (
             <>
               <HeadlineCards summary={summary} />

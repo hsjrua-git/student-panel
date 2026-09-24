@@ -54,9 +54,11 @@ function ParameterChoice({ parameter, used, periodNumber, disabled }) {
   return (
     <li className="param-choice">
       <div className="param-line">
-        <span>
-          <strong>{parameter.name}</strong>: {used ? 'used' : 'not used'} in
-          Period {periodNumber}
+        <span className="chip-row">
+          <strong>{parameter.name}</strong>
+          <span className={used ? 'chip ok' : 'chip'}>
+            {used ? 'Used' : 'Not used'}
+          </span>
         </span>
         {!isOpen && (
           <button

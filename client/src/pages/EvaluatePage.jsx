@@ -7,6 +7,7 @@ import {
   saveEvaluations,
 } from '../api/evaluations.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import EvaluationGrid from '../components/EvaluationGrid.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
 import PeriodParametersPanel from '../components/PeriodParametersPanel.jsx';
@@ -210,24 +211,31 @@ function EvaluatePage() {
     return (
       <main>
         <h1>Evaluate</h1>
-        <p>
-          You do not have permission to enter scores. You can see scores on
-          each student's page.
-        </p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to enter scores. You can see scores on each student's page."
+        />
       </main>
     );
   }
   if (periodsQuery.isPending) {
     return (
-      <main>
-        <p>Loading...</p>
+      <main aria-busy="true">
+        <div className="page-loading" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <p>Loading…</p>
+        </div>
       </main>
     );
   }
   if (periodsQuery.isError) {
     return (
       <main>
-        <p className="error">{periodsQuery.error.message}</p>
+        <EmptyState
+          tone="danger"
+          title="Couldn't load the evaluation page"
+          description={periodsQuery.error.message}
+        />
       </main>
     );
   }
@@ -235,10 +243,14 @@ function EvaluatePage() {
     return (
       <main>
         <h1>Evaluate</h1>
-        <p>
-          Set the period start date first, on the{' '}
-          <Link to="/settings">Settings</Link> page.
-        </p>
+        <EmptyState
+          title="Set up the calendar"
+          description="Set the period start date first, then you can start entering scores."
+        >
+          <p>
+            <Link to="/settings">Go to Settings</Link>
+          </p>
+        </EmptyState>
       </main>
     );
   }
@@ -246,7 +258,10 @@ function EvaluatePage() {
     return (
       <main>
         <h1>Evaluate</h1>
-        <p>Period 1 has not started yet.</p>
+        <EmptyState
+          title="Period 1 hasn't started"
+          description="Once the first period begins, you can enter scores here."
+        />
       </main>
     );
   }
@@ -265,13 +280,16 @@ function EvaluatePage() {
 
   return (
     <main className="wide">
-      <h1>Evaluate</h1>
-
-      {can('data.import') && (
-        <p>
-          <Link to="/evaluate/import">Import scores from a CSV file…</Link>
-        </p>
-      )}
+      <div className="page-head">
+        <h1>Evaluate</h1>
+        {can('data.import') && (
+          <div className="page-head-actions">
+            <Link className="btn" to="/evaluate/import">
+              Import scores
+            </Link>
+          </div>
+        )}
+      </div>
 
       <PeriodPicker
         periods={periods}
@@ -286,7 +304,7 @@ function EvaluatePage() {
         />
       )}
 
-      <div className="toolbar">
+      <div className="control-bar">
         <input
           type="search"
           className="search"
@@ -296,8 +314,10 @@ function EvaluatePage() {
           aria-label="Search students"
         />
         <GroupFilter value={groupId} onChange={handleGroupChange} />
+        <span className="spacer" />
         <button
           type="button"
+          className="primary"
           onClick={handleSave}
           disabled={draftCount === 0 || hasLiveErrors || mutation.isPending}
         >
@@ -316,8 +336,8 @@ function EvaluatePage() {
         A score can be changed for 7 days after it is first saved (1 day if it
         was entered late). After that it is locked
         {can('scores.override')
-          ? ' (🔒). You can still change it, with a written reason.'
-          : ' (🔒) and only someone who can override locks can change it.'}
+          ? '. You can still change it, with a written reason.'
+          : ' and only someone who can override locks can change it.'}
       </p>
 
       {hasLiveErrors && (
@@ -338,7 +358,7 @@ function EvaluatePage() {
       )}
 
       {loadError && <p className="error">{loadError.message}</p>}
-      {isLoading && !loadError && <p>Loading...</p>}
+      {isLoading && !loadError && <p className="hint">Loading…</p>}
       {!isLoading && !loadError && (
         <EvaluationGrid
           parameters={parametersQuery.data}

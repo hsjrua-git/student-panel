@@ -7,6 +7,7 @@ import {
   formatRange,
   formatStudentCode,
 } from '../lib/format.js';
+import { LockIcon, NoteFilledIcon, NoteIcon } from './icons.jsx';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
 const GRID_PAGE_SIZE = 50;
@@ -95,7 +96,7 @@ const EvaluationRow = memo(function EvaluationRow({
               />
               {access !== 'open' && (
                 <span className="lock" aria-hidden="true">
-                  🔒
+                  <LockIcon />
                 </span>
               )}
               {onNoteChange && (
@@ -111,7 +112,7 @@ const EvaluationRow = memo(function EvaluationRow({
                   title={hasNote ? shownNote : 'Add a note'}
                   onClick={() => onOpenNoteChange(isNoteOpen ? null : key)}
                 >
-                  {hasNote ? '📝' : '🗒'}
+                  {hasNote ? <NoteFilledIcon /> : <NoteIcon />}
                 </button>
               )}
             </div>
@@ -210,7 +211,7 @@ function EvaluationGrid({
     if (data && page > totalPages) onPageChange(totalPages);
   }, [data, page, totalPages, onPageChange]);
 
-  if (isPending) return <p>Loading students...</p>;
+  if (isPending) return <p className="hint">Loading students…</p>;
   if (isError) return <p className="error">{error.message}</p>;
   if (data.total === 0) {
     return (

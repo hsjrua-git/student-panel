@@ -63,9 +63,8 @@ function ParameterRow({ parameter }) {
 
   if (isEditing) {
     return (
-      <tr>
-        <td colSpan={4}>
-          <form onSubmit={handleSave} className="edit-form">
+      <div className="param-card">
+        <form onSubmit={handleSave} className="edit-form">
             <label>
               Name
               <input
@@ -113,24 +112,29 @@ function ParameterRow({ parameter }) {
             {problem && <p className="error">{problem}</p>}
             {update.isError && <p className="error">{update.error.message}</p>}
           </form>
-        </td>
-      </tr>
+      </div>
     );
   }
 
+  const range = formatRange(parameter);
   return (
-    <tr>
-      <td>{parameter.name}</td>
-      <td>{parameter.unit ?? '—'}</td>
-      <td>{formatRange(parameter)}</td>
-      {can('parameters.manage') && (
-        <td className="actions">
-          <button type="button" onClick={startEditing}>
+    <div className="param-card">
+      <div className="param-card-head">
+        <h3>{parameter.name}</h3>
+        {can('parameters.manage') && (
+          <button type="button" className="quiet" onClick={startEditing}>
             Edit
           </button>
-        </td>
-      )}
-    </tr>
+        )}
+      </div>
+      <span className="chip-row">
+        {range !== '—' && <span className="chip">Range {range}</span>}
+        {parameter.unit && <span className="chip">{parameter.unit}</span>}
+        {range === '—' && !parameter.unit && (
+          <span className="hint">No range or unit set</span>
+        )}
+      </span>
+    </div>
   );
 }
 

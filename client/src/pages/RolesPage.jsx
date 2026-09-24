@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 import {
   createRole,
   deleteRole,
@@ -154,7 +155,11 @@ function RoleEditor({ catalog, role, onDone }) {
       />
 
       <div className="toolbar">
-        <button type="submit" disabled={save.isPending || name.trim() === ''}>
+        <button
+          type="submit"
+          className="primary"
+          disabled={save.isPending || name.trim() === ''}
+        >
           {save.isPending ? 'Saving…' : isNew ? 'Create role' : 'Save changes'}
         </button>
         <button type="button" onClick={onDone}>
@@ -189,25 +194,32 @@ function RolesPage() {
   if (!can('roles.manage')) {
     return (
       <main>
-        <h1>Roles</h1>
-        <p>You do not have permission to manage roles.</p>
+        <EmptyState
+          title="Read-only access"
+          description="You do not have permission to manage roles."
+        />
       </main>
     );
   }
 
   if (rolesQuery.isPending || catalogQuery.isPending) {
     return (
-      <main>
-        <h1>Roles</h1>
-        <p>Loading…</p>
+      <main aria-busy="true">
+        <div className="page-loading" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <p>Loading…</p>
+        </div>
       </main>
     );
   }
   if (rolesQuery.isError) {
     return (
       <main>
-        <h1>Roles</h1>
-        <p className="error">{rolesQuery.error.message}</p>
+        <EmptyState
+          tone="danger"
+          title="Couldn't load roles"
+          description={rolesQuery.error.message}
+        />
       </main>
     );
   }
@@ -226,7 +238,20 @@ function RolesPage() {
 
   return (
     <main className="wide">
-      <h1>Roles</h1>
+      <div className="page-head">
+        <h1>Roles</h1>
+        {editing === null && (
+          <div className="page-head-actions">
+            <button
+              type="button"
+              className="primary"
+              onClick={() => setEditing('new')}
+            >
+              New role
+            </button>
+          </div>
+        )}
+      </div>
       <p className="hint">
         A role is a named set of permissions. Give people the role that matches
         what they should be able to do. Ticking a permission automatically ticks
@@ -234,12 +259,7 @@ function RolesPage() {
       </p>
 
       {editing === null ? (
-        <>
-          <p>
-            <button type="button" onClick={() => setEditing('new')}>
-              New role
-            </button>
-          </p>
+        <section className="section-card">
           <div className="table-wrap">
             <table>
               <thead>
@@ -256,9 +276,7 @@ function RolesPage() {
                   <tr key={role.id}>
                     <td>
                       {role.name}
-                      {role.isSystem && (
-                        <span className="hint"> (built-in)</span>
-                      )}
+                      {role.isSystem && <span className="badge">built-in</span>}
                     </td>
                     <td>{role.description || '—'}</td>
                     <td>{role.permissions.length}</td>
@@ -274,6 +292,7 @@ function RolesPage() {
                           {!role.isSystem && (
                             <button
                               type="button"
+                              className="danger"
                               onClick={() => handleDelete(role)}
                               disabled={role.userCount > 0 || remove.isPending}
                               title={
@@ -298,9 +317,9 @@ function RolesPage() {
               {remove.error.message}
             </p>
           )}
-        </>
+        </section>
       ) : (
-        <section>
+        <section className="section-card">
           <h2>{editing === 'new' ? 'New role' : `Edit ${editing.name}`}</h2>
           <RoleEditor
             catalog={catalog}

@@ -6,7 +6,7 @@ import {
   savePreferences,
 } from '../api/preferences.js';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { applyTheme } from '../lib/theme.js';
+import { applyPalette, applyTheme } from '../lib/theme.js';
 import { DEFAULT_PREFERENCES } from './defaults.js';
 import { PreferencesContext } from './PreferencesContext.jsx';
 
@@ -34,6 +34,11 @@ export function PreferencesProvider({ children }) {
   useEffect(() => {
     if (theme) applyTheme(theme);
   }, [theme]);
+
+  const palette = query.data?.palette;
+  useEffect(() => {
+    if (palette) applyPalette(palette);
+  }, [palette]);
 
   const update = useMutation({
     mutationKey: KEY,

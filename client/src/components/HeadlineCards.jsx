@@ -1,6 +1,6 @@
-function Card({ label, value, note }) {
+function Card({ label, value, note, tone }) {
   return (
-    <div className="stat-card">
+    <div className={tone ? `stat-card ${tone}` : 'stat-card'}>
       <div className="stat-label">{label}</div>
       <div className="stat-value">{value}</div>
       {note && <div className="hint">{note}</div>}
@@ -10,6 +10,8 @@ function Card({ label, value, note }) {
 
 function HeadlineCards({ summary }) {
   const plural = summary.parametersInUse === 1 ? '' : 's';
+  const allMeasured =
+    summary.students > 0 && summary.studentsComplete === summary.students;
   return (
     <div className="stat-grid">
       <Card
@@ -26,6 +28,7 @@ function HeadlineCards({ summary }) {
         label="Fully measured"
         value={summary.studentsComplete}
         note={`of ${summary.students} students`}
+        tone={allMeasured ? 'ok' : undefined}
       />
       <Card
         label="Not measured at all"
@@ -35,6 +38,7 @@ function HeadlineCards({ summary }) {
             ? `${summary.studentsPartial} partly measured`
             : undefined
         }
+        tone={summary.studentsNone > 0 ? 'danger' : undefined}
       />
     </div>
   );
