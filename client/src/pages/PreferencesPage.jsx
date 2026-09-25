@@ -14,11 +14,11 @@ const PALETTES = [
     value: 'aurora',
     label: 'Aurora',
     preview: {
-      paper: '#e7e9fb',
+      paper: '#f4f5f7',
       surface: '#ffffff',
-      line: '#e4e6f5',
-      spine: '#141329',
-      brand: '#5850ec',
+      line: '#e6e8ec',
+      spine: '#16181d',
+      brand: '#cf4c0d',
     },
   },
   {
@@ -63,6 +63,28 @@ const PALETTES = [
       line: '#dbeae1',
       spine: '#0e241b',
       brand: '#047857',
+    },
+  },
+  {
+    value: 'cobalt',
+    label: 'Cobalt',
+    preview: {
+      paper: '#f4f5f7',
+      surface: '#ffffff',
+      line: '#e6e8ec',
+      spine: '#16181d',
+      brand: '#1d6fe0',
+    },
+  },
+  {
+    value: 'crimson',
+    label: 'Crimson',
+    preview: {
+      paper: '#f4f5f7',
+      surface: '#ffffff',
+      line: '#e6e8ec',
+      spine: '#0b0b0d',
+      brand: '#d21f3c',
     },
   },
 ];

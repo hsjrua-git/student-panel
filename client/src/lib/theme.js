@@ -2,13 +2,26 @@ const STORAGE_KEY = 'studentPanelTheme';
 const PALETTE_KEY = 'studentPanelPalette';
 const THEMES = ['system', 'light', 'dark'];
 // 'aurora' is the built-in default: it maps to *no* data-palette attribute, so
-// the signature indigo/violet glass tokens at the top of index.css apply
-// untouched. Every other palette (including the classic 'gradebook' look) sets
-// [data-palette] and lets the stylesheet recolor the whole interface.
-const PALETTES = ['aurora', 'gradebook', 'midnight', 'ember', 'meadow'];
+// the signature grey base + top-edge glow tokens at the top of index.css apply
+// untouched. Every other palette sets [data-palette] and lets the stylesheet
+// recolor the interface. 'cobalt' and 'crimson' are the CyFocus-style palettes:
+// they keep the neutral grey/charcoal shell and only re-hue the accent + the
+// top-edge glow (cool-blue / crimson-red); the older palettes recolor the whole
+// interface.
+const PALETTES = [
+  'aurora',
+  'gradebook',
+  'midnight',
+  'ember',
+  'meadow',
+  'cobalt',
+  'crimson',
+];
 
 export function normalizeTheme(value) {
-  return THEMES.includes(value) ? value : 'system';
+  // Dark-first: an unset or invalid theme falls back to dark (the default
+  // look). 'system' and 'light' remain fully selectable.
+  return THEMES.includes(value) ? value : 'dark';
 }
 
 export function normalizePalette(value) {

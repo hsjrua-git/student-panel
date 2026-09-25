@@ -1,5 +1,5 @@
 export const DEFAULT_PREFERENCES = {
-  theme: 'system',
+  theme: 'dark',
   palette: 'aurora',
   studentsPageSize: 25,
   studentsSort: 'newest',

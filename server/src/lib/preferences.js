@@ -1,7 +1,15 @@
 import { isUuid } from './ids.js';
 
 export const THEMES = ['system', 'light', 'dark'];
-export const PALETTES = ['aurora', 'gradebook', 'midnight', 'ember', 'meadow'];
+export const PALETTES = [
+  'aurora',
+  'gradebook',
+  'midnight',
+  'ember',
+  'meadow',
+  'cobalt',
+  'crimson',
+];
 export const PAGE_SIZES = [10, 25, 50, 100];
 export const SORTS = ['newest', 'oldest', 'name', 'code'];
 export const TABS = ['overview', 'period', 'parameter'];
@@ -9,7 +17,7 @@ export const CSV_DELIMITERS = [',', ';'];
 const MAX_HIDDEN = 200;
 
 export const DEFAULT_PREFERENCES = {
-  theme: 'system',
+  theme: 'dark',
   palette: 'aurora',
   studentsPageSize: 25,
   studentsSort: 'newest',

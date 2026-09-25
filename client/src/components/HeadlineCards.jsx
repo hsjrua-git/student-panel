@@ -1,3 +1,5 @@
+import CountUp from './CountUp.jsx';
+
 function Card({ label, value, note, tone }) {
   return (
     <div className={tone ? `stat-card ${tone}` : 'stat-card'}>
@@ -16,23 +18,29 @@ function HeadlineCards({ summary }) {
     <div className="stat-grid">
       <Card
         label="Students"
-        value={summary.students}
+        value={<CountUp value={summary.students} />}
         note={`${summary.parametersInUse} parameter${plural} in use`}
       />
       <Card
         label="Scores entered"
-        value={summary.completion === null ? '—' : `${summary.completion}%`}
+        value={
+          summary.completion === null ? (
+            '—'
+          ) : (
+            <CountUp value={summary.completion} suffix="%" />
+          )
+        }
         note={`${summary.measured} of ${summary.expected}`}
       />
       <Card
         label="Fully measured"
-        value={summary.studentsComplete}
+        value={<CountUp value={summary.studentsComplete} />}
         note={`of ${summary.students} students`}
         tone={allMeasured ? 'ok' : undefined}
       />
       <Card
         label="Not measured at all"
-        value={summary.studentsNone}
+        value={<CountUp value={summary.studentsNone} />}
         note={
           summary.studentsPartial > 0
             ? `${summary.studentsPartial} partly measured`

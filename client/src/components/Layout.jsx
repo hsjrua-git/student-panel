@@ -2,7 +2,12 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { NAV_SECTIONS, ROUTE_PERMISSIONS } from '../lib/navigation.js';
-import AccountMenu from './AccountMenu.jsx';
+import {
+  ChevronsLeftIcon,
+  LockIcon,
+  PreferencesIcon,
+  SignOutIcon,
+} from './icons.jsx';
 import PageLoader from './PageLoader.jsx';
 
 // Titles shown in the header for routes that aren't in the sidebar.
@@ -16,6 +21,12 @@ function Layout() {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  // Desktop-only: collapse the labelled rail down to a slim icon-only strip.
+  // Session-local React state (like openGroups): a layout convenience that
+  // resets at logout and never leaks between users on a shared machine.
+  // Starts collapsed at every login — Layout unmounts on logout, so this
+  // default re-applies each time a user signs in (ref 5's slim-rail default).
+  const [navCollapsed, setNavCollapsed] = useState(true);
   // Which nav groups are expanded. Starts empty (all folded) at every login.
   // Layout stays mounted while navigating between pages, so an expanded group
   // stays expanded across the session; logging out unmounts Layout, which
@@ -105,8 +116,19 @@ function Layout() {
 
   const currentTitle = titleForPath(location.pathname, sections);
 
+  // The icon-only rail is a desktop affordance; on mobile the sidebar is a
+  // full-width overlay drawer, so collapsing never applies there. It also only
+  // applies once the nav is showing — on the forced change-password screen
+  // (showNav false) the rail stays expanded so the pinned account actions keep
+  // their labels and Change password stays reachable.
+  const railCollapsed = showNav && !isMobile && navCollapsed;
+
   return (
-    <div className={`app-shell${drawerOpen ? ' drawer-open' : ''}`}>
+    <div
+      className={`app-shell${drawerOpen ? ' drawer-open' : ''}${
+        railCollapsed ? ' nav-collapsed' : ''
+      }`}
+    >
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
@@ -118,8 +140,19 @@ function Layout() {
         ref={sidebarRef}
         inert={isMobile && !drawerOpen}
       >
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
+        <div className="sidebar-top">
+          {showNav && (
+            <button
+              type="button"
+              className="rail-toggle"
+              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-pressed={navCollapsed}
+              aria-controls="primary-navigation"
+              onClick={() => setNavCollapsed((collapsed) => !collapsed)}
+            >
+              <ChevronsLeftIcon className="rail-toggle-icon" size={18} />
+            </button>
+          )}
           <span className="brand-name">Student Panel</span>
         </div>
         {showNav && (
@@ -127,8 +160,13 @@ function Layout() {
             {sections.map((section) => (
               <details
                 className="nav-group"
-                open={Boolean(openGroups[section.title])}
+                open={railCollapsed || Boolean(openGroups[section.title])}
                 onToggle={(event) => {
+                  // While collapsed the rail forces every group open so all
+                  // icons show; don't record that transient state — the user's
+                  // real expand/fold choices are preserved for when they expand
+                  // the rail again.
+                  if (railCollapsed) return;
                   // Read the element's open state NOW, while the event is still
                   // live. React releases the synthetic event once this handler
                   // returns and nulls out currentTarget, so reading it inside
@@ -157,16 +195,82 @@ function Layout() {
                   </svg>
                 </summary>
                 <div className="nav-group-items">
-                  {section.items.map((item) => (
-                    <NavLink key={item.to} to={item.to} className="nav-link">
-                      {item.label}
-                    </NavLink>
-                  ))}
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className="nav-link"
+                        title={railCollapsed ? item.label : undefined}
+                      >
+                        {Icon && (
+                          <span className="nav-icon" aria-hidden="true">
+                            <Icon size={18} />
+                          </span>
+                        )}
+                        <span className="nav-label">{item.label}</span>
+                      </NavLink>
+                    );
+                  })}
                 </div>
               </details>
             ))}
           </nav>
         )}
+
+        {/* Personal actions pinned at the foot of the rail (ref 5): who's signed
+            in, then Preferences / Change password / Sign out. Preferences and
+            Sign out stay visible in both the expanded and collapsed rail; Change
+            password rides along only when there's room for its label. This is
+            the app's single home for these actions — there is no separate topbar
+            account menu. */}
+        <div className="sidebar-account">
+          <div
+            className="sidebar-account-id"
+            title={railCollapsed ? `${user.fullName} · ${user.role}` : undefined}
+          >
+            <span className="avatar" aria-hidden="true">
+              {initialsOf(user.fullName)}
+            </span>
+            <span className="sidebar-account-meta">
+              <span className="account-name">{user.fullName}</span>
+              <span className="account-role">{user.role}</span>
+            </span>
+          </div>
+          <div className="sidebar-account-actions">
+            <NavLink
+              to="/preferences"
+              className="nav-link"
+              title={railCollapsed ? 'Preferences' : undefined}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                <PreferencesIcon size={18} />
+              </span>
+              <span className="nav-label">Preferences</span>
+            </NavLink>
+            <NavLink to="/change-password" className="nav-link account-collapsed-hide">
+              <span className="nav-icon" aria-hidden="true">
+                <LockIcon size={18} />
+              </span>
+              <span className="nav-label">Change password</span>
+            </NavLink>
+            <button
+              type="button"
+              className="nav-link account-signout"
+              onClick={() => logout.mutate()}
+              disabled={logout.isPending}
+              title={railCollapsed ? 'Sign out' : undefined}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                <SignOutIcon size={18} />
+              </span>
+              <span className="nav-label">
+                {logout.isPending ? 'Signing out…' : 'Sign out'}
+              </span>
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Backdrop only matters on small screens, where the sidebar floats over
@@ -207,12 +311,9 @@ function Layout() {
               </svg>
             </button>
           )}
-          <span className="topbar-title">{currentTitle}</span>
-          <AccountMenu
-            user={user}
-            onSignOut={() => logout.mutate()}
-            signingOut={logout.isPending}
-          />
+          <span className="topbar-title" key={currentTitle}>
+            {currentTitle}
+          </span>
         </header>
 
         {/* The skip-link jumps here; tabIndex=-1 lets this container take focus
@@ -226,6 +327,18 @@ function Layout() {
       </div>
     </div>
   );
+}
+
+// Up to two initials for the account chip's avatar: first + last word of the
+// full name, falling back to the first character (or "?" for an empty name).
+function initialsOf(fullName) {
+  const parts = String(fullName ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function titleForPath(pathname, sections) {

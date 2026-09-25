@@ -8,9 +8,9 @@ describe('normalizeTheme', () => {
     expect(normalizeTheme('dark')).toBe('dark');
   });
 
-  it('falls back to system for anything unrecognised', () => {
-    expect(normalizeTheme('solarized')).toBe('system');
-    expect(normalizeTheme(null)).toBe('system');
-    expect(normalizeTheme(undefined)).toBe('system');
+  it('falls back to dark (the default) for anything unrecognised', () => {
+    expect(normalizeTheme('solarized')).toBe('dark');
+    expect(normalizeTheme(null)).toBe('dark');
+    expect(normalizeTheme(undefined)).toBe('dark');
   });
 });

@@ -1,13 +1,14 @@
 /* ============================================================================
    Student Panel — interface styles
 
-   The "Aurora" signature aesthetic (the out-of-box default): a deep
-   indigo/violet spine beside a workspace lit by a faint aurora gradient, with
-   glass surfaces floating over it and one electric indigo accent. Everything is
-   driven by the design tokens below, so light/dark theming, the selectable
-   palettes (see section 1 — including the classic 'gradebook' look, now an
-   opt-in palette), and future tweaks happen in one place. Motion is soft and
-   short, and fully removed under prefers-reduced-motion (see the end of file).
+   The signature aesthetic (the out-of-box default, dark-first): a neutral
+   grey/charcoal spine beside a workspace lit by a faint top-edge ambient glow,
+   with glass surfaces floating over it and one accent hue (orange by default;
+   cool-blue in Cobalt, crimson in Crimson). Type is Manrope (self-hosted
+   variable font). Everything is driven by the design tokens below, so
+   light/dark theming, the selectable palettes (see section 1), and future
+   tweaks happen in one place. Motion is soft and slow, and fully removed under
+   prefers-reduced-motion (see the end of file).
 
    Sections:
      1. Design tokens (light + dark) + palettes
@@ -17,30 +18,49 @@
      5. Utilities, focus, motion
    ============================================================================ */
 
+/* ------------------------------------------------------------------- font - */
+/* Manrope — self-hosted variable font (latin subset, weight axis 200–800).
+   Served from our own origin by Vite's asset pipeline, so it satisfies the
+   `font-src 'self'` CSP with no external requests (works on an offline LAN).
+   `font-display: swap` paints the fallback stack immediately, then swaps —
+   no invisible-text flash. One file covers every weight the UI uses. */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./assets/fonts/manrope-variable.woff2') format('woff2');
+}
+
 /* ------------------------------------------------------------------ tokens - */
 :root {
   color-scheme: light;
 
-  --paper: #eceefb;
+  /* Neutral grey base (CyFocus reference): surfaces carry no warm tint — the
+     only color in the shell comes from the palette-hued top-edge glow and the
+     orange brand accent. */
+  --paper: #f4f5f7;
   --surface: #ffffff;
-  --surface-2: #eef0fb;
-  --surface-3: #e3e6f7;
+  --surface-2: #eef0f3;
+  --surface-3: #e4e7ec;
 
-  --ink: #1a1c2e;
-  --ink-soft: #545879;
-  /* Tuned so muted/secondary text clears WCAG AA (4.5:1) on the light aurora
-     surfaces; the softer step above (--ink-soft) sits ~6.6:1. */
-  --ink-faint: #656a8c;
+  --ink: #191c21;
+  --ink-soft: #565c66;
+  /* Tuned so muted/secondary text clears WCAG AA (4.5:1) on the light grey
+     surfaces; the softer step above (--ink-soft) sits comfortably higher. */
+  --ink-faint: #6b7079;
 
-  --line: #e4e6f5;
-  --line-strong: #ccd0ea;
+  --line: #e6e8ec;
+  --line-strong: #d2d6dd;
 
-  --brand: #5850ec;
-  --brand-strong: #453ecb;
+  /* Orange is demoted to an accent + the ambient glow only — it no longer
+     tints the neutrals. */
+  --brand: #cf4c0d;
+  --brand-strong: #a83a0a;
   --brand-ink: #ffffff;
-  --brand-soft: #e9e8fd;
-  /* Cooler secondary accent used for gradients/aurora glow only. */
-  --brand-2: #4f8ff5;
+  --brand-soft: #fce3d0;
+  /* Warmer secondary accent (amber) used for gradients/glow only. */
+  --brand-2: #f59e0b;
 
   --ok: #1f9d63;
   --ok-soft: #e4f5ec;
@@ -49,24 +69,24 @@
   --warn: #b8790a;
   --warn-soft: #fbefd3;
 
-  /* The sidebar keeps its own deep-indigo spine in both themes: it is the
-     app's visual signature and anchors the layout. */
-  --sidebar-bg: #141329;
-  --sidebar-edge: #262147;
-  --sidebar-ink: #d7d8ee;
-  --sidebar-ink-soft: #8b8cb5;
+  /* The sidebar keeps its own dark neutral spine in both themes: it is the
+     app's visual anchor. Grey, not warm-charcoal. */
+  --sidebar-bg: #16181d;
+  --sidebar-edge: #2a2d34;
+  --sidebar-ink: #e6e8ec;
+  --sidebar-ink-soft: #9aa0aa;
   --sidebar-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-active-bg: rgba(123, 116, 246, 0.2);
+  --sidebar-active-bg: rgba(249, 130, 46, 0.2);
   --sidebar-active-ink: #ffffff;
-  --sidebar-active-bar: #8b8cff;
+  --sidebar-active-bar: #f9822e;
 
   --radius-lg: 16px;
   --radius: 10px;
-  --radius-sm: 6px;
+  --radius-sm: 8px;
 
-  --shadow-sm: 0 1px 2px rgba(18, 20, 45, 0.06);
-  --shadow-md: 0 8px 24px -10px rgba(38, 33, 90, 0.28);
-  --shadow-pop: 0 18px 44px -14px rgba(30, 26, 80, 0.4);
+  --shadow-sm: 0 1px 2px rgba(18, 20, 24, 0.07);
+  --shadow-md: 0 8px 24px -10px rgba(18, 20, 24, 0.22);
+  --shadow-pop: 0 18px 44px -14px rgba(14, 16, 20, 0.32);
 
   /* Glass + aurora glow. These reference --surface / --brand / --brand-2, and
      custom properties resolve var() lazily at use-time against the element's
@@ -75,17 +95,28 @@
   --glass-bg: color-mix(in srgb, var(--surface) 82%, transparent);
   --glass-blur: saturate(1.3) blur(14px);
   --glass-border: color-mix(in srgb, var(--line) 65%, transparent);
-  --glow-1: color-mix(in srgb, var(--brand) 9%, transparent);
-  --glow-2: color-mix(in srgb, var(--brand-2, var(--brand)) 8%, transparent);
+  --glow-1: color-mix(in srgb, var(--brand) 15%, transparent);
+  --glow-2: color-mix(in srgb, var(--brand-2, var(--brand)) 11%, transparent);
 
   --sidebar-w: 250px;
   --content-max: 880px;
 
-  --t-fast: 120ms;
-  --t: 180ms;
-  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  /* Motion is calm and slow everywhere (CyFocus reference): no fast transition
+     anywhere in the app. --t-fast covers small feedback (presses), --t the
+     everyday transitions; both sit in the slow, settled range. The universal
+     reduced-motion block at the end of the file still zeroes all of it. */
+  --t-fast: 320ms;
+  --t: 480ms;
+  --ease: cubic-bezier(0.33, 1, 0.68, 1);
 
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Manrope leads; the platform UI stack is the fallback while the font swaps
+     in and the safety net if it ever fails to load. --font-numeric is the same
+     family with lining tabular figures for KPI/table numbers that must align. */
+  --font: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-numeric: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+
+  font-family: var(--font);
   line-height: 1.55;
   color: var(--ink);
   background: var(--paper);
@@ -98,24 +129,24 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --paper: #0a0a17;
-  --surface: #14152b;
-  --surface-2: #1b1c38;
-  --surface-3: #262747;
+  --paper: #121316;
+  --surface: #1a1c20;
+  --surface-2: #212429;
+  --surface-3: #2a2e35;
 
-  --ink: #e9eaf6;
-  --ink-soft: #a9adce;
-  /* ~7.8:1 on the dark surfaces; --ink-faint sits ~5.3:1 (clears AA). */
-  --ink-faint: #878bb4;
+  --ink: #eceef1;
+  --ink-soft: #b0b5bd;
+  /* Clears WCAG AA on the dark grey surfaces; --ink-faint sits ~6:1. */
+  --ink-faint: #8b9099;
 
-  --line: #262842;
-  --line-strong: #383c5e;
+  --line: #2a2d33;
+  --line-strong: #3a3e46;
 
-  --brand: #8b8cff;
-  --brand-strong: #a7a6ff;
-  --brand-ink: #0f0e20;
-  --brand-soft: rgba(139, 140, 255, 0.18);
-  --brand-2: #5b9dff;
+  --brand: #f97316;
+  --brand-strong: #fb9a4b;
+  --brand-ink: #1c1206;
+  --brand-soft: rgba(249, 115, 22, 0.18);
+  --brand-2: #f5b544;
 
   --ok: #46c187;
   --ok-soft: rgba(70, 193, 135, 0.14);
@@ -124,10 +155,10 @@
   --warn: #e0a53a;
   --warn-soft: rgba(224, 165, 58, 0.16);
 
-  --sidebar-bg: #0b0a1c;
-  --sidebar-edge: #1d1b3c;
-  --sidebar-ink: #d7d8ee;
-  --sidebar-ink-soft: #868aad;
+  --sidebar-bg: #0e0f12;
+  --sidebar-edge: #22252b;
+  --sidebar-ink: #e6e8ec;
+  --sidebar-ink-soft: #969ba4;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 24px -10px rgba(0, 0, 0, 0.6);
@@ -138,24 +169,24 @@
   :root[data-theme='system'] {
     color-scheme: dark;
 
-    --paper: #0a0a17;
-    --surface: #14152b;
-    --surface-2: #1b1c38;
-    --surface-3: #262747;
+    --paper: #121316;
+    --surface: #1a1c20;
+    --surface-2: #212429;
+    --surface-3: #2a2e35;
 
-    --ink: #e9eaf6;
-    --ink-soft: #a9adce;
-    /* ~7.8:1 on the dark surfaces; --ink-faint sits ~5.3:1 (clears AA). */
-    --ink-faint: #878bb4;
+    --ink: #eceef1;
+    --ink-soft: #b0b5bd;
+    /* Clears WCAG AA on the dark grey surfaces; --ink-faint sits ~6:1. */
+    --ink-faint: #8b9099;
 
-    --line: #262842;
-    --line-strong: #383c5e;
+    --line: #2a2d33;
+    --line-strong: #3a3e46;
 
-    --brand: #8b8cff;
-    --brand-strong: #a7a6ff;
-    --brand-ink: #0f0e20;
-    --brand-soft: rgba(139, 140, 255, 0.18);
-    --brand-2: #5b9dff;
+    --brand: #f97316;
+    --brand-strong: #fb9a4b;
+    --brand-ink: #1c1206;
+    --brand-soft: rgba(249, 115, 22, 0.18);
+    --brand-2: #f5b544;
 
     --ok: #46c187;
     --ok-soft: rgba(70, 193, 135, 0.14);
@@ -164,10 +195,10 @@
     --warn: #e0a53a;
     --warn-soft: rgba(224, 165, 58, 0.16);
 
-    --sidebar-bg: #0b0a1c;
-    --sidebar-edge: #1d1b3c;
-    --sidebar-ink: #d7d8ee;
-    --sidebar-ink-soft: #868aad;
+    --sidebar-bg: #0e0f12;
+    --sidebar-edge: #22252b;
+    --sidebar-ink: #e6e8ec;
+    --sidebar-ink-soft: #969ba4;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 8px 24px -10px rgba(0, 0, 0, 0.6);
@@ -282,6 +313,26 @@
   --sidebar-edge: #1a4030;
 }
 
+/* Cobalt & Crimson — the CyFocus-style palettes. Unlike the four above, these
+   deliberately DON'T restate the neutrals: they keep the base grey/charcoal
+   shell and only re-hue the accent (--brand / --brand-strong) and the top-edge
+   glow. --brand drives --glow-1 (15% wash) and the derived --glow-2 / sidebar
+   accents via the common [data-palette] block above; --brand-2 must be set too
+   because the login screen's glow reads it directly (otherwise amber leaks). */
+
+/* Cobalt (palette "5") — charcoal shell, cool-blue accent + glow (light). */
+:root[data-palette='cobalt'] {
+  --brand: #1d6fe0;
+  --brand-strong: #1857b8;
+  --brand-2: #5aa2f5;
+}
+/* Crimson (palette "4") — near-black shell, crimson-red accent + glow (light). */
+:root[data-palette='crimson'] {
+  --brand: #d21f3c;
+  --brand-strong: #b01730;
+  --brand-2: #f2555a;
+}
+
 
 /* Dark variants: (0,3,0) selectors reclaim dark mode from the light palette
    blocks above. Each restates the full neutral/ink/line/brand/sidebar set,
@@ -351,6 +402,32 @@
   --sidebar-edge: #163024;
 }
 
+/* Cobalt (dark) — the base charcoal neutrals fall through unchanged; only the
+   cool-blue accent is brightened for dark surfaces. */
+:root[data-theme='dark'][data-palette='cobalt'] {
+  --brand: #4f9df7;
+  --brand-strong: #7db4f9;
+  --brand-2: #4f9df7;
+}
+/* Crimson (dark) — a near-black shell (darker than the base charcoal) with a
+   luminous crimson accent + glow. */
+:root[data-theme='dark'][data-palette='crimson'] {
+  --paper: #0b0b0d;
+  --surface: #141416;
+  --surface-2: #1b1b1e;
+  --surface-3: #242427;
+  --ink: #ececee;
+  --ink-soft: #b0b2b6;
+  --ink-faint: #85888e;
+  --line: #262629;
+  --line-strong: #35353a;
+  --brand: #f2555a;
+  --brand-strong: #f57e82;
+  --brand-2: #f2555a;
+  --sidebar-bg: #08080a;
+  --sidebar-edge: #1e1e22;
+}
+
 @media (prefers-color-scheme: dark) {
   /* System theme following the OS into dark: same dark palette tokens. */
   :root[data-theme='system'][data-palette='gradebook'] {
@@ -416,6 +493,29 @@
     --sidebar-bg: #081109;
     --sidebar-edge: #163024;
   }
+  /* Cobalt following the OS into dark: charcoal base falls through, blue accent. */
+  :root[data-theme='system'][data-palette='cobalt'] {
+    --brand: #4f9df7;
+    --brand-strong: #7db4f9;
+    --brand-2: #4f9df7;
+  }
+  /* Crimson following the OS into dark: near-black shell + crimson accent. */
+  :root[data-theme='system'][data-palette='crimson'] {
+    --paper: #0b0b0d;
+    --surface: #141416;
+    --surface-2: #1b1b1e;
+    --surface-3: #242427;
+    --ink: #ececee;
+    --ink-soft: #b0b2b6;
+    --ink-faint: #85888e;
+    --line: #262629;
+    --line-strong: #35353a;
+    --brand: #f2555a;
+    --brand-strong: #f57e82;
+    --brand-2: #f2555a;
+    --sidebar-bg: #08080a;
+    --sidebar-edge: #1e1e22;
+  }
 }
 
 /* -------------------------------------------------------------- base els - */
@@ -426,19 +526,20 @@
 body {
   margin: 0;
   min-height: 100vh;
-  /* Aurora wash: two faint radial glows anchored to the top corners over the
-     paper base. --glow-1/--glow-2 are palette-tinted (indigo→cyan on the
-     default, single-hue on other palettes, and transparent on gradebook), so
-     the ambient light re-tints with the theme. background-attachment: fixed
-     keeps it anchored to the viewport as content scrolls, like room light. */
+  /* Top-edge ambient glow (CyFocus reference): a wide, soft band of palette-hued
+     light spills down from the top edge over the neutral grey base. --glow-1/-2
+     are palette-tinted (orange→amber on the default, single-hue on other
+     palettes, transparent on gradebook), so the ambient light re-tints with the
+     theme. background-attachment: fixed anchors it to the viewport as content
+     scrolls, like a light source above the interface. */
   background:
     radial-gradient(
-      1200px 820px at 8% -12%,
+      135% 52% at 50% -22%,
       var(--glow-1),
-      transparent 62%
+      transparent 60%
     ),
     radial-gradient(
-      1080px 760px at 96% -4%,
+      80% 40% at 50% -12%,
       var(--glow-2),
       transparent 58%
     ),
@@ -452,25 +553,25 @@ h2,
 h3,
 h4 {
   color: var(--ink);
-  line-height: 1.2;
-  letter-spacing: -0.011em;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
 }
 
 h1 {
-  font-size: 1.55rem;
-  font-weight: 680;
+  font-size: 1.7rem;
+  font-weight: 750;
   margin: 0 0 1rem;
 }
 
 h2 {
-  font-size: 1.15rem;
-  font-weight: 640;
+  font-size: 1.2rem;
+  font-weight: 700;
   margin: 0 0 0.75rem;
 }
 
 h3 {
   font-size: 1rem;
-  font-weight: 640;
+  font-weight: 680;
 }
 
 a {
@@ -503,9 +604,44 @@ main.auth-screen {
   display: grid;
   place-items: center;
   padding: 2rem 1.25rem;
+  position: relative;
+  overflow: hidden;
+  /* The sign-in screen leads with the same palette-hued top-edge glow as the
+     app shell, over the neutral grey base, so the signature is consistent from
+     the first screen. Static — no drift. */
+  background:
+    radial-gradient(
+      130% 55% at 50% -20%,
+      color-mix(in srgb, var(--brand) 26%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      85% 42% at 50% -8%,
+      color-mix(in srgb, var(--brand-2, var(--brand)) 20%, transparent),
+      transparent 60%
+    ),
+    var(--paper);
+}
+
+/* A soft static glow sits high behind the card for a little extra depth — no
+   motion (the background stays still per the reference; the login glow does not
+   drift). */
+main.auth-screen::before {
+  content: '';
+  position: absolute;
+  inset: -25%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    620px 460px at 50% 8%,
+    color-mix(in srgb, var(--brand) 14%, transparent),
+    transparent 62%
+  );
 }
 
 .auth-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 400px;
   padding: 2.25rem 2rem;
@@ -515,6 +651,14 @@ main.auth-screen {
   border: 1px solid var(--glass-border);
   border-radius: calc(var(--radius) + 4px);
   box-shadow: var(--shadow-pop);
+  animation: auth-card-in 640ms var(--ease) both;
+}
+
+@keyframes auth-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
 }
 
 .auth-brand {
@@ -533,8 +677,9 @@ main.auth-screen {
 
 .auth-title {
   margin: 0 0 0.35rem;
-  font-size: 1.5rem;
-  letter-spacing: -0.01em;
+  font-size: 1.75rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
@@ -579,8 +724,8 @@ textarea {
   border-radius: var(--radius-sm);
   padding: 0.5rem 0.6rem;
   transition:
-    border-color var(--t) var(--ease),
-    box-shadow var(--t) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
     background-color var(--t) var(--ease);
 }
 
@@ -625,6 +770,10 @@ select {
    non-submit button). Specific components below (.tab, .link, .note-toggle,
    .sort, and the shell buttons) reset this entirely. */
 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   font: inherit;
   font-weight: 560;
   color: var(--ink);
@@ -663,18 +812,36 @@ button.primary {
   color: var(--brand-ink);
   background: var(--brand);
   border-color: transparent;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--brand) 22%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand) 30%, transparent);
 }
 
 button[type='submit']:hover,
 button.primary:hover {
   background: var(--brand-strong);
   border-color: transparent;
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--brand) 24%, transparent),
+    0 8px 18px -5px color-mix(in srgb, var(--brand) 34%, transparent);
+}
+
+/* Press settles from the hover-lift. The base `button:active` (translateY(1px))
+   is lower specificity than the primary :hover above, so without this the lift
+   would win while the button is both hovered and pressed; restate it here at
+   matching specificity, after :hover, so a click reads as a real press. */
+button[type='submit']:active,
+button.primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--brand) 22%, transparent);
 }
 
 button[type='submit']:disabled,
 button.primary:disabled {
   background: var(--brand);
   border-color: transparent;
+  box-shadow: none;
 }
 
 /* Destructive actions: outlined in the danger colour so they read as their own
@@ -712,6 +879,7 @@ a.btn {
   transition:
     background-color var(--t) var(--ease),
     border-color var(--t) var(--ease),
+    box-shadow var(--t) var(--ease),
     color var(--t) var(--ease),
     transform var(--t-fast) var(--ease);
 }
@@ -730,12 +898,26 @@ a.btn.primary {
   color: var(--brand-ink);
   background: var(--brand);
   border-color: transparent;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--brand) 22%, transparent),
+    0 3px 10px -3px color-mix(in srgb, var(--brand) 30%, transparent);
 }
 
 a.btn.primary:hover {
   color: var(--brand-ink);
   background: var(--brand-strong);
   border-color: transparent;
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--brand) 24%, transparent),
+    0 8px 18px -5px color-mix(in srgb, var(--brand) 34%, transparent);
+}
+
+/* Same press-settle as the primary <button>: restate :active after :hover at
+   matching specificity so a click overrides the hover-lift. */
+a.btn.primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--brand) 22%, transparent);
 }
 
 /* Quiet tier: low-emphasis actions (Reset, Remove) and navigation "options"
@@ -997,10 +1179,21 @@ tr.inactive,
 }
 
 /* ============================================================= app shell = */
+/* Registered so the rail width can animate: an unregistered custom property is
+   not interpolable, so grid-template-columns would snap on collapse. The
+   transition below drives the desktop expand/collapse glide (250px <-> 74px);
+   reduced-motion is handled by the blanket kill switch at the end of the file. */
+@property --sidebar-w {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 250px;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   min-height: 100vh;
+  transition: --sidebar-w var(--t) var(--ease);
 }
 
 /* ---- sidebar ---- */
@@ -1009,7 +1202,7 @@ tr.inactive,
   top: 0;
   align-self: start;
   height: 100vh;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -1033,11 +1226,22 @@ tr.inactive,
     var(--sidebar-bg);
 }
 
-.brand {
+/* The rail's top row: the collapse/expand toggle followed by the wordmark
+   (ref 5 "Outcrowd" — the control lives at the top, in place of the old brand
+   square). Pinned; the nav below it is the only scrolling region. */
+.sidebar-top {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.6rem 1rem;
+  gap: 0.5rem;
+  padding: 0.25rem 0.35rem 0.85rem;
+}
+
+.brand-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-weight: 680;
   font-size: 1.05rem;
   letter-spacing: -0.01em;
@@ -1061,6 +1265,9 @@ tr.inactive,
 }
 
 .sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -1116,7 +1323,9 @@ tr.inactive,
 
 .nav-link {
   position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.5rem 0.7rem;
   border-radius: var(--radius-sm);
   color: var(--sidebar-ink);
@@ -1126,6 +1335,31 @@ tr.inactive,
   transition:
     background-color var(--t) var(--ease),
     color var(--t) var(--ease);
+}
+
+/* The glyph sits in a fixed 18px box so labels align in a tidy column and the
+   icon stays put when the rail collapses to icon-only. */
+.nav-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--sidebar-ink-soft);
+  transition: color var(--t) var(--ease);
+}
+
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.nav-link:hover .nav-icon,
+.nav-link.active .nav-icon {
+  color: inherit;
 }
 
 .nav-link:hover {
@@ -1169,6 +1403,111 @@ tr.inactive,
   .nav-group[open]::details-content {
     height: auto;
     opacity: 1;
+  }
+}
+
+/* ---- collapse-to-rail toggle + slim icon-only rail ---- */
+/* A compact square icon button living in the sidebar top row. One glyph serves
+   both directions — CSS rotates it 180° while the rail is collapsed. */
+.rail-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-ink-soft);
+  cursor: pointer;
+  transition:
+    background-color var(--t) var(--ease),
+    color var(--t) var(--ease);
+}
+
+.rail-toggle:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-ink);
+  border-color: transparent;
+}
+
+.rail-toggle-icon {
+  flex: none;
+  transition: transform var(--t) var(--ease);
+}
+
+/* Collapsed: the shell drives --sidebar-w narrower, and everything but the
+   glyphs is hidden. Group headers stay in the DOM (their items are forced
+   open in Layout) but read only as spacers, so the rail is a clean icon
+   column. Labels return as native title tooltips on hover. */
+.app-shell.nav-collapsed {
+  --sidebar-w: 74px;
+}
+
+.nav-collapsed .sidebar {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  align-items: stretch;
+}
+
+.nav-collapsed .sidebar-top {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.nav-collapsed .brand-name,
+.nav-collapsed .nav-group-head > span,
+.nav-collapsed .nav-group-head .chevron,
+.nav-collapsed .nav-label {
+  display: none;
+}
+
+/* Collapsed, the icon column centres vertically in the space between the top
+   row and the pinned account block (ref 5). `safe` keeps the first icons from
+   being clipped off the top if the list is ever taller than the rail. */
+.nav-collapsed .sidebar-nav {
+  justify-content: safe center;
+}
+
+.nav-collapsed .nav-group-head {
+  justify-content: center;
+  padding: 0.15rem;
+  pointer-events: none;
+  min-height: 0.5rem;
+}
+
+.nav-collapsed .nav-link {
+  justify-content: center;
+  padding: 0.55rem;
+}
+
+.nav-collapsed .nav-link.active::before {
+  left: -0.5rem;
+}
+
+/* Collapsed account block: only the avatar and the icon actions remain; the
+   name/role text and the label-only Change password link drop away. */
+.nav-collapsed .sidebar-account-id {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.nav-collapsed .sidebar-account-meta,
+.nav-collapsed .account-collapsed-hide {
+  display: none;
+}
+
+.nav-collapsed .rail-toggle-icon {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 880px) {
+  .rail-toggle {
+    display: none;
   }
 }
 
@@ -1234,26 +1573,33 @@ tr.inactive,
   display: none;
 }
 
-/* ---- account menu (top-right dropdown) ---- */
-.account-menu {
-  position: relative;
+/* ---- pinned account block (sidebar foot) ---- */
+/* Who's signed in, then Preferences / Change password / Sign out. This is the
+   app's only home for these actions now — the old top-right dropdown is gone.
+   The block is pinned below the scrolling nav and shows in both rail states. */
+.sidebar-account {
   flex: none;
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--sidebar-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
-.account-trigger {
+.sidebar-account-id {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.5rem;
-  background: transparent;
-  border-color: transparent;
-  color: var(--ink);
-  border-radius: var(--radius);
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.35rem 0.6rem 0.5rem;
 }
 
-.account-trigger:hover {
-  background: var(--surface-2);
-  border-color: transparent;
+.sidebar-account-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
 }
 
 .avatar {
@@ -1263,110 +1609,61 @@ tr.inactive,
   height: 2rem;
   flex: none;
   border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand);
+  /* A soft brand-tinted disc with white initials — legible on the always-dark
+     rail and tracking the chosen palette. */
+  background: color-mix(in srgb, var(--brand) 32%, transparent);
+  color: #fff;
   font-size: 0.78rem;
   font-weight: 680;
   letter-spacing: 0.02em;
-}
-
-.account-trigger-text {
-  display: none;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.15;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .account-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--sidebar-ink);
 }
 
 .account-role {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 0.76rem;
-  color: var(--ink-faint);
+  color: var(--sidebar-ink-soft);
 }
 
-.caret {
-  display: none;
-  width: 0.7rem;
-  height: 0.7rem;
-  color: var(--ink-faint);
-}
-
-.account-dropdown {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  min-width: 13rem;
-  padding: 0.35rem;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-pop);
-  z-index: 40;
-  animation: menu-in var(--t) var(--ease);
-  transform-origin: top right;
-}
-
-@keyframes menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-}
-
-.account-dropdown-head {
+.sidebar-account-actions {
   display: flex;
   flex-direction: column;
-  padding: 0.5rem 0.6rem;
+  gap: 2px;
 }
 
-.account-dropdown-sep {
-  height: 1px;
-  margin: 0.3rem 0;
-  background: var(--line);
-}
-
-.account-dropdown-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 0.5rem 0.6rem;
-  border-radius: var(--radius-sm);
+/* Sign out is a <button> wearing .nav-link: reset the button chrome and give it
+   a restrained danger tint on hover so it reads as the one destructive action. */
+.account-signout {
+  font-family: inherit;
   background: transparent;
   border: 0;
-  color: var(--ink);
-  font: inherit;
-  text-decoration: none;
   cursor: pointer;
-  transition: background-color var(--t-fast) var(--ease);
 }
 
-.account-dropdown-item:hover {
-  background: var(--surface-2);
-  border: 0;
+.account-signout:hover {
+  background: color-mix(in srgb, var(--danger) 24%, transparent);
+  color: #fff;
 }
 
-.account-dropdown-item.danger {
-  color: var(--danger);
+.account-signout:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
-.account-dropdown-item.danger:hover {
-  background: var(--danger-soft);
-}
-
-/* Show the full account label once there's room. */
-@media (min-width: 720px) {
-  .account-trigger-text {
-    display: flex;
-  }
-  .caret {
-    display: block;
-  }
+.account-signout:disabled:hover {
+  background: transparent;
+  color: var(--sidebar-ink);
 }
 
 /* ---- mobile: sidebar becomes a slide-in drawer ---- */
@@ -1436,11 +1733,11 @@ tr.inactive,
 /* ---- phones: tighten the type scale and un-cram the pager ---- */
 @media (max-width: 640px) {
   h1 {
-    font-size: 1.3rem;
+    font-size: 1.42rem;
   }
 
   h2 {
-    font-size: 1.05rem;
+    font-size: 1.1rem;
   }
 
   table {
@@ -1586,12 +1883,13 @@ tr.inactive,
 }
 
 .stat-value {
-  margin-top: 0.15rem;
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  font-variant-numeric: tabular-nums;
+  margin-top: 0.25rem;
+  font-family: var(--font-numeric);
+  font-size: 2.7rem;
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .param-card h3 {
@@ -2446,19 +2744,40 @@ button.link:hover {
 }
 
 /* ------------------------------------------------- entrance motion ------ */
-/* One orchestrated moment per page rather than a scattered fade on every
-   element: the routed <main> is remounted on navigation, so this short rise +
-   fade plays once as the new page settles in. Fully disabled under
-   prefers-reduced-motion by the block below. */
-@keyframes page-enter {
+/* The page body's own entrance is driven imperatively on the live DOM by
+   AnimatedRoutes in App.jsx (each top-level section animates on its own line by
+   position and type, its buttons/fields following), so there is no blanket
+   `main { animation }` here — a CSS remount fade would stack with, and muddy,
+   that choreography.
+
+   What DOES belong here is the topbar title, which lives in the chrome OUTSIDE
+   #main-content and so is never touched by the route transition. Layout gives
+   the title span a `key={currentTitle}`, so React remounts it when the page
+   changes and this short rise + fade plays once — the header's own small beat,
+   on the same easing as the body it sits above. Disabled under reduced motion
+   by the block at the end of the file. */
+@keyframes title-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
 }
 
-main {
-  animation: page-enter 260ms var(--ease);
+.topbar-title {
+  animation: title-in var(--t) var(--ease);
+}
+
+/* Always reserve the scrollbar's width, so a tall page and a short page have
+   the same content width. Otherwise the whole grid shifts a scrollbar's worth
+   when the page height crosses the viewport between routes — which reads as the
+   sidebar "breathing" on every navigation during the transition below.
+   `scrollbar-gutter: stable` is the modern way; `overflow-y: scroll` is the
+   belt-and-suspenders that also holds a permanent track on older engines and
+   anywhere the gutter property is ignored. (On overlay-scrollbar platforms —
+   e.g. macOS — scrollbars take no width, so there is no jump to begin with.) */
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
 }
 
 /* KPI reveal: when the headline numbers land, the four tiles rise in on a short,
@@ -2476,22 +2795,22 @@ main {
 }
 
 .stat-grid .stat-card {
-  animation: card-rise 300ms var(--ease) backwards;
+  animation: card-rise 480ms var(--ease) backwards;
 }
 .stat-grid .stat-card:nth-child(1) {
-  animation-delay: 40ms;
+  animation-delay: 60ms;
 }
 .stat-grid .stat-card:nth-child(2) {
-  animation-delay: 90ms;
+  animation-delay: 150ms;
 }
 .stat-grid .stat-card:nth-child(3) {
-  animation-delay: 140ms;
+  animation-delay: 240ms;
 }
 .stat-grid .stat-card:nth-child(4) {
-  animation-delay: 190ms;
+  animation-delay: 330ms;
 }
 .stat-grid .stat-card:nth-child(n + 5) {
-  animation-delay: 230ms;
+  animation-delay: 400ms;
 }
 
 /* The parameter cards on the dashboard get the same bounded reveal a beat after
@@ -2500,26 +2819,26 @@ main {
    ResponsiveContainer still measures the right width. `backwards` fill keeps the
    hover deepen working; reduced motion zeroes it in the block at end of file. */
 .param-grid .param-card {
-  animation: card-rise 320ms var(--ease) backwards;
+  animation: card-rise 500ms var(--ease) backwards;
 }
 .param-grid .param-card:nth-child(1) {
-  animation-delay: 120ms;
+  animation-delay: 180ms;
 }
 .param-grid .param-card:nth-child(2) {
-  animation-delay: 170ms;
+  animation-delay: 270ms;
 }
 .param-grid .param-card:nth-child(3) {
-  animation-delay: 220ms;
+  animation-delay: 360ms;
 }
 .param-grid .param-card:nth-child(n + 4) {
-  animation-delay: 260ms;
+  animation-delay: 430ms;
 }
 
 /* Mobile drawer: as the panel slides in, its contents arrive in a short,
-   bounded stagger (brand, then each nav group) so they don't all pop at once.
-   Bounded to a handful of steps on purpose — a per-item cascade over a whole
-   page is the tell of thoughtless motion; a brief reveal of a few drawer
-   groups is not. */
+   bounded stagger (top row, then each nav group, then the account block) so they
+   don't all pop at once. Bounded to a handful of steps on purpose — a per-item
+   cascade over a whole page is the tell of thoughtless motion; a brief reveal of
+   a few drawer groups is not. */
 @keyframes drawer-item {
   from {
     opacity: 0;
@@ -2528,12 +2847,13 @@ main {
 }
 
 @media (max-width: 880px) {
-  .app-shell.drawer-open .brand,
-  .app-shell.drawer-open .nav-group {
-    animation: drawer-item 300ms var(--ease) both;
+  .app-shell.drawer-open .sidebar-top,
+  .app-shell.drawer-open .nav-group,
+  .app-shell.drawer-open .sidebar-account {
+    animation: drawer-item 440ms var(--ease) both;
   }
 
-  .app-shell.drawer-open .brand {
+  .app-shell.drawer-open .sidebar-top {
     animation-delay: 60ms;
   }
   .app-shell.drawer-open .sidebar-nav > .nav-group:nth-child(1) {
@@ -2550,6 +2870,9 @@ main {
   }
   .app-shell.drawer-open .sidebar-nav > .nav-group:nth-child(n + 5) {
     animation-delay: 270ms;
+  }
+  .app-shell.drawer-open .sidebar-account {
+    animation-delay: 310ms;
   }
 }
 

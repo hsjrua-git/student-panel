@@ -39,7 +39,15 @@ function writeFlag(value) {
 }
 
 export function lazyWithReload(importer) {
-  return lazy(async () => {
+  // Memoize the load so React.lazy and an explicit .preload() below share a
+  // single in-flight import (calling it twice must not fetch the chunk twice).
+  let promise;
+  const load = () => {
+    if (!promise) promise = attempt();
+    return promise;
+  };
+
+  async function attempt() {
     try {
       const module = await importer();
       // A clean load means any earlier stale-chunk trouble is over; clear the
@@ -58,5 +66,13 @@ export function lazyWithReload(importer) {
       // takes over by returning a promise that never resolves.
       return new Promise(() => {});
     }
-  });
+  }
+
+  const Component = lazy(load);
+  // Lets the router kick off a page's chunk download *before* navigating to it
+  // (App.jsx preloads the target route so a view transition captures the real
+  // page, not the Suspense loader). Idempotent — resolves instantly once the
+  // chunk is cached, and shares the very promise React.lazy will await.
+  Component.preload = load;
+  return Component;
 }

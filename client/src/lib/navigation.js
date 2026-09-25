@@ -10,6 +10,20 @@
 // only decides what the client shows and lets you navigate to — the API remains
 // the real gate.
 
+import {
+  DashboardIcon,
+  ResultsIcon,
+  StudentsIcon,
+  EvaluateIcon,
+  ParametersIcon,
+  GroupsIcon,
+  FieldsIcon,
+  SettingsIcon,
+  UsersIcon,
+  RolesIcon,
+  AuditIcon,
+} from '../components/icons.jsx';
+
 export const ROUTE_PERMISSIONS = {
   '/dashboard': 'dashboard.view',
   '/results': 'scores.view',
@@ -35,32 +49,32 @@ export const NAV_SECTIONS = [
   {
     title: 'Overview',
     items: [
-      { to: '/dashboard', label: 'Dashboard' },
-      { to: '/results', label: 'Results' },
+      { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
+      { to: '/results', label: 'Results', icon: ResultsIcon },
     ],
   },
   {
     title: 'Teaching',
     items: [
-      { to: '/students', label: 'Students' },
-      { to: '/evaluate', label: 'Evaluate' },
+      { to: '/students', label: 'Students', icon: StudentsIcon },
+      { to: '/evaluate', label: 'Evaluate', icon: EvaluateIcon },
     ],
   },
   {
     title: 'Setup',
     items: [
-      { to: '/parameters', label: 'Parameters' },
-      { to: '/groups', label: 'Groups' },
-      { to: '/fields', label: 'Fields' },
-      { to: '/settings', label: 'Settings' },
+      { to: '/parameters', label: 'Parameters', icon: ParametersIcon },
+      { to: '/groups', label: 'Groups', icon: GroupsIcon },
+      { to: '/fields', label: 'Fields', icon: FieldsIcon },
+      { to: '/settings', label: 'Settings', icon: SettingsIcon },
     ],
   },
   {
     title: 'Administration',
     items: [
-      { to: '/users', label: 'Users' },
-      { to: '/roles', label: 'Roles' },
-      { to: '/audit', label: 'Audit log' },
+      { to: '/users', label: 'Users', icon: UsersIcon },
+      { to: '/roles', label: 'Roles', icon: RolesIcon },
+      { to: '/audit', label: 'Audit log', icon: AuditIcon },
     ],
   },
 ];
