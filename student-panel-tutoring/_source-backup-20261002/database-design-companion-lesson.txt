@@ -1,0 +1,435 @@
+===============================================================================
+ DATABASE DESIGN - COMPANION LESSON
+ A bridge between the primer (paper design) and a real, touchable database
+===============================================================================
+
+ Read the primer first (database-design-primer.txt). This file does not
+ replace it. It stands next to it and does three jobs the primer, on purpose,
+ does not do:
+
+   1. It shows you how ALL your learning materials fit together, so you never
+      feel lost about "which file am I supposed to be in right now."
+   2. It makes the abstract ideas concrete: what a database, a table, a row,
+      a column, and a query actually ARE as real things - still without asking
+      you to install anything.
+   3. It clears up the handful of confusions that trip up almost every
+      beginner, and for each one it points at exactly where it lives in the
+      primer and in the samples PDF, and tells you how the student-panel
+      project does it (which is sometimes different - and that is fine).
+
+ Everything here is still READING. You will not touch a computer in this file.
+ The touching-a-computer work has its own file: database-design-practice-lesson.txt.
+ Do that one AFTER this one.
+
+ Style note: this file uses the same four signposts as the primer, so they
+ should already feel familiar:
+
+   >> CONTEMPLATE   stop and think before reading on. No rush.
+   TRY IT          a tiny thing to do on paper.
+   KEY IDEA        the one sentence to remember.
+   >> PITFALL       a common mistake, named so you can dodge it.
+
+ Take your time. There is no prize for finishing fast. If a part does not
+ click, mark it and bring it to me - that is exactly what these files are for.
+
+-------------------------------------------------------------------------------
+ PART 1 - THE BIG PICTURE: HOW YOUR MATERIALS FIT TOGETHER
+-------------------------------------------------------------------------------
+
+ Before any detail, the map. You now have several documents, written at
+ different times and by different helpers. They are not competing. They are
+ layers around one idea: how to design a database well. Here is the whole set
+ and the single job each one has.
+
+   (1) database-design-primer.txt   <- MY main course. General ER design,
+       from scratch, on paper. Parts 0-10 plus a glossary. This is the trunk
+       of the tree. If two files ever seem to disagree, we settle it here or
+       by thinking it through together - not by picking whichever file we read
+       last.
+
+   (2) database-design-companion-lesson.txt   <- THIS file. The bridge. It
+       makes the primer concrete and clears up confusions. Read it second.
+
+   (3) database-design-practice-lesson.txt   <- hands-on. You open a free,
+       in-browser database and actually build small tables. Read it third,
+       and do it with the sandbox open.
+
+   (4) database-design-lessons-1....docx   <- a lessons notebook written by
+       another AI. Prose lessons (its "Lesson 1" ... "Lesson 19"), plus ten
+       practice questions with answers at the end. It covers the SAME ground
+       as the primer, with the same examples, in a different voice.
+
+   (5) Database Design - Samples ... .PDF   <- the picture-book companion to
+       (4). Every example from the notebook, drawn as real tables (with sample
+       rows) and as crow's-foot diagrams. This is the best "show me what it
+       actually looks like" reference you have.
+
+   (6) the student-panel project itself   <- the FINISHED, real design we are
+       working toward understanding and re-deriving. We look at it, we do NOT
+       change it. You build your own version in student-panel-I.
+
+ KEY IDEA: the primer teaches the method, the notebook+PDF show the same method
+ in pictures and prose, the companion+practice turn it into understanding and
+ skill, and student-panel is the real thing we measure our understanding
+ against.
+
+ >> CONTEMPLATE: which of these six is the one you reach for when you are stuck
+ on "HOW do I decide X?" (the primer) versus "what does X LOOK like?" (the
+ samples PDF). Knowing which tool answers which kind of question saves hours.
+
+ A reading order that works well:
+   primer Parts 0-4  ->  this companion Parts 1-4  ->  practice lesson
+   ->  primer Parts 5-10  ->  revisit the samples PDF  ->  then we re-derive
+   student-panel together. You do not have to follow it exactly; it is a
+   suggestion, and you are allowed to change it. Tell me if you want to.
+
+-------------------------------------------------------------------------------
+ PART 2 - FROM PAPER TO A REAL DATABASE: WHAT THESE THINGS ACTUALLY ARE
+-------------------------------------------------------------------------------
+
+ The primer talks about entities, attributes, and relationships. Those are
+ PAPER ideas - they live in your head and in your pencil drawing. But a real
+ database is a real thing on a real computer. This part connects the two, so
+ the words stop being abstract. We will still only READ here; the practice
+ lesson is where you make these with your own hands.
+
+ Start from the biggest thing and go smaller.
+
+ A DATABASE is a labelled box that holds tables. One project, one box. The
+ student-panel project has exactly one database inside it. Think "a filing
+ cabinet."
+
+ A TABLE is a single grid inside that box: columns across the top, rows going
+ down. One table holds one KIND of thing. A "students" table. A "parameters"
+ table. On paper you called this an ENTITY TYPE. In the database it is a table.
+ Think "one sheet in the filing cabinet, with a printed header row."
+
+ A COLUMN is one labelled slot that every row fills in the same way: "name",
+ "email", "joined_on". On paper you called this an ATTRIBUTE. Think "one
+ heading on the sheet."
+
+ A ROW is one actual thing: one real student, one real parameter. On paper you
+ called this an ENTITY INSTANCE. Think "one line filled in on the sheet."
+
+   KEY IDEA: table = the kind of thing (entity type).  row = one of them
+   (instance).  column = one fact you keep about each (attribute). If you only
+   remember one mapping from paper to database, remember this one.
+
+ A SCHEMA is the blueprint: the list of tables, their columns, and the rules
+ (which column is the key, which column points at another table). The schema is
+ the DESIGN - the exact thing the primer is teaching you to produce. The rows
+ are the DATA that later flows into that design. Design the schema well and the
+ data behaves; design it badly and no amount of careful typing saves you.
+
+ A QUERY is a question you ask the database in a language called SQL. You will
+ meet four verbs, and only four, for a long time:
+     CREATE TABLE ...   -> "make a new sheet with these headings" (build design)
+     INSERT ...         -> "add one filled-in line"               (add a row)
+     SELECT ...         -> "show me the lines that match this"    (ask a question)
+     UPDATE / DELETE ...-> "change or remove lines"               (edit data)
+
+ You do not need to memorise SQL now. You need to see that a QUERY is just you
+ talking to the grid, and that CREATE TABLE is literally your paper design
+ becoming real. In the practice lesson you will type each of these once and
+ watch it happen.
+
+ ONE SMALL THING, SHOWN IN ALL THREE FORMS
+
+ Here is a single idea - "we keep students, each with a name and a join date" -
+ shown as (a) the paper attribute list, (b) the grid it becomes, and (c) the
+ CREATE TABLE that builds it. Same idea, three costumes.
+
+   (a) ON PAPER (primer style):
+       student = (student_id [key], full_name, joined_on)
+
+   (b) AS A GRID (samples-PDF style):
+       +------------+-------------+------------+
+       | student_id | full_name   | joined_on  |   <- columns (attributes)
+       +------------+-------------+------------+
+       |     1      | Sara Ahmadi | 2026-09-01 |   <- a row (one instance)
+       |     2      | Omid Karimi | 2026-09-03 |   <- another row
+       +------------+-------------+------------+
+
+   (c) AS SQL (practice-lesson style):
+       CREATE TABLE student (
+         student_id  INTEGER PRIMARY KEY,
+         full_name   TEXT NOT NULL,
+         joined_on   DATE
+       );
+
+ Read (a), (b), (c) top to bottom and notice they are the SAME three columns
+ every time. The primer draws (a). The samples PDF draws (b). The practice
+ lesson has you type (c) and then watch the rows from (b) appear. Nothing new
+ is being added as you move across - only the costume changes.
+
+ >> PITFALL: beginners think SQL is "the hard part" and design is "the easy
+ part." It is the reverse. CREATE TABLE is a near-mechanical translation of a
+ good paper design. If the design is right, the SQL is short and obvious. All
+ the hard thinking happens on paper, before you type anything. That is WHY the
+ primer keeps you on paper so long.
+
+-------------------------------------------------------------------------------
+ PART 3 - READING THE DIAGRAMS FLUENTLY (A CROW'S-FOOT CHEAT-SHEET)
+-------------------------------------------------------------------------------
+
+ The primer (Part 4) and the samples PDF both draw relationships in "crow's-
+ foot" notation. Most beginners can follow the words but freeze at the little
+ symbols on the connecting line. This part is a cheat-sheet you can keep open
+ beside any diagram. It also explains one thing neither file spells out loudly:
+ the symbols are written MIRRORED on the two ends of a line, which is why the
+ same relationship can show "o<" at one end and ">o" at the other.
+
+ THE FOUR SYMBOLS. A line connects two tables. Near EACH end there are up to
+ two marks. The mark CLOSEST to the table says the MAXIMUM (one, or many); the
+ mark just before it says the MINIMUM (zero = optional, or one = mandatory).
+
+     |    a single bar      -> "one"        (exactly one on this side)
+     o    a small circle    -> "zero"       (this side is OPTIONAL; may be none)
+     <    a crow's foot      -> "many"       (this side can be many)
+     ||   bar-bar            -> "one and only one"      (min 1, max 1)
+     |<   bar then foot      -> "one or many"           (min 1, max many)
+     o<   circle then foot   -> "zero or many"          (min 0, max many)
+     o|   circle then bar     -> "zero or one"           (min 0, max 1)
+
+   KEY IDEA: read the symbols from the OUTSIDE in toward the table: the far
+   mark is the minimum (o = optional, | = mandatory), the near mark is the
+   maximum (| = one, crow's foot = many).
+
+ THE MIRRORING. On the LEFT end of a horizontal line the marks point rightward,
+ so "zero or many" is written  o<  reading left-to-right. On the RIGHT end the
+ same "zero or many" is drawn as a mirror image, so it reads  >o  . They mean
+ the identical thing; they just face the line from opposite sides. Do not let
+ ">o" and "o<" look like two different ideas - they are the same idea seen from
+ the two ends.
+
+ WORKED READING. Here is the primer's library line:
+
+     Member  ||-----o<  Loan  >o-----||  Copy
+
+ Read it in two halves, each half outward-to-inward toward its table:
+   - Member side:  "||" next to Member = one-and-only-one Member.
+                   "o<" next to Loan   = zero-or-many Loans.
+     => "one member has zero or many loans; each loan belongs to exactly one
+        member."
+   - Copy side:   ">o" next to Loan = zero-or-many Loans (mirrored o<).
+                  "||" next to Copy = one-and-only-one Copy.
+     => "one copy has zero or many loans; each loan is of exactly one copy."
+
+ Put together: a loan links exactly one member to exactly one copy; a member or
+ a copy may have no loans yet (the "o" = optional side), which is why a brand-
+ new member and a brand-new copy both fit the diagram.
+
+ TRY IT (paper): take any diagram in the samples PDF, cover the prose, and read
+ the symbols aloud as full sentences the way we just did. If your sentence
+ matches the PDF's caption, you can read crow's-foot. If not, bring the diagram
+ to me and we will read it together.
+
+ >> PITFALL: forgetting that the crow's foot (many) sits on the end that holds
+ the FOREIGN KEY. "Many loans per member" means the LOAN table carries
+ member_id, not the other way around. The foot points at the table that does
+ the pointing. We cover this confusion again in Part 4, number 4.
+
+-------------------------------------------------------------------------------
+ PART 4 - THE TEN CONFUSIONS ALMOST EVERY BEGINNER HITS
+-------------------------------------------------------------------------------
+
+ For each one: the confusion in plain words, the fix, WHERE it lives in your
+ other materials, and HOW student-panel handles it (so you are not surprised
+ later). Where the practice lesson or your own future design will differ from
+ student-panel, I say so - that is a rule we keep.
+
+ 1) TYPE vs INSTANCE  (table vs row)
+    Confusion: "Is 'student' one thing or many things?"
+    Fix: "student" the TABLE is the KIND; each ROW is one real student. The
+    table is the cookie-cutter; the rows are the cookies. You design the
+    cutter, not each cookie.
+    Where: primer Part 2.1; samples PDF Lesson 1-2.
+    student-panel: a "students" table (the cutter); every enrolled student is a
+    row (a cookie).
+
+ 2) ENTITY vs ATTRIBUTE  (its own table, or just a column?)
+    Confusion: "Should 'group' be a column on student, or its own table?"
+    Fix: ask "do I keep facts ABOUT this thing, or will many rows share it?"
+    If yes to either, it is an ENTITY (own table) and you point at it with a
+    foreign key. If it is just one plain value that belongs to this one row, it
+    is an ATTRIBUTE (a column). "Colour" is a column in a small shop and a
+    table in a paint factory - purpose decides.
+    Where: primer Part 2.1-2.2; samples PDF Lesson 2 (the colour example).
+    student-panel: "group" is its own table (groups have names, parents, and
+    members), so a student's group is a foreign key, not a text column.
+
+ 3) NATURAL vs SURROGATE KEY  - and INT vs UUID
+    Confusion: "What do I put in the id column, and why not just use the name
+    or the email?"
+    Fix: a NATURAL key is real-world (email, ISBN, national id). A SURROGATE
+    key is invented by the system purely to be a stable handle. Natural keys
+    change and repeat; surrogate keys never do. Modern practice: give each
+    table a surrogate primary key AND keep the useful natural value under a
+    UNIQUE rule so it still cannot duplicate.
+    Two kinds of surrogate exist, and here is a real difference between your
+    materials:
+       - the samples PDF uses INTEGER auto-numbers (1, 2, 3 ...) everywhere.
+         Simple and great for learning.
+       - the primer (Part 3) and student-panel use a UUID - a long random id
+         like 7f3a...-...-9c2b - PLUS a human-friendly unique code.
+    Both are surrogate keys; neither is wrong. INT is easier to read while
+    learning; UUID is better when ids must be unique across machines or must
+    not reveal "how many" or "what order." This is a DIFFERENCE you will meet,
+    not a contradiction.
+    Where: primer Part 3 (it even notes student-panel's UUID + student_code);
+    samples PDF Lessons 3-4 (INT ids).
+    student-panel: UUID primary keys, plus a unique human student_code. So when
+    you see "1, 2, 3" in the PDF and long random ids in student-panel, you are
+    seeing the same idea in two costumes. In the PRACTICE lesson we will use INT
+    ids (like the PDF) because they are easier to type and read - that is a
+    place where the practice deliberately differs from student-panel.
+
+ 4) WHERE THE FOREIGN KEY GOES  (which table carries the pointer?)
+    Confusion: "Does the loan point at the member, or the member at the loan?"
+    Fix: in a one-to-many, the foreign key lives on the MANY side. One member,
+    many loans -> loan carries member_id. Rule of thumb: the child points at
+    the parent; the crow's foot sits where the FK lives.
+    Where: primer Part 3 (FK placement); samples PDF Lessons 7-8.
+    student-panel: a score/evaluation row points at the student and the
+    parameter it is about; the "many" rows carry the pointers, exactly as the
+    rule says.
+
+ 5) WHAT "NULL" MEANS  (empty on purpose, or missing by accident?)
+    Confusion: "A blank cell - is that allowed? what does it mean?"
+    Fix: NULL means "no value here." You must DECIDE, per column, whether blank
+    is legal and what it means. loan.returned_on being NULL means "not returned
+    yet" - a real, useful meaning. A NULL email might mean "we never collected
+    it." Give every nullable column a sentence of meaning; forbid NULL (NOT
+    NULL) where blank would be nonsense.
+    Where: primer Part 2.2 and Part 2.4 (participation = the optional/mandatory
+    choice); samples PDF Lesson 8 and the delete-rule tables.
+    student-panel: it uses NULL deliberately - e.g. an assignment can point at
+    EITHER a group OR a single student, so one of those two pointers is NULL at
+    a time (the "either/or" pattern). We will look closely at that when we
+    reach it.
+
+ 6) DERIVE, DON'T STORE  - and the one big exception
+    Confusion: "Should I keep a 'total' column, or an 'age' column?"
+    Fix: if a value can be computed from other values, usually do NOT store it;
+    compute it when asked. Store birth_date, show age. Store line items, add up
+    the total. Storing a derived value means it can drift out of step with the
+    thing it came from.
+    THE EXCEPTION (important, and this is where the samples PDF ADDS something
+    the primer only hints at): a value you capture ON PURPOSE at a moment in
+    time, because it must never change afterward, is NOT a derived value - it
+    is a FROZEN FACT. The classic case is unit_price_at_sale on an order line.
+    The product's price today is irrelevant; the order must remember what the
+    customer actually paid. Keep it. It only LOOKS like a redundancy.
+    Where: primer Part 2.2 and Part 6 (derive-don't-store, denormalise);
+    samples PDF Lessons 9 and 16 ("Not a break: unit_price_at_sale is a frozen
+    fact") - a genuinely good addition worth folding into your notes.
+    student-panel: a recorded score is a frozen fact of its period - once a
+    period is scored, that number stands even if the parameter's setup later
+    changes. Same principle as unit_price_at_sale.
+
+ 7) ONE VALUE PER CELL  (first normal form, in plain words)
+    Confusion: "Can I just put 'math, science, art' in one subjects column?"
+    Fix: no. One cell, one value. A list in a cell cannot be searched, counted,
+    or constrained properly ("who takes science?" becomes guesswork). Repeating
+    columns (phone1, phone2, phone3) are the same mistake wearing a different
+    hat. The fix is always: give the repeating thing its OWN table with a
+    foreign key back.
+    Where: primer Part 6 (1NF); samples PDF Lesson 14 (phone1/2/3 and the list-
+    in-a-cell break). You will FEEL this one in the practice lesson by trying to
+    query a comma-list and failing.
+    student-panel: multi-valued things (a student's many scores, a group's many
+    members) live in their own tables, never as lists in a cell.
+
+ 8) THE ONE MOVE: when to add a table "in the middle"
+    Confusion: "This relationship feels messy - what do I do?"
+    Fix: three different-looking problems all have the SAME solution - put a new
+    table between the two things:
+       - MANY-TO-MANY (students <-> courses): a bridge table (enrolment).
+       - A LINK THAT HAS ITS OWN FACTS (the enrolment has a grade and a date):
+         same bridge, now carrying those facts.
+       - A THREE-WAY fact (doctor + drug + patient = a prescription): a table
+         in the middle holding all three pointers.
+    If a relationship has its own attributes, or joins more than two things, or
+    is many-to-many, it wants to BE a table, not a line.
+    Where: primer Part 5 (the five hard patterns); samples PDF Lessons 10-13
+    ("three triggers, one idea").
+    student-panel: its scores/evaluations table is exactly this - a table in
+    the middle that links a student and a parameter for a period and carries the
+    score itself. The thing that felt like "just a link" is actually the most
+    important table in the design.
+
+ 9) RESERVED WORDS  (why you cannot name a table "order" or "group")
+    Confusion: none at first - then a confusing error when a table named "order"
+    or "group" or "user" refuses to work.
+    Fix: those words already mean something to the database (ORDER BY, GROUP BY,
+    USER). Avoid them as plain names: use "orders", "groups", "app_user", or
+    quote them. This is a PHYSICAL-level gotcha the primer does not mention and
+    the samples PDF flags - a useful addition.
+    Where: samples PDF "How to read" note on reserved words.
+    student-panel: runs on Postgres, where "user", "order", and "group" are all
+    reserved, so its real tables use safe names. Worth remembering before you
+    name anything in the practice lesson.
+
+10) SOFT DELETE vs HARD DELETE  (does "delete" really erase?)
+    Confusion: "If I remove a student, is the data gone forever?"
+    Fix: a HARD delete removes the row for good. A SOFT delete keeps the row but
+    marks it (e.g. an archived_at date or an is_active flag) so it stops showing
+    up while the history it is attached to survives. Which to use is a design
+    decision about whether you ever need the past back.
+    Where: primer Part 9 (design judgement, soft vs hard delete); the samples
+    PDF shows HARD deletes with ON DELETE rules (RESTRICT/CASCADE/SET NULL).
+    student-panel: SOFT-deletes / archives rather than erasing, so past scores
+    stay meaningful. In the PRACTICE lesson we will use HARD deletes on a
+    throwaway database - that is simpler and lets you SEE referential integrity
+    refuse an orphan. So the practice deliberately differs from student-panel
+    here: practice erases, student-panel archives. Keep that difference in mind.
+
+-------------------------------------------------------------------------------
+ PART 5 - DO THE OTHER AI PIECES AGREE WITH THE PRIMER?
+-------------------------------------------------------------------------------
+
+ Short answer: yes, almost entirely - they were written to sit alongside the
+ primer and even tell you to compare notes. They use the same examples and the
+ same crow's-foot notation, and on every big idea (keys, foreign keys, the five
+ patterns, the three normal forms) they say the same thing in a different
+ voice. In a few places they ADD something useful the primer underplays (the
+ frozen-fact exception, reserved words, the explicit mirroring of crow's-foot
+ symbols, a surrogate-id option for bridge tables). The one thing to ADD is
+ that the samples PDF uses only INTEGER ids and never mentions UUID - which is
+ exactly what student-panel uses - so a learner following only the PDF would be
+ surprised by student-panel's long random ids (see Part 4, number 3).
+
+ The full, point-by-point comparison - what agrees, what differs, what needs
+ adding, and which side is right and why - is written out separately in:
+
+     database-design-AI-pieces-review.txt
+
+ Read that when you want the detailed verdict. This companion only needed to
+ reassure you that your materials are a team, not a tug-of-war.
+
+-------------------------------------------------------------------------------
+ PART 6 - WHAT TO DO WITH THIS COMPANION
+-------------------------------------------------------------------------------
+
+ 1. Read it once, slowly, with the primer nearby. When Part 4 points at a
+    primer part, flip there and reread that bit in light of the confusion we
+    just named.
+ 2. Keep the Part 3 cheat-sheet handy whenever you look at a diagram.
+ 3. THEN open the practice lesson (database-design-practice-lesson.txt) and do
+    it with the in-browser sandbox open. Reading made these ideas concrete;
+    doing will make them yours.
+ 4. Write down any question that does not resolve. Bring the list to me. We do
+    NOT move on to re-deriving student-panel until your questions are answered -
+    there is no rush, and confusion now is cheaper than confusion later.
+
+ KEY IDEA for the whole file: design lives on paper; a database is just that
+ paper design, made real and filled with rows. Everything you are learning is
+ how to make the paper good BEFORE it becomes real.
+
+ A reminder of our standing rule: we never change the student-panel project.
+ You will build your own version in student-panel-I, and whenever your way
+ differs from student-panel's way, I will point it out - as I already did in
+ Part 4 for ids (INT vs UUID) and deletes (hard vs soft).
+
+                              - end of companion -
+

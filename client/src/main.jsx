@@ -13,6 +13,7 @@ import { PreferencesProvider } from './preferences/PreferencesProvider.jsx';
 import './index.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import CustomCursor from './components/CustomCursor.jsx';
 
 applyRememberedTheme();
 
@@ -51,6 +52,7 @@ createRoot(document.getElementById('root')).render(
           <AuthProvider>
             <PreferencesProvider>
               <App />
+              <CustomCursor />
             </PreferencesProvider>
           </AuthProvider>
         </BrowserRouter>

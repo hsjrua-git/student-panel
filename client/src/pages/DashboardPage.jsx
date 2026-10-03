@@ -1,17 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { getTrends } from '../api/dashboard.js';
 import { getResults } from '../api/results.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
-import HeadlineCards from '../components/HeadlineCards.jsx';
+import CohortHero from '../components/CohortHero.jsx';
+import CohortDrawer from '../components/CohortDrawer.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import ParameterCard from '../components/ParameterCard.jsx';
+import ExportLink from '../components/ExportLink.jsx';
+import ParameterDrawer from '../components/ParameterDrawer.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
+import StudentDrawer from '../components/StudentDrawer.jsx';
 import UnmeasuredList from '../components/UnmeasuredList.jsx';
 import {
+  cohortField,
   parameterStats,
+  studentBreakdown,
   summarize,
   trendSeries,
   unmeasuredStudents,
@@ -39,11 +44,18 @@ function DashboardPage() {
 
   const results = resultsQuery.data;
   const summary = useMemo(() => (results ? summarize(results) : null), [results]);
+  const cohort = useMemo(() => (results ? cohortField(results) : []), [results]);
   const stats = useMemo(() => (results ? parameterStats(results) : []), [results]);
   const unmeasured = useMemo(
     () => (results ? unmeasuredStudents(results) : []),
     [results]
   );
+  // Which detail drawer is open: {type:'parameter'|'student'|'cohort', id?} or
+  // null. All three drawers stay mounted so their slide-in/out is pure CSS;
+  // closing just clears the target and each panel keeps its last content (its own
+  // render-time cache) until it is off-screen.
+  const [openTarget, setOpenTarget] = useState(null);
+  const closeDrawer = useCallback(() => setOpenTarget(null), []);
 
   if (periodsQuery.isPending) {
     return (
@@ -104,6 +116,30 @@ function DashboardPage() {
     (period) => period.number <= periodNumber
   );
 
+  // The open drawer's data, derived from the unified target. Only one type is
+  // ever active at a time; the others resolve to null so their (always-mounted)
+  // drawer renders its cached content while closed. Stats default to [] so the
+  // parameter lookup is safe before results land; the trend is only computed when
+  // a parameter is actually selected.
+  const openParamId =
+    openTarget?.type === 'parameter' ? openTarget.id : null;
+  const openStat =
+    openParamId !== null
+      ? stats.find((stat) => stat.parameter.id === openParamId) ?? null
+      : null;
+  const openTrend = openStat
+    ? trendSeries({
+        trends: trendsQuery.data ?? [],
+        periods: upToSelected,
+        parameterId: openParamId,
+      })
+    : [];
+  const openStudent =
+    openTarget?.type === 'student' && results
+      ? studentBreakdown(results, openTarget.id)
+      : null;
+  const openCohort = openTarget?.type === 'cohort' ? summary : null;
+
   return (
     <main className="wide">
       <div className="page-head">
@@ -124,6 +160,12 @@ function DashboardPage() {
           onChange={setChosen}
         />
         <GroupFilter value={groupId} onChange={setGroupId} />
+        <ExportLink
+          prefill={{
+            periods: { mode: 'selection', numbers: [periodNumber] },
+            students: groupId ? { mode: 'group', groupId } : undefined,
+          }}
+        />
       </div>
 
       {resultsQuery.isPending && <p className="hint">Loading…</p>}
@@ -162,39 +204,39 @@ function DashboardPage() {
             />
           ) : (
             <>
-              <HeadlineCards summary={summary} />
+              <CohortHero
+                summary={summary}
+                field={cohort}
+                stats={stats}
+                onSelect={setOpenTarget}
+              />
 
               <section>
-                <h2>Parameters</h2>
-                {trendsQuery.isError && (
-                  <p className="hint">
-                    The history charts could not be loaded:{' '}
-                    {trendsQuery.error.message}
-                  </p>
-                )}
-                <div className="param-grid">
-                  {stats.map((stat) => (
-                    <ParameterCard
-                      key={stat.parameter.id}
-                      stat={stat}
-                      trend={trendSeries({
-                        trends: trendsQuery.data ?? [],
-                        periods: upToSelected,
-                        parameterId: stat.parameter.id,
-                      })}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <h2>Not yet measured</h2>
+                <h2>Needs scoring</h2>
                 <UnmeasuredList items={unmeasured} />
               </section>
             </>
           )}
         </>
       )}
+
+      <ParameterDrawer
+        open={openTarget?.type === 'parameter' && Boolean(openStat)}
+        stat={openStat}
+        trend={openTrend}
+        trendError={trendsQuery.isError ? trendsQuery.error.message : null}
+        onClose={closeDrawer}
+      />
+      <StudentDrawer
+        open={openTarget?.type === 'student' && Boolean(openStudent)}
+        breakdown={openStudent}
+        onClose={closeDrawer}
+      />
+      <CohortDrawer
+        open={openTarget?.type === 'cohort' && Boolean(openCohort)}
+        summary={openCohort}
+        onClose={closeDrawer}
+      />
     </main>
   );
 }

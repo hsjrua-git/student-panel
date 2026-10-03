@@ -1,0 +1,396 @@
+================================================================================
+STUDENT PANEL — WHAT THE WHOLE SYSTEM IS, IN PLAIN LANGUAGE
+Detailed, top-down. Written for someone who is new to databases.
+================================================================================
+
+HOW TO READ THIS DOCUMENT
+-------------------------
+It goes from the big pieces down to the small ones:
+  MAJOR AREA  ->  the tables in it  ->  the columns / rules inside each table.
+For each thing you will see four labels used loosely:
+  - WHAT IT IS       : a plain definition.
+  - WHAT IT CAN DO   : the actions it enables.
+  - WHAT IT CAN BE   : the shapes/states it is allowed to take.
+  - RESTRICTIONS     : the rules that must always hold.
+
+A FEW WORDS DEFINED FIRST (jargon)
+----------------------------------
+  TABLE      : one "drawer" in the filing cabinet. A grid.
+  ROW        : one item in a drawer (one user, one score, one group).
+  COLUMN     : one fact about that item (a name, a date, a number).
+  PRIMARY KEY (PK)  : a row's own permanent ID. Never repeats.
+  FOREIGN KEY (FK)  : a column that points at a row in another drawer.
+                      This is how two drawers are "linked".
+  REQUIRED (NOT NULL) : this column must always be filled in.
+  NULLABLE            : this column is allowed to be left empty.
+  ONE-TO-MANY : one row here can be linked to many rows there
+                (one role -> many users).
+  EITHER/OR LINK (polymorphic) : a row that points at ONE of two things.
+                It has two FK columns and exactly one is filled in
+                (e.g. a teacher attached to a student OR to a group).
+  PERMISSION KEY : a fixed code word like "students.view" that means
+                "allowed to do this one thing". They live in the program's
+                code and cannot be invented by users.
+  ROLE       : a named bundle of permission keys (Administrator, Teacher...).
+  PERIOD     : a scoring round. How often scores are taken (rhythm).
+  LOCK       : the moment a score can no longer be edited.
+  ROLL-UP    : a group's combined number, calculated from everyone beneath it.
+
+THE FOUR MAJOR AREAS
+--------------------
+  1. PEOPLE & ACCESS      - who can log in and who can do what.
+  2. STUDENTS, GROUPS,    - the people being evaluated and how they are
+     AND THE TREE           organised into a tree of groups.
+  3. SCORING, PARAMETERS, - the actual scores, what is measured, and tasks.
+     AND TASKS
+  4. SYSTEM / RECORDS     - the history log and behind-the-scenes plumbing.
+
+Legend for NEW things below:  [NEW TABLE] or [NEW COLUMN].
+
+================================================================================
+1. MAJOR AREA: PEOPLE & ACCESS  (who can log in, who can do what)
+================================================================================
+
+This is the security backbone. The core idea, both today and after the
+expansion: the program has a FIXED list of permission keys. Admins decide
+which role holds which keys, but nobody can invent a new key from the screen.
+The server checks a key on EVERY request, so hiding a button is only a
+convenience — the real gate is on the server.
+
+1.1  TABLE: roles
+     WHAT IT IS   : a named bundle of permissions.
+     WHAT IT CAN DO : lets you define job types once and hand them to people.
+     WHAT IT CAN BE : any set of permission keys. Default roles are
+                      Administrator, Handler, Teacher, Student.
+     RESTRICTIONS : some roles are "system" roles (is_system = true) and are
+                    protected from deletion. The app also refuses to remove the
+                    last role that can manage roles/users (so you can't lock
+                    yourself out).
+
+     1.1.1  THE FOUR DEFAULT ROLES (what each can do)
+        ADMINISTRATOR (the "management" tier in your notes):
+            - Has EVERYTHING. Modifies groups & sub-groups, roles, users.
+            - Sets permissions per role, assigns roles to users.
+            - Modifies scores, student fields, and user fields.
+            - Views the log AND may delete a log line — but only with a reason.
+        HANDLER:
+            - View and add students. Manage groups. Put students in groups.
+            - See and add scores. See and add parameters.
+            - See and add student fields. View dashboard. Export per student.
+            - Can set or change a student's PERIOD (weekly, 2-weekly, monthly,
+              every 3 days, etc.).
+        TEACHER:
+            - View only THEIR OWN students. Enter scores for them.
+            - See a dashboard of only their students. Can set a student period.
+        STUDENT (a login given to a student-person):
+            - View their own evaluation and their own dashboard. Nothing else.
+
+1.2  TABLE: role_permissions
+     WHAT IT IS   : the list of which permission keys each role holds.
+     WHAT IT CAN DO : one row = "this role has this one capability".
+     RESTRICTIONS : some keys REQUIRE others (a prerequisite). Example:
+                    "override a locked score" requires "enter scores", which
+                    requires "view students" + "view parameters". The system
+                    ticks prerequisites automatically and rejects incoherent
+                    combinations.
+
+1.3  THE PERMISSION KEYS (the fixed catalogue)
+     WHAT IT IS   : the master list of allowed capabilities, in code.
+     EXISTING today (grouped): students view/add/edit/delete; groups
+        manage/assign; scores view/enter/override; parameters view/manage;
+        custom-fields manage / see-restricted; dashboard view; export; import;
+        share views; settings; users manage; roles manage; audit view.
+     NEW keys the expansion implies (need to be added): assign parameters,
+        manage tasks / assign tasks, set a student or group period, manage &
+        restrict USER fields, and delete-audit-with-reason.
+     TWO VERBS from your notes, applied throughout:
+        MODIFY = add, remove, edit.     MANAGE = create, organise.
+
+1.4  TABLE: users
+     WHAT IT IS   : a login account.
+     WHAT IT CAN BE : active or inactive; may be required to change password;
+                      points at exactly one role.
+     RESTRICTIONS : each user has one role at a time. The app protects against
+                    removing the last active administrator.
+
+     1.4.1  is_active (used for student logins)
+        A student's login is CREATED but starts INACTIVE. The student cannot get
+        in until an admin switches it on. No new column is needed for this — the
+        existing is_active flag does the job.
+     1.4.2  created_at + "restrictable" creation date
+        Every user already has a creation date. Your notes want it shown on the
+        user page and made restrictable (hidden from people who lack a key).
+        That "restrictable" behaviour is handled by the user custom-field system
+        below (1.5), not by a special column.
+
+1.5  TABLE: user_field_definitions            [NEW TABLE]
+     + COLUMN: users.extra                     [NEW COLUMN]
+     WHAT IT IS   : the ability to invent extra fields for USER accounts, the
+                    same way you already can for students.
+     WHAT IT CAN DO : define a field (label, type, and whether it is restricted);
+                      its value for each user is stored in users.extra.
+     WHAT IT CAN BE : a field can be normal (everyone with access sees it) or
+                      restricted (only people with the "see restricted" key).
+     RESTRICTIONS : only people who can manage fields may define them; only
+                    people with the restricted-view key see restricted values.
+
+1.6  TABLE: user_preferences
+     WHAT IT IS   : each person's own settings (theme, default sort, etc.).
+     RESTRICTIONS : private to that user; not part of the audit log.
+
+1.7  TABLE: saved_views
+     WHAT IT IS   : filters/looks a user has saved on the results screen.
+     WHAT IT CAN DO : re-open a saved filter later; optionally share it (needs
+                      the "share views" key).
+
+1.8  TABLE: user_sessions   (plumbing)
+     WHAT IT IS   : the record of who is currently logged in.
+     RESTRICTIONS : managed automatically. You never edit it by hand.
+
+================================================================================
+2. MAJOR AREA: STUDENTS, GROUPS, AND THE TREE
+================================================================================
+
+This area holds the people being evaluated and how they are organised. The most
+important idea: EVERYTHING is a tree, and every score lives somewhere in it.
+
+2.1  TABLE: students
+     WHAT IT IS   : a person being evaluated (a "student-person").
+     IMPORTANT — two meanings of the word "student":
+        - student-PERSON  = a row in this table (someone being scored).
+        - student-LOGIN   = a role that lets that person see their own results.
+        They are linked but are not the same thing.
+     WHAT IT CAN BE : may or may not have a linked login; may or may not have a
+                      personal period; always ends up inside at least one group.
+
+     2.1.1  COLUMN: user_id                    [NEW COLUMN]
+        Links a student-person to a login account. "Each student, if not
+        directly created as a user, becomes a user too" — so creating a student
+        can auto-create a (switched-off) login and store its id here.
+     2.1.2  COLUMNS: period_interval / period_anchor   [NEW COLUMNS]
+        The student's personal rhythm (e.g. every week, every 3 days). If a
+        group they belong to has its own period, the group's period wins for
+        scoring inside that group.
+     2.1.3  COLUMN: extra  + student_field_definitions
+        Custom student fields already exist (e.g. "instrument"). The values live
+        in extra; the definitions live in student_field_definitions, and a field
+        can be marked restricted.
+
+2.2  TABLE: student_groups   (the tree itself)
+     WHAT IT IS   : a group or sub-group. Groups can contain groups.
+     WHAT IT CAN DO : organise students into a hierarchy of any depth.
+     WHAT IT CAN BE : a top group, a middle group, or a bottom group.
+     RESTRICTIONS : a group points at its parent (parent_id). The app prevents
+                    loops (a group cannot end up being its own ancestor).
+
+     2.2.1  THE TREE SHAPE + defaults
+        Top = "everything". Under it your default branches:
+            - education      -> children, teenagers, adults
+            - performance    -> by level (levels decided later)
+            - miscellaneous  -> choir, band, acapella
+        A new student is placed directly under a default group in "education",
+        so they are never floating outside the tree.
+     2.2.2  COLUMNS: period_interval / period_anchor    [NEW COLUMNS] (optional)
+        A group MAY have its own rhythm. If it does, a student's rhythm inside
+        that group follows the group's. Not every group needs one.
+     2.2.3  Parameters on a group
+        A group MAY also have its own parameters (handled via the assignments
+        table in area 3). See area "FOUR GROUP STATES" near the end — a group's
+        period and its parameters are INDEPENDENT optional settings.
+
+2.3  TABLE: student_group_members
+     WHAT IT IS   : the list of which students sit in which groups.
+     WHAT IT CAN BE : a student can be in several groups at once.
+     RESTRICTIONS : putting a student in a group needs the "assign" key;
+                    creating/renaming groups needs the "manage" key.
+
+2.4  TABLE: teacher_assignments              [NEW TABLE]
+     WHAT IT IS   : the link that says "this teacher is responsible for this".
+     WHAT IT CAN DO : this is what makes "a teacher sees only their students"
+                      possible. It is the biggest new idea, because today the
+                      app only knows global permission keys — it has no notion of
+                      "mine vs not mine". This table adds that notion.
+     WHAT IT CAN BE : an EITHER/OR link. One row points at EITHER one student
+                      (student_id filled) OR one whole group (group_id filled).
+                      Attaching a teacher to a group gives them every student in
+                      it (and, by the tree, everything beneath it).
+     RESTRICTIONS : exactly one of the two targets should be set per row (this
+                    should be enforced by a CHECK rule — see the assessment at
+                    the end). A teacher can have many such rows.
+
+================================================================================
+3. MAJOR AREA: SCORING, PARAMETERS, AND TASKS
+================================================================================
+
+This is the heart of the app: what you measure, who you measure it on, and the
+scores themselves.
+
+3.1  TABLE: parameters
+     WHAT IT IS   : a thing you measure (e.g. "rhythm", "breath control").
+     WHAT IT CAN BE : may have a unit and a minimum/maximum allowed value.
+                      Defaults are unspecified for now ("***").
+     RESTRICTIONS : seeing them needs the "view" key; adding/editing needs the
+                    "manage" key.
+
+     3.1.1  COLUMNS: unit, min_value, max_value
+        Bound a score so a typo like 500 out of 10 is rejected.
+     3.1.2  TABLE: parameter_changes
+        WHAT IT IS : a history of edits to a parameter over the periods, so you
+        can see what changed and when.
+
+3.2  TABLE: parameter_assignments            [NEW TABLE]
+     WHAT IT IS   : says which parameters apply to which group or student.
+     WHAT IT CAN DO : move away from "every parameter applies to everyone" toward
+                      "this group / this student is scored on these parameters".
+     WHAT IT CAN BE : an EITHER/OR link (group_id OR student_id), just like
+                      teacher assignments.
+     RESTRICTIONS : exactly one target per row (CHECK rule recommended).
+
+3.3  TABLE: evaluations   (the scores themselves — the centre of everything)
+     WHAT IT IS   : one row = one score. "Student got VALUE on PARAMETER in
+                    PERIOD."
+     WHAT IT CAN DO : record every score; support two evaluation pages (one for
+                      student-persons, one for groups/sub-groups).
+
+     3.3.1  THE TWO SHAPES (this is the key design decision)
+        - group_id  is REQUIRED  [NEW COLUMN]  -> every score sits under a group.
+        - student_id is NULLABLE [NEW COLUMN].
+        So a row is one of exactly two things:
+          (a) student_id filled -> a named student's score INSIDE that group.
+          (b) student_id empty   -> the GROUP'S OWN direct score.
+        There is no group-less/personal score. A student always scored under a
+        group; by default the group they sit under in "education".
+     3.3.2  SAME STUDENT, DIFFERENT GROUPS = DIFFERENT SCORES
+        Because the group is part of every score row, the same student can be
+        scored separately in each group they belong to. Their score in group A
+        and in group B are different rows and do not clash.
+     3.3.3  COLUMNS: period_number, value, comment
+        Which round, the number, and an optional note.
+     3.3.4  COLUMN: locks_at  (locking)
+        WHAT IT IS : the moment this score freezes and can't be edited.
+        HOW IT IS DECIDED : from the PERIOD — the time between classes. A group's
+        period (if set) drives its students' rhythm; otherwise the student's own
+        period. (What happens when NEITHER is set is still undefined — see the
+        assessment at the end.)
+        OVERRIDE : someone with the override key can reopen a locked score.
+     3.3.5  ROLL-UP vs DIRECT (how the tree adds up)
+        Only DIRECT scores are stored. A group's rolled-up number (its students
+        plus all sub-groups, all the way down) is CALCULATED WHEN YOU LOOK by
+        walking the parent_id tree — it is not saved anywhere. A group's OWN
+        direct score (shape (b) above) is always shown SEPARATELY from its
+        rolled-up number, so "how the choir itself scored" stays distinct from
+        "the average of everyone in the choir". (The exact maths — average,
+        weighted, etc. — is not decided yet; see the assessment.)
+
+3.4  TABLE: tasks                            [NEW TABLE]
+     WHAT IT IS   : a to-do or skill item.
+     WHAT IT CAN BE : optionally tied to a parameter (parameter_id nullable);
+                      may or may not relate to scoring at all.
+     DELIBERATELY OPEN : columns are kept loose for now. You want the OPTION to
+                    add a completion checkbox later that MAY affect an
+                    evaluation but is not itself a score — that is a decision for
+                    later, so the shape is intentionally not locked down yet.
+
+3.5  TABLE: task_assignments                 [NEW TABLE]
+     WHAT IT IS   : hands a task to a group or a student.
+     WHAT IT CAN BE : an EITHER/OR link (group_id OR student_id), same pattern.
+     RESTRICTIONS : exactly one target per row (CHECK rule recommended).
+
+================================================================================
+4. MAJOR AREA: SYSTEM / RECORD-KEEPING
+================================================================================
+
+4.1  TABLE: audit_log
+     WHAT IT IS   : a record of every change anyone makes (who, what, when).
+     WHAT IT CAN DO : accountability. "Everything is logged; dates are recorded."
+     NEW COLUMNS: deleted_at + delete_reason   [NEW COLUMNS]
+        A log line can be SOFT-deleted (hidden, not truly erased) and ONLY with a
+        written reason. This is sensitive: it slightly weakens the trail, so it
+        should be admin-only and the deletion itself should be logged.
+
+4.2  TABLE: settings   (plumbing)
+     WHAT IT IS   : app-wide options (one key/value each).
+
+4.3  TABLE: schema_migrations   (plumbing)
+     WHAT IT IS   : the list of database updates already applied. Managed by the
+                    migration tool; you never touch it by hand.
+
+================================================================================
+THE FOUR GROUP STATES (period and parameters are INDEPENDENT options)
+================================================================================
+A group's PERIOD (its rhythm) and its PARAMETERS (what it is scored on) are two
+SEPARATE optional settings. All four combinations are valid:
+   1. neither a period nor parameters
+   2. a period but NO parameters
+   3. parameters but NO period
+   4. both
+Because both are optional, either can be added later. Nothing forces a group to
+have either one.
+
+================================================================================
+ASSESSMENT: WHAT IS NOT ENOUGH, AND WHAT MAY BE EXCESSIVE
+================================================================================
+
+NOT ENOUGH YET (gaps to decide before this can be built):
+
+  A. "Own students" is a whole new access mechanism, not just a table.
+     teacher_assignments stores the links, but the app today only checks GLOBAL
+     permission keys ("can enter scores" — for anyone). It has no "mine vs not
+     mine" filter. You must decide HOW the server narrows a teacher (and a
+     student login) down to only their rows, on every read and every write.
+     This is the single biggest piece of work in the whole expansion.
+
+  B. Roll-up maths is undefined. Before a group score can be shown, decide how
+     children combine: simple average, average weighted by number of students,
+     or a sum? And does a group's own direct score mix into the rolled-up number
+     or stay entirely separate? (You said "separate" for display — good, but the
+     combining rule for the rolled-up figure still needs a choice.)
+
+  C. Locking with no period. Locking depends on the period. Decide what happens
+     when a student has no personal period AND their group has none: never lock,
+     lock immediately, or fall back to a global default?
+
+  D. Uniqueness rules on evaluations. Should there be at most ONE score per
+     (group + student + parameter + period)? Almost certainly yes — otherwise
+     duplicates creep in. This needs a unique constraint.
+
+  E. The either/or links need a guard. teacher_assignments,
+     parameter_assignments and task_assignments each have two nullable targets.
+     Add a CHECK so EXACTLY ONE is set, or you can get meaningless rows that
+     point at nothing or at two things at once.
+
+  F. New permission keys are not enumerated yet. At least: assign parameters,
+     manage/assign tasks, set a period, manage & restrict user fields, and
+     delete-audit-with-reason. These must be added to the fixed catalogue.
+
+  G. Deferred-by-you (fine to leave, but they block full build):
+     performance "levels", and the default parameters (currently "***").
+
+MAY BE EXCESSIVE (worth a second thought):
+
+  H. Full custom fields for USERS. The one field you actually named is the
+     creation date — and that already exists. A whole custom-field system for
+     users (user_field_definitions + users.extra) is a lot of machinery for one
+     restrictable date. Consider just showing created_at with a restrict toggle,
+     and adding the full system only if you later want several user fields.
+
+  I. Period stored on BOTH student and group. Useful, but two places to set the
+     same idea invites confusion. Keep the precedence strictly one-way (group
+     overrides the student's personal period) and show it clearly in the UI.
+
+  J. Soft-deletable audit log. An audit trail you can edit is a weaker audit
+     trail. It is reasonable for cleanup, but keep it admin-only, require the
+     reason, and make the deletion itself a logged event that can't be deleted.
+
+  K. Tasks kept fully open. Good for now (you asked for it), but nothing about
+     tasks can actually be built until the checkbox/effect-on-evaluation
+     question is answered. Just know it is parked, not ready.
+
+================================================================================
+ONE OPEN LOGISTICS QUESTION
+================================================================================
+Is this design meant for THE FINISHED APP, or for the REBUILD (student-panel-I)
+you have been doing top-down? It does not change the design above, but it
+changes how the work would actually be carried out. No rush.
+================================================================================
+

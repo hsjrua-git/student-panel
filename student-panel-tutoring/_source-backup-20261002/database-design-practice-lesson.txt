@@ -1,0 +1,600 @@
+===============================================================================
+ DATABASE DESIGN - HANDS-ON PRACTICE LESSON
+ Turning the rules into skill, in a free in-browser database (no install)
+===============================================================================
+
+ Do this lesson AFTER the primer and the companion lesson. This is the first
+ time you will actually touch a computer. You will build small tables, put rows
+ in them, ask them questions, make the classic beginner mistakes ON PURPOSE,
+ feel why they hurt, and then fix them. Reading taught you the ideas; this makes
+ them yours.
+
+ WHY A SANDBOX, AND WHY NOT INSTALL ANYTHING YET
+ We agreed installation is the LAST phase. So this lesson uses a database that
+ runs INSIDE A WEB BROWSER TAB - nothing to install, nothing that can touch your
+ real machine or the student-panel project. When the tab closes, the practice
+ database is gone. That is exactly what we want for practice: a safe sandbox you
+ cannot break anything important in.
+
+ Signposts are the same as always:
+   >> CONTEMPLATE   stop and think first.
+   TRY IT          type this into the sandbox and watch what happens.
+   KEY IDEA        the one sentence to keep.
+   >> PITFALL       a trap, named so you can step around it.
+   LOOK FOR        what you should SEE after a TRY IT (so you know it worked).
+   MAPS TO         where this exercise lives in the primer / samples PDF, and
+                   how student-panel does the same thing (sometimes differently).
+
+ There is no clock. If an exercise does not behave, copy what you typed and what
+ you saw, and bring it to me. A broken query is a GREAT thing to learn from.
+
+-------------------------------------------------------------------------------
+ PART 0 - SETTING UP YOUR SANDBOX (read all of this before you start)
+-------------------------------------------------------------------------------
+
+ You need a web page that lets you type SQL and see the result. You have two
+ good options. Read both; pick one.
+
+ OPTION A (preferred - it matches student-panel's real engine):
+   student-panel stores its data with something called PGlite, which is the
+   PostgreSQL database compiled to run in a browser. Practicing on the same
+   engine means the SQL you learn here is the SQL student-panel actually speaks.
+   To find it: open a search engine and search for  PGlite playground  (the
+   project's home is pglite.dev). Look for an in-browser REPL / playground where
+   you can type SQL and run it. If you land on a page with a box that says
+   something like "postgres=>" and lets you type, you are in the right place.
+
+ OPTION B (fallback - simplest, always available):
+   Any free online SQL playground. Search for  SQLite online  or  SQL fiddle .
+   These give you an instant SQL box with no sign-up. SQLite speaks a SLIGHTLY
+   different dialect than Postgres (I point out every difference as we go), but
+   every design idea in this lesson works identically in both.
+
+ >> CONTEMPLATE: notice we are choosing a tool the way the primer says to
+ choose anything - by purpose. The purpose here is "practice the design safely,
+ without installing, close to the real engine." Option A serves it best;
+ Option B serves it good-enough. Either is fine for learning.
+
+ TWO DIALECT NOTES you will need (keep them nearby):
+   - AUTO-GENERATED IDS. In Postgres (Option A) an auto-numbered id column is
+     written  id INTEGER GENERATED ALWAYS AS IDENTITY  (older style: SERIAL).
+     In SQLite (Option B) it is  id INTEGER PRIMARY KEY  (SQLite fills it in
+     for you) or  id INTEGER PRIMARY KEY AUTOINCREMENT . To avoid this fork
+     entirely while learning, THIS LESSON TYPES THE IDS BY HAND (1, 2, 3). That
+     keeps every statement identical in both tools and keeps your attention on
+     the DESIGN, not on id machinery.
+   - DATES. Both tools accept dates written as text like '2026-09-01'. Good
+     enough for practice.
+
+ >> PITFALL: do not reuse table names between exercises in the same tab. If a
+ later exercise says CREATE TABLE member and you already made one, either start
+ a fresh tab or run  DROP TABLE member;  first. The sandbox remembers until you
+ reload.
+
+ A SAFETY NOTE: this is a scratch database in a browser tab. Type freely, break
+ things on purpose, reload to wipe it. Nothing here can reach your computer, your
+ files, or the student-panel project.
+
+-------------------------------------------------------------------------------
+ PART 1 - THE BIG PICTURE: WHAT WE WILL DO, AND WHY, BEFORE ANY TYPING
+-------------------------------------------------------------------------------
+
+ The whole lesson has one shape, biggest-picture first:
+
+     BUILD a tiny good table  ->  BREAK it the way beginners do  ->  FEEL the
+     pain  ->  FIX it with the design rules  ->  PROVE the fix with real rows.
+
+ That order is deliberate. If I only showed you the right answer, you would
+ believe me but not UNDERSTAND. By making the mistake first and feeling exactly
+ how it bites, the fix stops being a rule you memorised and becomes a reflex.
+ This mirrors how the primer and the samples PDF teach normal forms: show the
+ anomaly, then remove it.
+
+ Here is the arc of the five working parts, so you always know where you are:
+
+   PART 2  WARM-UP      - one table, three rows, your first question. Prove the
+                          tool works and the paper-to-grid-to-SQL idea is real.
+   PART 3  FEEL THE PAIN- commit the three classic sins (repeating columns, a
+                          list in one cell, one giant wide table) and watch them
+                          fail a real question.
+   PART 4  FIX IT       - split tables, add a foreign key, build a bridge for a
+                          many-to-many, and a self-reference tree. The core of
+                          the lesson.
+   PART 5  TEST WITH ROWS - the discipline both the primer and the PDF end on:
+                          put real rows in and answer your purpose questions.
+   PART 6  MAP BACK     - line every exercise up against the primer, the samples
+                          PDF, and student-panel (and where you differ).
+
+ KEY IDEA: you are not here to learn SQL. You are here to make the DESIGN IDEAS
+ physical. SQL is just the hands; design is the head. We type only enough SQL to
+ make the ideas move.
+
+ >> CONTEMPLATE before you start: in one sentence, what question would make a
+ badly-designed table obviously bad? (Hint from the primer: "a design is good
+ if it can ANSWER the questions you need.") Hold your sentence; by Part 3 you
+ will have made a table that cannot answer its own question.
+
+-------------------------------------------------------------------------------
+ PART 2 - WARM-UP: YOUR FIRST TABLE, ROWS, AND QUESTION
+-------------------------------------------------------------------------------
+
+ WHAT we will do: make one table, put three rows in it, and ask it one question.
+ WHY: to prove the sandbox works and to SEE the paper-to-grid-to-SQL chain from
+ the companion lesson happen in front of you.
+
+ >> CONTEMPLATE: on paper, write the three columns a "member" needs for a tiny
+ library: an id, a name, and the date they joined. You already drew this in the
+ companion lesson. We are about to make it real.
+
+ E1. CREATE, INSERT, SELECT.
+
+ TRY IT - type these one block at a time (run, read the result, then the next):
+
+     CREATE TABLE member (
+       member_id  INTEGER PRIMARY KEY,
+       full_name  TEXT NOT NULL,
+       joined_on  TEXT
+     );
+
+     INSERT INTO member (member_id, full_name, joined_on) VALUES
+       (1, 'Sara Ahmadi', '2026-09-01'),
+       (2, 'Omid Karimi', '2026-09-03'),
+       (3, 'Lena Hassan', '2026-09-05');
+
+     SELECT * FROM member;
+
+ LOOK FOR: the SELECT shows a grid of three rows and three columns - the exact
+ grid the companion lesson drew on paper. You just turned a paper design into a
+ real, queryable thing.
+
+ TRY IT - now ask a real question:
+
+     SELECT full_name FROM member WHERE joined_on >= '2026-09-03';
+
+ LOOK FOR: two names (Omid and Lena). You asked "who joined on or after the 3rd"
+ and the table answered. THAT is what "a design can answer the question" means,
+ made concrete.
+
+ >> PITFALL: forgetting the semicolon at the end of a statement. Most tools need
+ it to know you are done. If nothing happens, check for a missing  ;  .
+
+ KEY IDEA: CREATE TABLE is your paper design becoming real; SELECT is you asking
+ it a question. Everything else in this lesson is variations on these two.
+
+ MAPS TO: primer Part 2 (entities/attributes) and the companion Part 2.
+ student-panel difference: here member_id is a hand-typed INTEGER; student-panel
+ would use a UUID primary key plus a unique human code. Same idea (a stable
+ surrogate key), different costume - exactly as the companion warned.
+
+-------------------------------------------------------------------------------
+ PART 3 - FEEL THE PAIN (MAKE THE CLASSIC MISTAKES ON PURPOSE)
+-------------------------------------------------------------------------------
+
+ WHAT: build three tables the WRONG way and let them fail. WHY: the primer's
+ normal-form rules sound abstract until a table refuses to answer a simple
+ question. We will make it refuse.
+
+ E2. REPEATING COLUMNS (phone1, phone2, phone3).
+
+ >> CONTEMPLATE: a member might have several phone numbers. The tempting fix is
+ three columns. What happens when someone has a fourth? or when you want "find
+ the member with phone 555-0300" without knowing which column it is in?
+
+ TRY IT:
+
+     CREATE TABLE member_bad_phones (
+       member_id  INTEGER PRIMARY KEY,
+       full_name  TEXT NOT NULL,
+       phone1     TEXT,
+       phone2     TEXT,
+       phone3     TEXT
+     );
+
+     INSERT INTO member_bad_phones VALUES
+       (1, 'Sara Ahmadi', '555-0100', '555-0101', NULL),
+       (2, 'Omid Karimi', '555-0200', NULL, NULL);
+
+ Now try to answer "which member has phone 555-0101?" You are forced to write:
+
+     SELECT full_name FROM member_bad_phones
+     WHERE phone1 = '555-0101' OR phone2 = '555-0101' OR phone3 = '555-0101';
+
+ LOOK FOR / FEEL IT: it works, but you had to name every phone column by hand.
+ Add phone4 tomorrow and this query (and every query like it) is wrong until you
+ edit it. The design fights you.
+
+ >> PITFALL: "I'll just add more columns when I need them." Columns are the
+ SHAPE of your data; needing to add a column just to store one more of the same
+ thing is the signal that the thing wants its own TABLE (we fix this in E5).
+
+ MAPS TO: primer Part 6 (1NF, no repeating groups); samples PDF Lesson 14.
+
+ E3. A LIST STUFFED INTO ONE CELL.
+
+ >> CONTEMPLATE: the other tempting shortcut is one column holding "555-0100,
+ 555-0101". Looks tidy. What breaks?
+
+ TRY IT:
+
+     CREATE TABLE member_bad_list (
+       member_id  INTEGER PRIMARY KEY,
+       full_name  TEXT NOT NULL,
+       phones     TEXT
+     );
+
+     INSERT INTO member_bad_list VALUES
+       (1, 'Sara Ahmadi', '555-0100, 555-0101'),
+       (2, 'Omid Karimi', '555-0200');
+
+ Now try the honest question "who has phone 555-0100?":
+
+     SELECT full_name FROM member_bad_list WHERE phones = '555-0100';
+
+ LOOK FOR / FEEL IT: Sara does NOT appear - her cell is '555-0100, 555-0101',
+ which is not EQUAL to '555-0100'. The list hid her. You can hack around it with
+ pattern-matching, but counting, sorting, or guaranteeing no duplicates all
+ become guesswork.
+
+ KEY IDEA: one value per cell. A list in a cell is data you cannot ask questions
+ about - which defeats the whole point of a database.
+
+ MAPS TO: primer Part 6 (1NF, atomic values); samples PDF Lesson 14. This is
+ the pain the companion lesson's confusion number 7 warned you about.
+
+ E4. ONE GIANT WIDE TABLE (the redundancy / update anomaly).
+
+ >> CONTEMPLATE: imagine tracking library loans in a SINGLE table that repeats
+ the member's name and the book's title on every loan row. What goes wrong the
+ day a member changes their name?
+
+ TRY IT:
+
+     CREATE TABLE loan_wide (
+       loan_id      INTEGER PRIMARY KEY,
+       member_name  TEXT,
+       book_title   TEXT,
+       borrowed_on  TEXT
+     );
+
+     INSERT INTO loan_wide VALUES
+       (1, 'Sara Ahmadi', 'The Blue Door', '2026-09-10'),
+       (2, 'Sara Ahmadi', 'Quiet Rivers',  '2026-09-12'),
+       (3, 'Omid Karimi', 'The Blue Door', '2026-09-13');
+
+ Sara married and is now 'Sara Noori'. Update her name:
+
+     UPDATE loan_wide SET member_name = 'Sara Noori' WHERE loan_id = 1;
+
+     SELECT * FROM loan_wide;
+
+ LOOK FOR / FEEL IT: loan 1 says 'Sara Noori' but loan 2 STILL says 'Sara
+ Ahmadi'. The same person now has two names in the same table, because her name
+ was copied onto every loan. This is the UPDATE ANOMALY the primer names: facts
+ duplicated across rows drift apart the moment one copy changes.
+
+ >> CONTEMPLATE three more pains hiding in this one table:
+   - INSERT anomaly: you cannot record a member who has not borrowed anything
+     yet - there is nowhere to put them.
+   - DELETE anomaly: delete their last loan and the member vanishes entirely.
+   - the book title is duplicated too, with the same drift problem.
+
+ KEY IDEA: store each fact ONCE, in the table it belongs to, and POINT at it.
+ A member's name belongs in a member table; a loan should only POINT at the
+ member, not re-type their name.
+
+ MAPS TO: primer Part 6 (the three anomalies, 2NF/3NF); samples PDF Lesson 16.
+ student-panel note: student-panel keeps each fact once - a score row points at
+ a student and a parameter, it does not copy the student's name - which is why
+ renaming a student there changes it everywhere at once, with no drift. In E6
+ you will build it the right way and watch the anomaly disappear.
+
+-------------------------------------------------------------------------------
+ PART 4 - FIX IT (TURN THE RULES INTO TABLES)
+-------------------------------------------------------------------------------
+
+ Now we repair every pain from Part 3 using the exact moves from the primer.
+ WHAT: four fixes - own-table-for-many-values, split-and-point, a bridge, a
+ tree. WHY: these four moves cover the large majority of real designs,
+ student-panel included.
+
+ E5. FIX THE PHONES: give the repeating thing its OWN table (the "one move").
+
+ >> CONTEMPLATE: a member HAS MANY phones; a phone belongs to ONE member. That
+ is one-to-many. From the companion (confusion 4), where does the foreign key
+ go? (On the many side - the phone.)
+
+ TRY IT:
+
+     CREATE TABLE member2 (
+       member_id  INTEGER PRIMARY KEY,
+       full_name  TEXT NOT NULL
+     );
+
+     CREATE TABLE phone (
+       phone_id   INTEGER PRIMARY KEY,
+       member_id  INTEGER NOT NULL REFERENCES member2(member_id),
+       number     TEXT NOT NULL
+     );
+
+     INSERT INTO member2 VALUES (1, 'Sara Ahmadi'), (2, 'Omid Karimi');
+     INSERT INTO phone VALUES
+       (10, 1, '555-0100'),
+       (11, 1, '555-0101'),
+       (12, 2, '555-0200');
+
+ Now the question that was painful in E2/E3 is clean, and works no matter how
+ many phones anyone has:
+
+     SELECT m.full_name
+     FROM member2 m JOIN phone p ON p.member_id = m.member_id
+     WHERE p.number = '555-0101';
+
+ LOOK FOR: Sara. One row, no OR-chain, no hidden list. A member can now have
+ one, four, or forty phones with zero change to the design.
+
+ KEY IDEA: "many of the same thing" is never more columns and never a list in a
+ cell - it is a child table with a foreign key pointing back at the parent.
+
+ MAPS TO: primer Part 2.2 (multi-valued attribute) and Part 5 (patterns);
+ samples PDF Lessons 3 and 14. REFERENCES is the foreign key from companion
+ confusion 4.
+
+ E6. FIX THE WIDE LOAN TABLE: split, point, and meet REFERENTIAL INTEGRITY.
+
+ >> CONTEMPLATE: the wide table (E4) mixed three things - members, books, and
+ loans. Separate them. A loan POINTS at one member and one book; it stops
+ copying their names.
+
+ TRY IT:
+
+     CREATE TABLE book (
+       book_id  INTEGER PRIMARY KEY,
+       title    TEXT NOT NULL
+     );
+
+     CREATE TABLE loan (
+       loan_id      INTEGER PRIMARY KEY,
+       member_id    INTEGER NOT NULL REFERENCES member2(member_id),
+       book_id      INTEGER NOT NULL REFERENCES book(book_id),
+       borrowed_on  TEXT NOT NULL
+     );
+
+     INSERT INTO book VALUES (100, 'The Blue Door'), (101, 'Quiet Rivers');
+     INSERT INTO loan VALUES
+       (1, 1, 100, '2026-09-10'),
+       (2, 1, 101, '2026-09-12'),
+       (3, 2, 100, '2026-09-13');
+
+ Now rename Sara ONCE, in the one place her name lives:
+
+     UPDATE member2 SET full_name = 'Sara Noori' WHERE member_id = 1;
+
+     SELECT l.loan_id, m.full_name, b.title, l.borrowed_on
+     FROM loan l
+     JOIN member2 m ON m.member_id = l.member_id
+     JOIN book   b ON b.book_id   = l.book_id;
+
+ LOOK FOR: BOTH of Sara's loans now show 'Sara Noori'. The update anomaly from
+ E4 is simply gone - because her name exists in exactly one row now.
+
+ TRY IT - now provoke REFERENTIAL INTEGRITY. Try to lend a book to a member who
+ does not exist:
+
+     INSERT INTO loan VALUES (4, 999, 100, '2026-09-14');
+
+ LOOK FOR / FEEL IT: the database REFUSES with a foreign-key error. There is no
+ member 999, so a loan pointing at 999 would be an "orphan," and the REFERENCES
+ rule will not allow it. The design is now protecting its own truth.
+
+ KEY IDEA: a foreign key is a promise the database keeps for you - "this pointer
+ must point at a row that really exists." That promise is referential integrity.
+
+ >> PITFALL (dialect): in some SQLite playgrounds foreign keys are OFF by
+ default, so the orphan INSERT might wrongly SUCCEED. If it does, run
+   PRAGMA foreign_keys = ON;
+ once at the top and try again. In the Postgres/PGlite sandbox (Option A) they
+ are enforced automatically. This is a real difference between the two tools.
+
+ MAPS TO: primer Part 3 (foreign keys, referential integrity) and Part 6 (3NF);
+ samples PDF Lessons 6, 7, 16.
+ student-panel difference: student-panel SOFT-deletes (archives) rather than
+ hard-deleting, so it rarely creates orphans in the first place; here we use
+ plain tables and hard rules so you can SEE the refusal. Practice erases;
+ student-panel archives - keep that difference in mind (companion confusion 10).
+
+ E7. A BRIDGE TABLE: many-to-many, with a fact ON the link.
+
+ >> CONTEMPLATE: a student takes many courses; a course has many students. That
+ is many-to-many, and (companion confusion 8) it needs a table IN THE MIDDLE.
+ And the pairing itself has a fact - the grade. Where does the grade live? Not
+ on student, not on course - on the LINK.
+
+ TRY IT:
+
+     CREATE TABLE student (
+       student_id  INTEGER PRIMARY KEY,
+       full_name   TEXT NOT NULL
+     );
+     CREATE TABLE course (
+       course_id   INTEGER PRIMARY KEY,
+       title       TEXT NOT NULL
+     );
+     CREATE TABLE enrolment (
+       student_id  INTEGER NOT NULL REFERENCES student(student_id),
+       course_id   INTEGER NOT NULL REFERENCES course(course_id),
+       grade       TEXT,
+       PRIMARY KEY (student_id, course_id)
+     );
+
+     INSERT INTO student VALUES (1, 'Sara'), (2, 'Omid');
+     INSERT INTO course  VALUES (10, 'Algebra'), (11, 'History');
+     INSERT INTO enrolment VALUES
+       (1, 10, 'A'),
+       (1, 11, 'B'),
+       (2, 10, 'A');
+
+ LOOK FOR: Sara is in two courses, Algebra has two students, and each PAIRING
+ carries its own grade. One bridge table expresses all of that.
+
+ Notice PRIMARY KEY (student_id, course_id) - a COMPOSITE key. It says "the same
+ student cannot be enrolled in the same course twice." Prove it bites:
+
+     INSERT INTO enrolment VALUES (1, 10, 'C');
+
+ LOOK FOR / FEEL IT: REFUSED - (1, 10) already exists. The composite key stops
+ the duplicate pairing automatically.
+
+ >> CONTEMPLATE: what if Sara should be allowed to RETAKE Algebra in a later
+ term? Then the pair (student, course) is no longer unique and the key must grow
+ to include the term. This is exactly the design judgement the samples PDF
+ raises (Lesson 5) - the key must match the real rule about what may repeat.
+
+ KEY IDEA: a many-to-many becomes a bridge table whose key is the PAIR of
+ pointers; any fact about the pairing (grade, date) lives on the bridge.
+
+ MAPS TO: primer Part 5.1 (M:N -> bridge); samples PDF Lessons 9, 10, 11.
+ student-panel: its scores/evaluations table is the big real example of this -
+ a table in the middle linking a student and a parameter (per period) and
+ carrying the score. When we re-derive student-panel, this exercise is the one
+ to remember. (Design choice to flag: you may instead give a bridge its own
+ single surrogate id AND keep a UNIQUE on the pair - the samples PDF shows that
+ option too. Both are valid; pick one on purpose.)
+
+ E8. A SELF-REFERENCE TREE: a table that points at itself.
+
+ >> CONTEMPLATE: groups can contain groups; a category can have sub-categories.
+ How do you store a parent without a separate "parents" table? (Companion /
+ primer answer: one column that points back at the SAME table.)
+
+ TRY IT:
+
+     CREATE TABLE category (
+       category_id  INTEGER PRIMARY KEY,
+       name         TEXT NOT NULL,
+       parent_id    INTEGER REFERENCES category(category_id)
+     );
+
+     INSERT INTO category VALUES
+       (1, 'All Students', NULL),
+       (2, 'Grade 10', 1),
+       (3, 'Grade 11', 1),
+       (4, 'Grade 10 - Section A', 2),
+       (5, 'Grade 10 - Section B', 2);
+
+ LOOK FOR: a three-level tree in ONE table. 'All Students' has parent_id NULL -
+ that NULL is not missing data, it MEANS "this is the root, it has no parent."
+
+ TRY IT - ask "what are the direct children of Grade 10 (id 2)?":
+
+     SELECT name FROM category WHERE parent_id = 2;
+
+ LOOK FOR: the two sections. One self-pointing column handles a tree of any
+ depth with no extra tables.
+
+ >> CONTEMPLATE: why not columns like parent, grandparent, great_grandparent?
+ Because you would cap the depth and relive the "repeating columns" pain of E2.
+ The self-reference has no depth limit. Its cost: asking for ALL descendants
+ (not just direct children) needs a special recursive query - a fair trade.
+
+ KEY IDEA: "a thing that contains more of its own kind" = one column that points
+ back at the same table; NULL marks the root.
+
+ MAPS TO: primer Part 5.3 (self-reference tree); samples PDF Lesson 12.
+ student-panel: it uses this twice - GROUPS form a tree (a group inside a group)
+ and PARAMETERS form a tree - both with a self-referencing parent pointer and
+ NULL at the root, exactly like this. You just built the shape of two real
+ student-panel tables.
+
+-------------------------------------------------------------------------------
+ PART 5 - TEST WITH ROWS (THE DISCIPLINE BOTH BOOKS END ON)
+-------------------------------------------------------------------------------
+
+ WHAT: before you trust a design, put a handful of REAL rows in and try to
+ answer the questions the design exists for. WHY: a design that cannot answer
+ its own purpose questions is wrong, no matter how tidy it looks. The primer
+ ends on this (Part 7 step 10, "review against the purpose"); the samples PDF
+ ends on it too (Lesson 18, "test with rows").
+
+ You already have good tables from E5-E8. Answer these out loud, then in SQL:
+
+   Q1 "How many loans does each member have?" (uses member2 + loan from E6)
+
+       SELECT m.full_name, COUNT(l.loan_id) AS loans
+       FROM member2 m
+       LEFT JOIN loan l ON l.member_id = m.member_id
+       GROUP BY m.full_name;
+
+     LOOK FOR: a count per member. The LEFT JOIN means a member with zero loans
+     still shows (with 0) - that is the "optional side" (the little o) from the
+     crow's-foot cheat-sheet, made real.
+
+   Q2 "What grade did Sara get in Algebra?" (uses enrolment from E7)
+
+       SELECT grade FROM enrolment WHERE student_id = 1 AND course_id = 10;
+
+   Q3 "List the direct sub-groups of 'All Students'." (uses category from E8)
+
+       SELECT name FROM category WHERE parent_id = 1;
+
+ >> CONTEMPLATE: each question was easy because the design put each fact in one
+ clear place. Go back to the BAD tables from Part 3 and try to answer the same
+ kinds of questions - feel how much harder (or impossible) they are. That
+ contrast IS the lesson.
+
+ KEY IDEA: "test with rows" is not an afterthought - it is how you know a design
+ is finished. If three real rows can answer your purpose questions cleanly, the
+ design is sound.
+
+-------------------------------------------------------------------------------
+ PART 6 - MAP BACK: EXERCISES vs PRIMER vs PDF vs STUDENT-PANEL
+-------------------------------------------------------------------------------
+
+ One table so every exercise has a home in your other materials, and every
+ place the PRACTICE deliberately differs from student-panel is named.
+
+   Exercise         Idea                 Primer      Samples PDF   student-panel
+   --------         ----                 ------      -----------   -------------
+   E1 warm-up       table/row/column     Part 2      Lesson 1-2    same idea
+   E2 phone1/2/3    repeating columns    Part 6      Lesson 14     avoided
+   E3 list-in-cell  1NF / atomic         Part 6      Lesson 14     avoided
+   E4 wide table    update anomaly       Part 6      Lesson 16     avoided
+   E5 phone table   multi-valued->table  Part 2.2/5  Lesson 3      same shape
+   E6 split+FK      3NF + ref. integrity Part 3/6    Lesson 6/7    same shape
+   E7 enrolment     M:N bridge + key     Part 5.1    Lesson 9-11   = evaluations
+   E8 category tree self-reference       Part 5.3    Lesson 12     groups+params
+
+ WHERE PRACTICE DIFFERS FROM STUDENT-PANEL (our standing rule - always flagged):
+   - IDS: practice uses hand-typed INTEGER ids; student-panel uses UUID primary
+     keys plus a unique human code. Same purpose (a stable surrogate key).
+   - DELETE: practice HARD-deletes (so you can see referential integrity bite);
+     student-panel SOFT-deletes / archives (so history survives).
+   - ENGINE/DIALECT: practice may use SQLite (Option B); student-panel uses
+     Postgres via PGlite (Option A matches it). Watch reserved words
+     (order/group/user) and the foreign-keys-ON pragma noted in E6.
+   - SCALE: practice tables are tiny teaching toys; student-panel is a full
+     16-table design. The MOVES are identical; only the count differs.
+
+ KEY IDEA: you have now physically built, in miniature, four of the exact shapes
+ student-panel is made of (child table + FK, 3NF split, a bridge, a self-
+ reference tree). Re-deriving student-panel later is mostly these moves, repeated
+ with care.
+
+-------------------------------------------------------------------------------
+ WHERE THIS LEADS
+-------------------------------------------------------------------------------
+
+ Keep the sandbox tab and your paper sheets. Our next step (after you have read
+ the primer, the companion, and done this practice, and brought me your
+ questions) is to re-derive the student-panel schema together using the primer's
+ ten-step method - and you will recognise E6, E7, and E8 inside it.
+
+ Reminder of the rule we never break: we do NOT change the student-panel
+ project. You build your own version in student-panel-I, and wherever your way
+ differs from student-panel's way, I will say so - just as this lesson flagged
+ ids, deletes, and dialect above.
+
+ Take your time. Bring questions. A confused question now saves a broken table
+ later.
+
+                          - end of practice lesson -
+

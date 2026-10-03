@@ -1,0 +1,30 @@
+evaluation database;
+the scores for each parameter are given to students[evaluated] each period.
+everything is logged. dates are recorded.
+everything that can be filtered, has filter option; if different filterable parts, filter option for each separately.
+a field is shown for each created user showing their creation date in user page that can be restricted.
+each student if not deirectly created as user, becomes a user too.
+
+{
+   modify: add, remove, edit.
+   manage: create, organize.
+}
+
+management has all other permissions in addition to the below.
+management modifies groups and sub-groups, roles, and main users. modifies permission for each role, assign roles to users. modify scores, user, student[evaluated] fields, user fields. management can view logs and can delete given a reason.
+
+default roles are administrator, handler, teacher, student[user]. roles can be modified.
+
+administrator role as default has all the permissions management has.
+
+handler can view, add students. manage groups. assign students[evaluated] to groups. see, add scores. see and add parameters. see and add students[evaluated] fields. view dashboard. export data on each student. can define (the first time) or change a period for a student[evaluated] (how long between each class (like a week, two weeks, a month, 3 days)).
+
+teacher can view their own student[evaluated]. see and enter scores for them. see dashboard of only their students[evaluated]. can define a period for a student.
+
+student[user] can view their evaluation, and their own dashboard.
+
+groups can be modified. defaults are education [defaults are children, teenagers, adults], performance by level, and miscellaneous [defaults: choir, band, acapella]
+
+groups, sub-groups, and students[evaluated] can be assigned task and parameter. tasks assigned may or may not be directly relevant to parameters.
+
+parameters can be modified. defaults are ***.

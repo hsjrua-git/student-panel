@@ -37,6 +37,32 @@ export function summarize(results) {
   };
 }
 
+// One entry per student — the "living class field" on the dashboard hero. Each
+// becomes a dot lit by how completely that student is measured this period,
+// against the parameters in use (the same set summarize() counts against, so the
+// three state buckets here add up to summarize's complete/partial/none totals).
+// Roster order is preserved so a dot maps to a stable position across renders.
+export function cohortField(results) {
+  const inUse = results.parameters.filter((parameter) => parameter.inUse);
+  return results.students.map((student) => {
+    const measured = inUse.filter(
+      (parameter) => student.values[parameter.id] !== undefined
+    ).length;
+    let state;
+    if (inUse.length > 0 && measured === inUse.length) state = 'full';
+    else if (measured > 0) state = 'partial';
+    else state = 'none';
+    return {
+      id: student.id,
+      fullName: student.fullName,
+      studentCode: student.studentCode,
+      measured,
+      inUse: inUse.length,
+      state,
+    };
+  });
+}
+
 export function parameterStats(results) {
   return results.parameters.map((parameter) => {
     const values = [];
@@ -116,6 +142,37 @@ export function trendSeries({ trends, periods, parameterId }) {
       average: byPeriod.get(period.number)?.average ?? null,
       count: byPeriod.get(period.number)?.count ?? 0,
     }));
+}
+
+// One student's card behind their node: every in-use parameter this period with
+// the score entered (or null where it's still missing) and the change from the
+// previous period, plus the measured/total tally. Built from the results already
+// loaded — the same "measured means the value is defined" rule summarize() and
+// cohortField() use — so a click on a node needs no extra fetch. An unknown id
+// (e.g. a stale selection) yields an empty-but-shaped record rather than throwing.
+export function studentBreakdown(results, studentId) {
+  const inUse = results.parameters.filter((parameter) => parameter.inUse);
+  const student = results.students.find((s) => s.id === studentId) ?? null;
+  const values = student?.values ?? {};
+  const previous = student?.previous ?? {};
+  const rows = inUse.map((parameter) => {
+    const now = values[parameter.id];
+    const before = previous[parameter.id];
+    return {
+      parameter,
+      value: now === undefined ? null : now,
+      change:
+        now !== undefined && before !== undefined ? round(now - before) : null,
+    };
+  });
+  return {
+    id: studentId,
+    fullName: student?.fullName ?? '',
+    studentCode: student?.studentCode ?? null,
+    measured: rows.filter((row) => row.value !== null).length,
+    inUse: inUse.length,
+    rows,
+  };
 }
 
 export function unmeasuredStudents(results) {

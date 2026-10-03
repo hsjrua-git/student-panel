@@ -68,6 +68,26 @@ export function UploadIcon(props) {
   );
 }
 
+// A down-arrow out of a tray: the marker for downloads / the Export Center.
+export function DownloadIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 4v11" />
+      <path d="m8 11 4 4 4-4" />
+      <path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />
+    </Svg>
+  );
+}
+
+// A plain X: dismiss a dialog or drawer.
+export function CloseIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Svg>
+  );
+}
+
 /* ---- sidebar navigation glyphs ----
    One per menu item, sharing the same Svg wrapper (currentColor, ~1em) so they
    inherit the nav link's colour and sit on the icon-only collapsed rail. */

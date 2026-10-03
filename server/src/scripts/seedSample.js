@@ -53,7 +53,8 @@ async function addSample() {
       `SELECT id,
               min_value::float8 AS "minValue",
               max_value::float8 AS "maxValue"
-       FROM parameters`
+       FROM parameters
+       ORDER BY sort_order, name`
     ),
   ]);
 
@@ -83,15 +84,35 @@ async function addSample() {
 
     for (let period = 1; period <= current; period++) {
       const usedIds = new Set(parametersUsedInPeriod(changesResult.rows, period));
-      const missingChance = period === current ? 0.35 : 0.12;
+      // In-use parameters this period, kept in sort_order (the query orders
+      // them). Each student measures a PREFIX of this list, so earlier
+      // parameters get broader coverage than later ones — that per-parameter
+      // spread is what makes the dashboard's satellites glow at visibly
+      // different strengths instead of all looking the same.
+      const used = parametersResult.rows.filter((p) => usedIds.has(p.id));
+      const k = used.length;
+      if (k === 0) continue;
 
-      for (const parameter of parametersResult.rows) {
-        if (!usedIds.has(parameter.id)) continue;
-        const min = parameter.minValue ?? 0;
-        const max = parameter.maxValue ?? 10;
+      studentIds.forEach((studentId, index) => {
+        // Even coverage ramp across the roster: the first students measure
+        // nothing, the last measure every parameter, everyone in between sits
+        // on a rung of the ladder. This guarantees the cohort shows the full
+        // range of states — hollow (none) → dim partial → bright partial →
+        // full — so the glow differences are actually visible rather than a
+        // random clump. A little per-(student, period) jitter keeps successive
+        // periods from being carbon copies (so trends aren't flat) without
+        // collapsing the spread.
+        const ramp = COUNT > 1 ? index / (COUNT - 1) : 1;
+        const jitter = (((index * 7 + period * 13) % 5) - 2) * 0.04;
+        const measuredCount = Math.max(
+          0,
+          Math.min(k, Math.round(ramp * k + jitter * k))
+        );
 
-        studentIds.forEach((studentId, index) => {
-          if (Math.random() < missingChance) return;
+        for (let j = 0; j < measuredCount; j++) {
+          const parameter = used[j];
+          const min = parameter.minValue ?? 0;
+          const max = parameter.maxValue ?? 10;
           const noise = (Math.random() + Math.random() - 1) * 1.5;
           const raw = abilities[index] + period / current + noise;
           const value = Math.min(max, Math.max(min, Math.round(raw * 2) / 2));
@@ -99,8 +120,8 @@ async function addSample() {
           rows.parameters.push(parameter.id);
           rows.periods.push(period);
           rows.values.push(value);
-        });
-      }
+        }
+      });
     }
 
     if (rows.values.length > 0) {

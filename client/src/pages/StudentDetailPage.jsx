@@ -14,6 +14,7 @@ import { usePeriods } from '../lib/usePeriods.js';
 import { visibleParameters } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 import ExportButton from '../components/ExportButton.jsx';
+import ExportLink from '../components/ExportLink.jsx';
 import StudentFieldsSection from '../components/StudentFieldsSection.jsx';
 import StudentGroupsSection from '../components/StudentGroupsSection.jsx';
 import StudentEvaluateSection from '../components/StudentEvaluateSection.jsx';
@@ -172,19 +173,24 @@ function StudentDetailPage() {
             Code {formatStudentCode(student.studentCode)}
           </p>
         </div>
-        {can('data.export') && canViewHistory && (
+        {can('data.export') && (
           <div className="page-head-actions">
-            <ExportButton
-              label="Export history (CSV)"
-              filename={`history-${student.studentCode}.csv`}
-              disabled={!periods.anchorDate || periods.current === null}
-              buildRows={() =>
-                historyCsvRows({
-                  evaluations,
-                  periods: periods.periods,
-                  parameters,
-                })
-              }
+            {canViewHistory && (
+              <ExportButton
+                label="Export history (CSV)"
+                filename={`history-${student.studentCode}.csv`}
+                disabled={!periods.anchorDate || periods.current === null}
+                buildRows={() =>
+                  historyCsvRows({
+                    evaluations,
+                    periods: periods.periods,
+                    parameters,
+                  })
+                }
+              />
+            )}
+            <ExportLink
+              prefill={{ students: { mode: 'selection', ids: [student.id] } }}
             />
           </div>
         )}

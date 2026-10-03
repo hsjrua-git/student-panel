@@ -38,6 +38,7 @@ const StudentDetailPage = lazyWithReload(() => import('./pages/StudentDetailPage
 const EvaluatePage = lazyWithReload(() => import('./pages/EvaluatePage.jsx'));
 const ParametersPage = lazyWithReload(() => import('./pages/ParametersPage.jsx'));
 const ResultsPage = lazyWithReload(() => import('./pages/ResultsPage.jsx'));
+const ExportPage = lazyWithReload(() => import('./pages/ExportPage.jsx'));
 const ImportStudentsPage = lazyWithReload(() => import('./pages/ImportStudentsPage.jsx'));
 const ImportScoresPage = lazyWithReload(() => import('./pages/ImportScoresPage.jsx'));
 const UsersPage = lazyWithReload(() => import('./pages/UsersPage.jsx'));
@@ -64,6 +65,7 @@ const ROUTE_PRELOADS = [
   ['/evaluate', EvaluatePage],
   ['/parameters', ParametersPage],
   ['/results', ResultsPage],
+  ['/export', ExportPage],
   ['/users', UsersPage],
   ['/roles', RolesPage],
   ['/groups', GroupsPage],
@@ -587,6 +589,7 @@ function AnimatedRoutes() {
             <Route path="/evaluate" element={<EvaluatePage />} />
             <Route path="/parameters" element={<ParametersPage />} />
             <Route path="/results" element={<ResultsPage />} />
+            <Route path="/export" element={<ExportPage />} />
             <Route path="/students/import" element={<ImportStudentsPage />} />
             <Route path="/evaluate/import" element={<ImportScoresPage />} />
             <Route path="/users" element={<UsersPage />} />

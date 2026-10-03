@@ -1,0 +1,857 @@
+===============================================================================
+  STUDENT PANEL - THE DATABASE, EXPLAINED FROM ZERO
+  A read-through companion for a complete beginner.
+  Pairs with:  student-panel-ER-diagram.(mermaid|html)  and  the roadmap file.
+===============================================================================
+
+Written for you (hsjrua) to PRINT, READ, and MARK UP. You will not be asked to
+install or build anything in this document. Read it slowly. Argue with it in the
+margins. Bring your questions back and we continue from there.
+
+
+===============================================================================
+  PART 0.  HOW TO USE THIS DOCUMENT
+===============================================================================
+
+We are going to learn the way you asked to learn:
+
+  1. Biggest picture first, then we descend from the major things to the minor
+     details - and we do that SAME descent again inside each part. So every
+     section starts with "what is this and why does it exist" before it ever
+     touches "here is the exact column."
+
+  2. Before the how, always the what and the why. When you meet a new piece,
+     first we ask together: what is it? what job does it do? what COULD it do,
+     what could it NOT do, and - the real question - SHOULD it exist at all?
+     That habit (call it "algorithmic perception") is the whole point. The
+     tables are just where we practice it.
+
+  3. You do the building later, in your own copy (student-panel-I). This
+     document only teaches. When you are ready, the roadmap tells you what to
+     try yourself; you report back; we compare your choices to the reference.
+
+Throughout, you will see two kinds of callout:
+
+  >> CONTEMPLATE:  a place to STOP reading and think before you read the answer.
+                   The thinking matters more than the answer.
+
+  !! COMPASS:      a place where the project's written docs and the project's
+                   real code disagree. When they do, the real code wins, and I
+                   will always tell you which is which.
+
+One compass reading before we even start, so it is not a surprise later:
+
+  !! COMPASS: The repo ships a document (CLAUDE.md) describing a bigger, older
+     design - full PostgreSQL, plus user accounts, roles, and permissions. The
+     build in front of us is a slimmed-down, SINGLE-OPERATOR version. A lot of
+     that machinery is intentionally GONE. We learn from the migration files
+     (the real, current blueprint), not from the prose. More on this in Part 6.
+
+===============================================================================
+  PART 1.  WHAT A DATABASE IS  (AND WHY THIS APP NEEDS ONE)
+===============================================================================
+
+Start with the problem, not the tool. This app exists to do one human thing:
+
+  "Keep track of students, write down scores for them again and again over
+   time, and later look back to see results and trends."
+
+Notice the shape of that sentence. There are THINGS that stick around (students),
+there are MEASUREMENTS taken repeatedly (scores), and there is TIME (again and
+again, look back). Any tool we pick has to hold all three comfortably.
+
+Why not just a spreadsheet or a folder of documents?
+
+  - A spreadsheet is one flat grid. The moment you have "students" AND "the
+    things you measure" AND "the times you measured" AND "the scores", a single
+    grid forces you to repeat yourself: the student's name copied onto every
+    score row, the parameter's name copied again and again. Repetition is where
+    mistakes and disagreements creep in (which spelling of the name is right?).
+
+  - A pile of files has no way to ASK questions across all of it: "show me the
+    average of this parameter for this group last term" is a manual afternoon.
+
+A database is a tool designed exactly for this: it lets you keep each KIND of
+thing in its own tidy list, LINK the lists together instead of copying, and then
+ASK precise questions that it answers for you.
+
+The particular flavour here is a RELATIONAL database. The whole idea in one line:
+
+  Put each kind of thing in its own TABLE. Give every row a stable ID. Instead
+  of copying one thing into another, store the ID and let the database follow
+  the link.
+
+A TABLE is just a grid with named columns:
+  - a ROW is one item (one student, one score),
+  - a COLUMN is one attribute of it (full name, birthdate, value),
+  - and every column has a TYPE that says what may live there (text? a number?
+    a date?), which the database enforces so junk cannot sneak in.
+
+What "relational" buys us, concretely:
+  - No duplication: a student's name is stored once, in one place.
+  - Integrity: the database can refuse a score that points at a student who does
+    not exist, or two students sharing one code.
+  - Questions: we can ask for sums, averages, filters, and trends across the
+    whole dataset and get an answer in milliseconds.
+
+  >> CONTEMPLATE: Before turning the page, imagine you had to design this with
+     NO database - only spreadsheets. How many separate sheets would you make,
+     and where would you feel the pain of copying the same fact twice? Hold that
+     picture; the real schema is essentially the disciplined version of it.
+
+===============================================================================
+  PART 2.  THE BUILDING BLOCKS  (THE VOCABULARY WE WILL REUSE EVERYWHERE)
+===============================================================================
+
+These are the ~11 ideas the whole schema is built from. Learn them here once and
+every table in Part 4 becomes a re-arrangement of things you already know. For
+each: what it is, why it exists, how THIS project uses it, and the trade-off.
+
+-------------------------------------------------------------------------------
+2.1  Columns have TYPES
+-------------------------------------------------------------------------------
+A type is a promise about what a column may hold. The database keeps the promise
+for you. The types this project uses:
+
+  text         free text of any length ("Ada Lovelace", "cm").
+  numeric      an exact number, good for scores (no rounding surprises).
+  integer /    whole numbers. "smallint" is just a small integer; used for the
+    smallint   single preferences row's id.
+  boolean      true / false (e.g. is this field restricted? is this task done?).
+  date         a calendar day with no time (a birthdate, a term start).
+  timestamptz  a precise moment in time, WITH timezone awareness ("time stamp
+               with time zone"). Used for created_at / updated_at / archived_at.
+  json / jsonb a whole little document tucked into one cell (more in 2.9).
+               jsonb is the binary, indexable form; json (in user_sessions) is
+               the plain form the session library expects.
+  uuid         a long random-looking identifier like
+               3f2504e0-4f89-41d3-9a0c-0305e82c3301  (more in 2.2).
+
+  Why it matters: types are your first, free layer of correctness. A "date"
+  column will reject "banana". You get that protection without writing any code.
+
+-------------------------------------------------------------------------------
+2.2  PRIMARY KEY (PK) - every row needs an identity
+-------------------------------------------------------------------------------
+A primary key is the column (or columns) that uniquely names a row, forever. No
+two rows may share it; it is never empty. It is how everything else will point
+at this row.
+
+This project almost always uses a uuid primary key, created by the database with
+gen_random_uuid(). A UUID is a big random ID.
+
+  Why random UUIDs instead of 1,2,3,...? Two honest reasons and one trade-off:
+   - You can create a row's ID before you talk to the database, and IDs from two
+     places never collide - handy for imports and for merging data.
+   - IDs do not leak counts ("we have 47 students") or order.
+   - Trade-off: they are bigger and not human-friendly to eyeball. The project
+     accepts that; identity should not be something humans retype anyway.
+
+  Three tables deliberately do NOT use a uuid, and each choice is a small lesson:
+   - settings uses a text key ("auth.password_hash") as its PK: it is a
+     key/value store, so the KEY is the identity.
+   - preferences uses a smallint id fixed to 1: there is only ever ONE row (the
+     single operator's preferences), so its "identity" is just "the row".
+   - user_sessions uses the session id (sid) the login library hands it.
+
+  >> CONTEMPLATE: identity is a DESIGN decision, not an automatic "add an id
+     column". For each table you meet, ask: what truly makes a row one-of-a-kind
+     here? Sometimes it is a made-up id; sometimes the data already contains it.
+
+-------------------------------------------------------------------------------
+2.3  FOREIGN KEY (FK) - the link, and the promise behind it
+-------------------------------------------------------------------------------
+A foreign key is a column that holds another row's primary key. That is the
+"relate" in relational. evaluations.student_id holds a students.id; that is how
+a score knows whose it is - without copying the student's name.
+
+The database also POLICES the link (referential integrity): it will refuse a
+score whose student_id points at nobody. And you get to decide what happens when
+the pointed-at row is deleted. This project uses:
+
+  ON DELETE CASCADE   delete the parent, its children go too. student_group_
+                      members rows vanish when their student or group is deleted
+                      (a membership with no group is meaningless).
+  ON DELETE SET NULL  delete the parent, the child survives with the link
+                      emptied. tasks.parameter_id: delete a parameter and the
+                      task remains, just no longer tied to it.
+  (RESTRICT/default)  refuse to delete the parent while children point at it -
+                      the safe default that protects history.
+
+  Why it matters: the FK is where "the data can never be nonsense" is enforced
+  by the database itself, not by hoping the app remembers. The ON DELETE choice
+  encodes a human decision about what a thing MEANS once its parent is gone.
+
+-------------------------------------------------------------------------------
+2.4  RELATIONSHIP SHAPES - one-to-one, one-to-many, many-to-many, and trees
+-------------------------------------------------------------------------------
+Every link has a "how many on each side":
+
+  one-to-many (the common one): one student has many scores; each score has one
+     student. You implement it by putting the FK on the "many" side
+     (evaluations.student_id). No extra table needed.
+
+  many-to-many: one student can be in many groups, and one group holds many
+     students. You cannot put that on either side alone. You need a BRIDGE table
+     whose rows each pair one student with one group - that is exactly what
+     student_group_members is.
+
+  one-to-one: rare; two tables that share the same identity. Not really used
+     here (preferences is effectively a one-row table instead).
+
+  self-referential (a TREE): a table whose FK points back at ITS OWN primary key.
+     student_groups.parent_id -> student_groups.id lets a group sit inside
+     another group to any depth (School > Grade 7 > Class 7B). parameters does
+     the same (a heading parameter with sub-parameters underneath).
+
+  >> CONTEMPLATE: many-to-many always needs its own table. When you sketch your
+     own version later, watch for the moment a relationship stops being "each X
+     has one Y" - that is the moment a bridge table is born.
+
+-------------------------------------------------------------------------------
+2.5  NULL - "we do not know" or "does not apply"
+-------------------------------------------------------------------------------
+NULL is the absence of a value. It is NOT zero and NOT empty text; it means "no
+value here". A column is either NOT NULL (a value is required) or nullable.
+
+The most important NULL in this whole database is evaluations.student_id being
+NULLABLE. A score always belongs to a group (group_id is required), but it may
+OPTIONALLY also name a student. So:
+   - student_id filled in  -> "this is one student's score",
+   - student_id NULL       -> "this is the GROUP's own score".
+One table, two meanings, decided by whether a column is null. Keep this in your
+pocket; it is the key to the core table.
+
+  >> CONTEMPLATE: "required vs optional" is you telling the database what a thing
+     fundamentally is. Ask of every column: could this legitimately be unknown?
+     If yes, it is nullable, and now every reader must handle the unknown case.
+
+-------------------------------------------------------------------------------
+2.6  CONSTRAINTS - rules the database refuses to break
+-------------------------------------------------------------------------------
+Beyond types and FKs, you can bolt on explicit rules. This project uses:
+
+  UNIQUE           no two rows may share this value. students.student_code is
+                   unique - two students can share a name, never a code.
+
+  CHECK            a row must satisfy a condition or it is rejected. Examples:
+                   - student_code must match a pattern (exactly 8 characters
+                     from a restricted alphabet - see students in Part 4);
+                   - periods.start_date must be <= end_date (no backwards terms);
+                   - a group may not be its own parent (parent_id <> id).
+
+  COMPOSITE PRIMARY KEY  the identity is TWO columns together. student_group_
+                   members has (student_id, group_id) as its key: the pair must
+                   be unique, which neatly says "you cannot add the same student
+                   to the same group twice", for free.
+
+  THE XOR PATTERN (exactly one of two)  the assignment tables (parameter_
+                   assignments, period_assignments, task_assignments) may point
+                   at EITHER a group OR a single student, but never both and
+                   never neither. A CHECK enforces "exactly one is filled in".
+                   In words: "assign this to a whole group, or to one student -
+                   pick one." This is a pattern you will reuse for life.
+
+  PARTIAL UNIQUE INDEX  a uniqueness rule that only applies to SOME rows. In
+                   evaluations there are two: one guarantees a student can have
+                   only one score per (parameter, period); the other guarantees
+                   a group's own score is unique per (parameter, period). They
+                   are "partial" because each applies only to the student-case
+                   or the group-case rows. (More on indexes next.)
+
+  >> CONTEMPLATE: every constraint is a sentence of human policy turned into
+     something the machine will never let slip. Read each one back as English -
+     "you can't score the same student on the same parameter in the same period
+     twice" - and decide if YOU agree with the policy. Sometimes you won't; that
+     is a real design conversation, not a typo.
+
+-------------------------------------------------------------------------------
+2.7  INDEXES - the book's index, for rows
+-------------------------------------------------------------------------------
+An index is a secondary structure the database keeps so it can FIND rows fast
+without scanning the whole table - exactly like the index at the back of a book.
+Two jobs:
+   - speed: "all scores in this period" stays fast as the table grows;
+   - uniqueness: a UNIQUE index is also how UNIQUE/partial-unique rules are kept.
+
+A neat variant used here is a FUNCTIONAL index - an index on a computed value.
+The audit log indexes lower(actor) so searching by name is case-insensitive and
+still fast, and split_part(action,'.',1) so it can group actions by their
+category prefix.
+
+  The trade-off: every index makes reads faster but writes a little slower (each
+  new row must update the indexes too) and takes disk space. So you index what
+  you actually search or must keep unique - not every column "just in case".
+
+-------------------------------------------------------------------------------
+2.8  SOFT DELETE / ARCHIVE - hiding vs destroying
+-------------------------------------------------------------------------------
+When something is "removed", do you truly erase it, or just hide it? This project
+mostly HIDES, using timestamp columns:
+   - students.deleted_at: NULL means active; a timestamp means "deleted at that
+     moment" (a soft delete - the row and its history survive).
+   - archived_at on groups, parameters, periods, fields, tasks: same idea, for
+     "retired, keep for the record" items.
+
+  Why: scores from last year still point at that parameter and that student. If
+  you truly deleted them, history would collapse (or the FKs would forbid the
+  delete). Soft-delete keeps the past intact while cleaning up the present.
+
+  The trade-off: every query that shows "current" things must remember to say
+  "where deleted_at/archived_at is null". You trade a little constant vigilance
+  for a fully preserved history. (Hard deletes still exist for genuine mistakes.)
+
+  >> CONTEMPLATE: "delete" is not one idea. Ask: is this a correction (it should
+     never have existed -> truly remove) or a retirement (it was real, it is
+     over -> archive)? The column you add depends on the answer.
+
+-------------------------------------------------------------------------------
+2.9  JSONB "extra" COLUMNS - the flexible escape hatch
+-------------------------------------------------------------------------------
+Several tables carry an "extra" jsonb column (students.extra, parameters.extra,
+tasks.extra) and preferences/saved_views store their whole payload as jsonb.
+Think of jsonb as "a small flexible document inside one cell".
+
+  Why have it: some data does not deserve its own column - it is optional, it
+  varies, or it is not known in advance. Rather than change the table's shape
+  every time, you tuck it into "extra". students.extra, for instance, holds the
+  values of custom fields the operator invented (see student_field_definitions).
+
+  The trade-off - and it is a real one: a proper column gets a type, constraints,
+  and easy indexing; data hidden inside jsonb gets far less of that automatic
+  protection and is clumsier to query and validate. So the rule of thumb the
+  project follows: things that are core and always-present earn a real column;
+  things that are optional, custom, or fluid live in "extra".
+
+  >> CONTEMPLATE: jsonb is power AND temptation. Every time you are tempted to
+     drop something into "extra", ask: is this genuinely fluid, or am I just
+     avoiding the discipline of designing a column? Both answers are sometimes
+     right.
+
+-------------------------------------------------------------------------------
+2.10  DERIVED-AT-READ-TIME vs STORED - don't save what you can compute
+-------------------------------------------------------------------------------
+parameters form a tree: leaf parameters (the tips) are the ones you actually
+score. A PARENT parameter's value is the AVERAGE of its children, and a parent's
+range is the WIDEST span of its children. Crucial detail:
+
+  those parent values are NOT stored anywhere. They are computed on the fly when
+  someone reads them.
+
+  Why not store them: a stored copy is a second source of truth that instantly
+  rots. Change one child's score and every stored ancestor is now a lie until
+  something remembers to recompute it. By computing at read time, there is ONE
+  source of truth (the leaf scores) and the parents are always correct by
+  construction.
+
+  The trade-off: a little more work each read. For this app's size that is
+  nothing, and correctness wins. (For huge systems you sometimes cache
+  deliberately - but you do it knowing you have created a thing that can rot.)
+
+  >> CONTEMPLATE: this is the deepest idea in the whole schema. "Store facts,
+     derive summaries." When you design your own, keep asking: is this column a
+     FACT someone entered, or a SUMMARY I could recompute? Summaries usually
+     should not be stored.
+
+-------------------------------------------------------------------------------
+2.11  MIGRATIONS - how the schema is built, in order, once
+-------------------------------------------------------------------------------
+You do not create these tables by hand-clicking. The shape of the database is
+written as a numbered series of SQL files - 001_..., 002_..., up to 008_... -
+called MIGRATIONS. A small runner applies any that have not run yet, inside a
+transaction (all-or-nothing), and records each one in a bookkeeping table
+(schema_migrations) so it is never applied twice. They are FORWARD-ONLY: you add
+009 to change things, you do not edit 003 after the fact.
+
+  Why it matters: the migrations ARE the blueprint, and they are the true,
+  current, version-controlled history of the design. This is why, all through
+  this course, when any prose (including the repo's own docs) disagrees with the
+  migrations, we believe the migrations.
+
+  >> CONTEMPLATE: a schema is not a drawing; it is a sequence of decisions over
+     time. Reading 001 -> 008 in order is reading the designer's mind changing.
+
+===============================================================================
+  PART 3.  THE BIG PICTURE OF THIS DATABASE
+===============================================================================
+
+Now zoom all the way out. Ignore columns. There are only a handful of real ideas
+here, and once you see them, the 16 tables organize themselves.
+
+The domain has four NOUNS and one VERB:
+
+     WHO        students        (and the GROUPS they belong to)
+     WHAT       parameters      (the things you measure)
+     WHEN       periods         (the terms/windows you measure in)
+     --------------------------------------------------------------
+     the VERB   evaluations     (a score = a WHO, a WHAT, a WHEN, and a value)
+
+That is the entire heart of the system in one picture:
+
+        students / groups  ─┐
+        parameters         ─┼──►   evaluations   (one row = one score)
+        periods            ─┘
+
+In data-modelling language, evaluations is a FACT table (it records events that
+happened - scores), and students/groups, parameters, and periods are its
+DIMENSIONS (the stable things a fact refers to). Almost everything else in the
+schema is either (a) helping define a dimension, (b) saying which dimension
+applies to whom, or (c) system plumbing off to the side.
+
+So the 16 tables fall into three honest layers:
+
+  LAYER A - SYSTEM PLUMBING (off to the side, no links to the rest)
+     settings, preferences, saved_views, user_sessions, audit_log
+     -> login secret, the operator's preferences, saved result views, login
+        sessions, and an append-only history of who-changed-what. On the ER
+        diagram these float alone: they connect to nothing.
+
+  LAYER B - THE DIMENSIONS AND THEIR ASSIGNMENTS (who / what / when)
+     students + student_field_definitions      (people, and custom fields)
+     student_groups + student_group_members     (the group tree, and membership)
+     parameters + parameter_assignments         (what we measure, to whom)
+     periods + period_assignments               (when, applied to whom)
+
+  LAYER C - THE CORE AND THE EXTRA
+     evaluations                                 (THE scores - the whole point)
+     tasks + task_assignments                    (to-do items, optionally tied to
+                                                  a parameter, assigned to a
+                                                  group or student, per period)
+
+How to trace the ER diagram with this in mind: find evaluations in the middle,
+and notice four lines leaving it - to student_groups, students, parameters, and
+periods. That is the fact-and-its-four-dimensions picture, made literal. Every
+other line is Layer B wiring (memberships and assignments) or the tasks corner.
+
+  >> CONTEMPLATE (the big one, and the seed of "compare your path"):
+     Cover the table list. On a blank page, design YOUR OWN tables for:
+     "track students, score them on configurable things, over terms, and review
+     trends." How many tables? Where does a score live? Do you separate the
+     thing-you-measure from the score? Do groups exist? Keep your sketch. In the
+     roadmap's Phase 1 we lay your sketch beside this one and study every place
+     you chose differently - not to correct you, but to see the choices clearly.
+
+===============================================================================
+  PART 4.  TABLE BY TABLE
+===============================================================================
+
+Now the descent into detail. Same order as the ER diagram's groups. For each
+table you get: PURPOSE, the COLUMNS, the KEYS & RULES, the LINKS, WHY it is shaped
+this way, and something to CONTEMPLATE. Read a group, glance at the diagram, then
+read the next. Do not try to memorize columns - understand jobs.
+
+-------------------------------------------------------------------------------
+GROUP A - SYSTEM PLUMBING  (migrations 001 and 002)
+-------------------------------------------------------------------------------
+These five keep the app running. They do not link to students/scores at all;
+on the diagram they stand alone. We cover them first precisely so we can then
+set them aside and focus on the real domain.
+
+### settings
+  PURPOSE : a tiny key/value store for app-wide settings. Most importantly it
+            holds the single operator's login secret under the key
+            "auth.password_hash".
+  COLUMNS : key (text), value (text), updated_at (timestamptz).
+  KEYS    : PK is the key itself (the name IS the identity - see 2.2).
+  WHY     : when you have a handful of named settings, a key/value table is
+            simpler than inventing a column per setting.
+  !! COMPASS: this one row is the ENTIRE authentication system of this build.
+     The repo's docs describe user accounts, roles, and per-user passwords; here
+     there is just one hashed password in one cell. Single operator, by design.
+     (We never print or copy that hash; we refer to it by key name only.)
+
+### preferences
+  PURPOSE : the operator's UI preferences (theme, default sorting, etc.).
+  COLUMNS : id (smallint, always 1), settings (jsonb), updated_at.
+  KEYS    : PK id, pinned to 1 - there is only ever ONE row.
+  WHY     : one operator -> one preferences record. jsonb because preferences
+            are a fluid bag of small options, exactly the 2.9 use-case.
+
+### saved_views
+  PURPOSE : named, saved configurations of the results screen ("Term 1, Group
+            7B, sorted by score") so they can be recalled.
+  COLUMNS : id (uuid), name (text), config (jsonb), created_at, updated_at.
+  WHY     : the SHAPE of a saved view (which filters/sorts) is fluid, so it lives
+            in jsonb; but each view is a real named thing, so it earns a uuid id.
+
+### user_sessions
+  PURPOSE : where logged-in sessions are stored, so a login survives page
+            reloads. Managed by the session library, not by app code directly.
+  COLUMNS : sid (varchar) the session id, sess (json) the session data, expire
+            (timestamp) when it lapses.
+  KEYS    : PK is sid (handed to us by the library).
+  WHY     : storing sessions in the database (rather than only in memory) means
+            a restart does not log everyone out. The library dictates this
+            table's exact shape - we host it, we do not design it.
+
+### audit_log
+  PURPOSE : an append-only diary of meaningful changes: who did what, to which
+            thing, when, with details.
+  COLUMNS : id (bigint, auto-incrementing), occurred_at, actor (text, defaults
+            to 'operator'), action (text, e.g. "student.update"), entity_type,
+            entity_id, details (jsonb).
+  KEYS    : a plain growing bigint id - this is a log, so simple append-order
+            identity is perfect (contrast the uuid choice elsewhere).
+  INDEXES : by occurred_at, by (entity_type, entity_id), and the two FUNCTIONAL
+            indexes from 2.7 - lower(actor) and split_part(action,'.',1).
+  WHY     : accountability and "what changed last Tuesday?". Append-only means
+            you add rows but never edit them - a log you can edit is not a log.
+  !! COMPASS: actor is just free text defaulting to 'operator' - there is no
+     users table to point at. In the full design this would reference a real
+     user. Single-operator reality again.
+
+-------------------------------------------------------------------------------
+GROUP B - PEOPLE AND THEIR SHAPE  (migration 003)
+-------------------------------------------------------------------------------
+
+### students
+  PURPOSE : the roster - one row per student. A DIMENSION of the core fact.
+  COLUMNS : id (uuid), student_code (text), full_name (text), birthdate (date),
+            gender (text), extra (jsonb), created_at, deleted_at.
+  KEYS &  : - PK id (uuid).
+  RULES     - student_code is UNIQUE and has a CHECK: exactly 8 characters drawn
+              from a restricted alphabet (digits 2-9 and capital letters, with
+              look-alikes like 0/O/1/I/L removed). So codes are short, unique,
+              and safe to read aloud or type without confusing O for 0.
+            - deleted_at implements SOFT DELETE (2.8): NULL = active.
+  LINKS   : referenced by student_group_members, evaluations, and the three
+            assignment tables (as the "student" side of their XOR).
+  WHY     : name is not identity (two students can share a name), so a stable
+            code and an internal uuid carry identity; the human-facing code is
+            deliberately engineered to be un-mistypeable.
+  >> CONTEMPLATE: why TWO identifiers (uuid AND student_code)? What does each do
+     that the other cannot? (Hint: one is for the machine and links; one is for
+     humans on paper.) This "internal id + human code" split is everywhere in
+     real systems.
+
+### student_field_definitions
+  PURPOSE : lets the operator INVENT their own extra student fields at runtime
+            ("allergy", "locker number") without changing the database shape.
+  COLUMNS : id (uuid), label (text), field_type (text), choices (jsonb),
+            is_restricted (boolean), sort_order (integer), archived_at,
+            created_at.
+  RULES   : field_type is limited by a CHECK to a known set (text, long_text,
+            number, date, yes_no, choice). choices (jsonb) holds the options for
+            a "choice" field. is_restricted marks sensitive fields.
+  LINKS   : here is the subtle one - there is NO foreign key from students to
+            here. Instead, a student's ANSWERS live in students.extra (jsonb),
+            keyed by this table's id. So this table is the DICTIONARY of custom
+            fields; students.extra holds the VALUES. That is a deliberate,
+            LOGICAL link the app maintains, not a database-enforced FK - which is
+            why the ER diagram draws no line between them.
+  WHY     : "let users define fields" is otherwise impossible without altering
+            the schema at runtime; the definitions-table + jsonb-values pattern
+            is the classic way to buy that flexibility. Re-read 2.9's trade-off:
+            you gained flexibility and gave up some automatic validation.
+  >> CONTEMPLATE: the app now has to enforce, in code, everything the database
+     would have enforced for a real column (type, required, valid choice). Was
+     the flexibility worth moving that burden into the app? When would you say
+     no and just add real columns instead?
+
+-------------------------------------------------------------------------------
+GROUP C - GROUPING  (migration 004)
+-------------------------------------------------------------------------------
+
+### student_groups
+  PURPOSE : arbitrary, nestable groupings of students (School > Grade > Class,
+            or "Chess club"). A DIMENSION - scores can attach to a group.
+  COLUMNS : id (uuid), name (text), parent_id (uuid, nullable), sort_order,
+            archived_at, created_at.
+  RULES   : parent_id is a FK back to student_groups.id (SELF-REFERENTIAL, 2.4) -
+            this is what makes groups a TREE of any depth. A CHECK forbids a
+            group being its own parent (parent_id <> id). Deeper loops (A->B->A)
+            are prevented in app code, not by a single CHECK.
+  WHY     : real institutions nest, so a flat list will not do; a parent_id tree
+            is the simplest structure that nests to any depth. archived_at lets
+            an old class retire without deleting its history.
+  >> CONTEMPLATE: a CHECK stops the one-step loop (a=its own parent), but NOT a
+     three-step loop. Why can't a simple CHECK catch the longer cycle, and why
+     must the app walk the chain to prevent it? (Trees are easy to store, subtly
+     hard to keep valid.)
+
+### student_group_members
+  PURPOSE : the BRIDGE (2.4) that makes students-to-groups a MANY-TO-MANY: a
+            student can be in several groups; a group holds many students.
+  COLUMNS : student_id (uuid), group_id (uuid), added_at (timestamptz).
+  KEYS &  : - COMPOSITE PK (student_id, group_id): the pair is the identity, so
+  RULES       the same student cannot be added to the same group twice (2.6).
+            - both FKs are ON DELETE CASCADE: delete the student or the group and
+              the now-meaningless membership rows disappear (2.3).
+  WHY     : this is the textbook shape of many-to-many. Notice it carries almost
+            nothing of its own (just added_at) - a pure join table. If it ever
+            needed to say "role in the group", that would become its own column
+            here.
+  >> CONTEMPLATE: why can this table CASCADE-delete happily while scores must
+     never be casually deleted? (What does a membership MEAN once its student is
+     gone, versus what a score means?) The ON DELETE choice always follows from
+     "what does this row mean without its parent".
+
+-------------------------------------------------------------------------------
+GROUP D - WHAT WE MEASURE  (migration 005)
+-------------------------------------------------------------------------------
+
+### parameters
+  PURPOSE : the configurable things you score students on ("Participation",
+            "Math > Algebra"). A DIMENSION, and itself a TREE.
+  COLUMNS : id (uuid), parent_id (uuid, nullable, self-FK), name, unit (text),
+            min_value, max_value, norm_min, norm_max (all numeric), extra
+            (jsonb), sort_order, archived_at, created_at.
+  RULES   : parent_id -> parameters.id makes a heading/sub-parameter TREE. The
+            numeric range columns describe the allowed/expected span of a score.
+  THE BIG : only LEAF parameters (no children) are actually scored. A PARENT's
+  IDEA      value is the AVERAGE of its children, and a parent's range is the
+            WIDEST of its children - and these are DERIVED AT READ TIME, never
+            stored (this is 2.10 made concrete). One source of truth: the leaves.
+  LINKS   : referenced by evaluations (which parameter a score is for),
+            parameter_assignments (who this parameter applies to), and
+            optionally by tasks.
+  WHY     : a tree lets you organize dozens of measures under headings and read a
+            roll-up "Math" score without ever storing that roll-up. Ranges let
+            the app validate and later colour scores as normal/low/high.
+  >> CONTEMPLATE: "only leaves hold facts; parents are computed." If you allowed
+     a parent to ALSO hold its own score, what contradiction could arise? (This
+     is why the design forbids it.)
+
+### parameter_assignments
+  PURPOSE : says WHICH parameters apply to WHOM - to a whole group, or to a
+            single student.
+  COLUMNS : id (uuid), parameter_id (FK), group_id (FK, nullable), student_id
+            (FK, nullable), created_at.
+  RULES   : the XOR pattern (2.6) - a CHECK enforces exactly one of group_id /
+            student_id is set. "Apply this parameter to Group 7B" OR "to this one
+            student", never both.
+  WHY     : not every student is measured on everything; assignments scope the
+            measures. The XOR keeps each row unambiguous about its target.
+  >> CONTEMPLATE: they could have made TWO tables (one for group-assignments, one
+     for student-assignments) instead of one table with an XOR. What does the
+     single-table-with-XOR choice buy, and what does it cost? Hold this - the
+     next two tables repeat the exact same shape.
+
+-------------------------------------------------------------------------------
+GROUP E - WHEN WE MEASURE  (migration 006)
+-------------------------------------------------------------------------------
+
+### periods
+  PURPOSE : the named time windows you score within (terms, months, "Q1"). A
+            DIMENSION - every score belongs to exactly one period.
+  COLUMNS : id (uuid), name, start_date (date), end_date (date), sort_order,
+            archived_at, created_at.
+  RULES   : a CHECK enforces start_date <= end_date (no backwards windows, 2.6).
+  WHY     : trends need a time axis you control by name, not by guessing from
+            timestamps. Making a period a first-class row (not just two loose
+            dates on each score) means you define "Term 1" ONCE and point at it.
+  >> CONTEMPLATE: why is a period its own table instead of just storing a start
+     and end date on every evaluation? (Think about renaming "Term 1", or asking
+     "all scores in Term 1" - and about not repeating the same dates on 500
+     rows. This is the no-duplication principle from Part 1, applied to time.)
+
+### period_assignments
+  PURPOSE : which periods apply to whom - the SAME XOR shape as parameter_
+            assignments.
+  COLUMNS : id (uuid), period_id (FK), group_id (FK, nullable), student_id (FK,
+            nullable), created_at.
+  RULES   : XOR CHECK - exactly one of group_id / student_id.
+  WHY     : lets different groups/students run on different period calendars.
+            Notice you are now RE-USING a pattern you already understand - that
+            is the payoff of learning the building blocks first.
+
+-------------------------------------------------------------------------------
+GROUP F - THE CORE  (migration 007)
+-------------------------------------------------------------------------------
+
+### evaluations   <-- this is the whole point of the database
+  PURPOSE : one row = one SCORE. It ties together a WHO, a WHAT, a WHEN, and a
+            value. This is the FACT table everything else exists to support.
+  COLUMNS : id (uuid), group_id (FK, NOT NULL), student_id (FK, NULLABLE),
+            parameter_id (FK, NOT NULL), period_id (FK, NOT NULL), value
+            (numeric, nullable), comment (text, <=500 chars), locked_at
+            (timestamptz), created_at, updated_at.
+  THE KEY : group_id is REQUIRED but student_id is OPTIONAL (2.5). That single
+  DECISION   choice gives the table two meanings in one shape:
+              - student_id set  -> "this individual student's score",
+              - student_id NULL -> "the GROUP's own score".
+  RULES   : - value is nullable (a score can be "not yet entered / not
+              applicable") and is NOT range-checked in the database - the app
+              validates it against the parameter's range. (A deliberate choice:
+              ranges can change over time; the DB stays permissive, the app
+              judges.)
+            - TWO PARTIAL UNIQUE INDEXES (2.6/2.7): one over (student_id,
+              parameter_id, period_id) for the student case, one over (group_id,
+              parameter_id, period_id) for the group case. Together: "at most one
+              score per who, per parameter, per period."
+            - locked_at marks a score as locked (finalized); the app allows an
+              OVERRIDE to change a locked score, and records it.
+  LINKS   : four FKs out, to its four dimensions - these are the four lines you
+            traced from the centre of the ER diagram.
+  WHY     : modelling a score as a fact with four dimensional links is what makes
+            every later question ("average of parameter X for group Y in period
+            Z") a straightforward query rather than a special case. Only leaf
+            parameters get rows here (parents are averaged from these, 2.10).
+  >> CONTEMPLATE (spend real time here): could a score exist without a period?
+     without a parameter? without a group? without a student? The nullability of
+     each FK is the designer answering exactly those questions. Do you agree with
+     each answer? This one table rewards more contemplation than the other 15
+     combined.
+
+-------------------------------------------------------------------------------
+GROUP G - EXTRA WORK  (migration 008)
+-------------------------------------------------------------------------------
+
+### tasks
+  PURPOSE : to-do / action items, optionally connected to a parameter ("bring
+            reading log", tied to the Reading parameter).
+  COLUMNS : id (uuid), title, description (text), parameter_id (FK, NULLABLE),
+            extra (jsonb), sort_order, archived_at, created_at.
+  RULES   : parameter_id is ON DELETE SET NULL (2.3) - delete the parameter and
+            the task survives, just untied. This is the opposite choice from the
+            membership table's CASCADE, and for a good reason: a task is a real
+            thing on its own; a membership is not.
+  WHY     : tasks are a lightweight companion feature; being optionally linked to
+            a parameter lets them ride alongside the measurement structure
+            without being trapped by it.
+
+### task_assignments
+  PURPOSE : who a task is for, and (optionally) in which period - once more the
+            XOR shape, now with an extra optional period and a done flag.
+  COLUMNS : id (uuid), task_id (FK), group_id (FK, nullable), student_id (FK,
+            nullable), period_id (FK, NULLABLE), done (boolean), done_at
+            (timestamptz), created_at.
+  RULES   : XOR CHECK on group_id / student_id (assign to a group OR a student).
+            period_id is optional - a task may be period-specific or standing.
+            done/done_at track completion.
+  WHY     : this is the THIRD table using the group-XOR-student pattern
+            (parameter_assignments, period_assignments, task_assignments). Seeing
+            the same shape a third time is the lesson: recognizing a repeated
+            pattern is exactly the "algorithmic perception" we are cultivating.
+  >> CONTEMPLATE: three tables share one pattern. If you were designing from
+     scratch, would you feel a pull to "unify" them into one generic
+     assignments table? What would you gain, and what clarity would you lose?
+     (There is no single right answer - senior engineers disagree on this. That
+     you can now SEE the tension is the point.)
+
+===============================================================================
+  PART 5.  HOW THE PIECES WORK TOGETHER  (FOUR WALKTHROUGHS)
+===============================================================================
+
+Tables are nouns; here is the system in motion. Follow each path on the diagram.
+
+5.1  RECORDING A SCORE
+     The operator picks a period (WHEN), a parameter - a leaf (WHAT), and a
+     target: either a whole group or one student (WHO). They type a value. That
+     becomes one evaluations row: period_id, parameter_id, group_id always set,
+     student_id set only if it is an individual's score (else NULL = the group's
+     own score). The partial unique index guarantees they cannot accidentally
+     create a SECOND score for the same who/what/when - a re-entry updates the
+     existing row instead. If the score was locked_at, changing it requires an
+     explicit override, which the audit_log records.
+
+5.2  READING A "MATH" SCORE THAT NOBODY EVER ENTERED
+     Suppose Math has children Algebra and Geometry (leaves). Only Algebra and
+     Geometry have evaluations rows. When a screen asks for the student's "Math"
+     value, the app fetches the leaf scores and AVERAGES them on the spot; the
+     Math range is taken as the WIDEST of the children's ranges. Nothing about
+     "Math" is stored - it cannot fall out of date, because it is recomputed
+     every time from the one source of truth (2.10).
+
+5.3  "SHOW ME EVERYONE IN GRADE 7"  (walking the group tree)
+     Grade 7 has child groups 7A, 7B, 7C, each with members. To list "everyone
+     in Grade 7", the app walks DOWN the student_groups tree from Grade 7 to all
+     its descendants, collects their ids, then finds student_group_members rows
+     for those group ids, then the students. The self-referential parent_id
+     (2.4) is what makes "and everything nested under it" possible.
+
+5.4  THE AUDIT TRAIL
+     Whenever a meaningful change happens (a student edited, a score overridden),
+     a row is appended to audit_log: the action ("student.update"), the
+     entity it touched, when, and a jsonb details blob (with secret-like values
+     redacted). Nobody edits these rows; they only accumulate. That is how the
+     single operator can later answer "what did I change, and when?".
+
+===============================================================================
+  PART 6.  WHERE IT ACTUALLY LIVES  (STORAGE REALITY)
+===============================================================================
+
+You have learned the design. Now, honestly, WHERE do these tables live? This is
+the biggest place the design on paper and the running reality differ, so we take
+it head-on.
+
+WHAT THE DOCS SAY vs WHAT IS RUNNING
+  The repo's own guide (CLAUDE.md) describes a full PostgreSQL SERVER, with user
+  accounts, roles, fine-grained permissions, and per-user password hashing. That
+  is a real, larger design - just not THIS build.
+
+  The build in front of us is a COMPACTED, SINGLE-OPERATOR version:
+    - Storage is PGlite, not a separate PostgreSQL server. PGlite is PostgreSQL
+      itself, compiled to run INSIDE the app's own process (Postgres-in-WASM). It
+      speaks the same SQL and honours the same migrations - but there is no
+      database server to install and run alongside; the data simply persists to
+      a folder on disk. Practically: you need Node 20+, and that is all.
+    - There are NO users/roles/permissions tables and no per-user auth. The whole
+      "who may sign in" system is the single hashed password in settings
+      (Part 4, Group A). One operator, one password.
+
+WHY THE APP CODE DOES NOT NOTICE THE DIFFERENCE
+  There is a small adapter file (db/pglite.js) that makes PGlite present the
+  SAME shape the app expects from a normal PostgreSQL connection pool
+  (query / connect / end). So the routes and queries are written as if talking to
+  regular Postgres; the adapter quietly serves them from the embedded engine.
+  This is a lovely lesson in itself: a thin "facade" lets you swap the storage
+  underneath without rewriting everything on top.
+
+HOW THE TABLES GET CREATED
+  A runner (db/migrate.js) applies migrations 001..008 in order, each inside a
+  transaction, recording them in schema_migrations so none runs twice; it is
+  forward-only (2.11). Run it once and the empty database becomes the 16-table
+  schema you have been reading about.
+
+  !! COMPASS (the habit to keep for life): when prose and code disagree, trust
+     the code - here, the migration files and the live database. Documentation
+     describes intent at a moment in time; it drifts. The migrations ARE the
+     schema. Throughout this course we will keep checking your understanding
+     against them, not against any prose (including mine).
+
+  >> CONTEMPLATE: the app was DESIGNED for big PostgreSQL and now runs on embedded
+     PGlite with almost no code change, thanks to one adapter file. What does
+     that tell you about the value of programming "to an interface" rather than
+     to a specific tool? Where else might you want that kind of seam?
+
+
+===============================================================================
+  PART 7.  THINGS TO CONTEMPLATE BEFORE WE MEET AGAIN
+===============================================================================
+
+Nothing to install, nothing to build yet. Just read, print, mark up, and chew on
+these. Bring your reactions back and we start Phase 0/1 from wherever your
+thinking landed.
+
+  1. THE BLANK-PAGE DESIGN (from Part 3). Design your OWN tables for the same
+     problem before you re-read this schema. Keep the sketch - we will compare.
+
+  2. Identity: for three tables the designer did NOT use a uuid (settings,
+     preferences, user_sessions). For each, say in one sentence why.
+
+  3. The most important nullable column in the database is evaluations.student_id.
+     Explain, to an imaginary friend, the two things a single evaluations row can
+     mean and how you tell them apart.
+
+  4. "Store facts, derive summaries" (2.10). Name one column ANYWHERE that you
+     think should be computed-not-stored, and one place you would be tempted to
+     store a summary anyway. Why the temptation?
+
+  5. The group-XOR-student pattern appears in three tables. Write down one
+     argument FOR merging them into a single generic table, and one argument
+     AGAINST. Do not pick a winner yet.
+
+  6. Soft delete vs hard delete (2.8): pick any two tables and decide which kind
+     of "remove" each deserves, and why.
+
+A closing word: you do not need to have answers to all of these. The questions
+themselves are the material. The point was never to memorize 16 tables - it was
+to start SEEING the decisions underneath them, so that when you design your own,
+you recognize the forks in the road as they arrive.
+
+-------------------------------------------------------------------------------
+  Next: open the roadmap file (student-panel-tutoring-roadmap.txt) to see how we
+  will work through this together, phase by phase. See you after your read-through.
+-------------------------------------------------------------------------------
+

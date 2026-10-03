@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Panel — complete database (ER diagram)</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.min.js" integrity="sha384-yQ4mmBBT+vhTAwjFH0toJXNYJ6O4usWnt6EPIdWwrRvx2V/n5lXuDZQwQFeSFydF" crossorigin="anonymous"></script>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; padding: 24px 20px 60px;
+    background: #f7f8fb; color: #1c2130;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1150px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #5b6478; margin: 0 0 20px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 0 0 18px; font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,.15); }
+  .dot.exist { background: #e8edf6; }
+  .dot.new { background: #d8f3e3; }
+  .card {
+    background: #fff; border: 1px solid #e3e7ef; border-radius: 12px;
+    padding: 16px; box-shadow: 0 1px 3px rgba(20,30,60,.05); overflow-x: auto;
+  }
+  .mermaid { text-align: center; }
+  .note { font-size: 13px; color: #5b6478; margin-top: 14px; }
+  h2 { font-size: 16px; margin: 28px 0 8px; }
+  h3 { font-size: 14px; margin: 18px 0 4px; color: #2b3346; }
+  ul { margin: 6px 0 0; padding-left: 20px; }
+  li { margin: 4px 0; }
+  code { background: #eef1f7; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .new-tag { color: #0f7a45; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Student Panel — complete database</h1>
+  <p class="sub">Every table, current and proposed. Green = a new table or a new column.</p>
+  <div class="legend">
+    <span><i class="dot exist"></i> Exists today</span>
+    <span><i class="dot new"></i> New (marked "NEW" on the box)</span>
+  </div>
+  <div class="card">
+<pre class="mermaid">
+erDiagram
+  ROLES ||--o{ USERS : "given to"
+  ROLES ||--o{ ROLE_PERMISSIONS : holds
+  USERS ||--o| USER_PREFERENCES : has
+  USERS ||--o{ SAVED_VIEWS : owns
+  USERS ||--o{ AUDIT_LOG : "acts in"
+  USERS |o--o| STUDENTS : "can also be a"
+  USERS ||--o{ TEACHER_ASSIGNMENTS : teaches
+  USERS ||--o{ STUDENT_GROUPS : created
+  USER_FIELD_DEFINITIONS ||--o{ USERS : "describes extra of"
+  STUDENT_FIELD_DEFINITIONS ||--o{ STUDENTS : "describes extra of"
+  STUDENT_GROUPS ||--o{ STUDENT_GROUPS : "parent of"
+  STUDENTS ||--o{ STUDENT_GROUP_MEMBERS : "placed via"
+  STUDENT_GROUPS ||--o{ STUDENT_GROUP_MEMBERS : "contains via"
+  STUDENTS ||--o{ EVALUATIONS : receives
+  STUDENT_GROUPS ||--o{ EVALUATIONS : "own score / context"
+  PARAMETERS ||--o{ EVALUATIONS : "measured by"
+  PARAMETERS ||--o{ PARAMETER_CHANGES : "history of"
+  PARAMETERS ||--o{ PARAMETER_ASSIGNMENTS : "given out via"
+  STUDENT_GROUPS ||--o{ PARAMETER_ASSIGNMENTS : "target of"
+  STUDENTS ||--o{ PARAMETER_ASSIGNMENTS : "target of"
+  PARAMETERS |o--o{ TASKS : "optionally about"
+  TASKS ||--o{ TASK_ASSIGNMENTS : "given out via"
+  STUDENT_GROUPS ||--o{ TASK_ASSIGNMENTS : "target of"
+  STUDENTS ||--o{ TASK_ASSIGNMENTS : "target of"
+  STUDENTS ||--o{ TEACHER_ASSIGNMENTS : "taught by"
+  STUDENT_GROUPS ||--o{ TEACHER_ASSIGNMENTS : "taught by"
+  ROLES {
+    uuid id PK
+    text name
+    boolean is_system
+  }
+  ROLE_PERMISSIONS {
+    uuid role_id FK
+    text permission_key
+  }
+  USERS {
+    uuid id PK
+    text username
+    uuid role_id FK
+    boolean is_active
+    timestamp created_at
+    jsonb extra "NEW custom user fields"
+  }
+  USER_FIELD_DEFINITIONS {
+    uuid id PK "NEW"
+    text label "NEW"
+    text field_type "NEW"
+    boolean is_restricted "NEW"
+  }
+  USER_PREFERENCES {
+    uuid user_id PK
+    jsonb settings
+  }
+  SAVED_VIEWS {
+    uuid id PK
+    uuid user_id FK
+    text name
+    jsonb config
+  }
+  USER_SESSIONS {
+    varchar sid PK
+    json sess
+    timestamp expire
+  }
+  STUDENTS {
+    uuid id PK
+    text student_code
+    text full_name
+    jsonb extra
+    uuid user_id FK "NEW link to login"
+    text period_interval "NEW personal rhythm"
+    date period_anchor "NEW"
+  }
+  STUDENT_FIELD_DEFINITIONS {
+    uuid id PK
+    text label
+    text field_type
+    boolean is_restricted
+  }
+  STUDENT_GROUPS {
+    uuid id PK
+    text name
+    uuid parent_id FK
+    uuid created_by FK
+    text period_interval "NEW optional group rhythm"
+    date period_anchor "NEW optional"
+  }
+  STUDENT_GROUP_MEMBERS {
+    uuid student_id FK
+    uuid group_id FK
+  }
+  TEACHER_ASSIGNMENTS {
+    uuid id PK "NEW"
+    uuid teacher_user_id FK "NEW"
+    uuid group_id FK "NEW nullable"
+    uuid student_id FK "NEW nullable"
+  }
+  PARAMETERS {
+    uuid id PK
+    text name
+    text unit
+    numeric min_value
+    numeric max_value
+  }
+  PARAMETER_CHANGES {
+    uuid id PK
+    uuid parameter_id FK
+    int period_number
+    text action
+  }
+  PARAMETER_ASSIGNMENTS {
+    uuid id PK "NEW"
+    uuid parameter_id FK "NEW"
+    uuid group_id FK "NEW nullable"
+    uuid student_id FK "NEW nullable"
+  }
+  EVALUATIONS {
+    uuid id PK
+    uuid group_id FK "NEW required"
+    uuid student_id FK "NEW nullable (null = group score)"
+    uuid parameter_id FK
+    int period_number
+    numeric value
+    timestamp locks_at
+    text comment
+  }
+  TASKS {
+    uuid id PK "NEW"
+    text title "NEW"
+    uuid parameter_id FK "NEW nullable"
+  }
+  TASK_ASSIGNMENTS {
+    uuid id PK "NEW"
+    uuid task_id FK "NEW"
+    uuid group_id FK "NEW nullable"
+    uuid student_id FK "NEW nullable"
+  }
+  AUDIT_LOG {
+    bigint id PK
+    uuid user_id FK
+    text action
+    timestamp occurred_at
+    timestamp deleted_at "NEW soft-delete"
+    text delete_reason "NEW required to delete"
+  }
+  SETTINGS {
+    text key PK
+    text value
+  }
+  SCHEMA_MIGRATIONS {
+    text filename PK
+    timestamp applied_at
+  }
+</pre>
+  </div>
+  <p class="note">
+    <strong>How to read the lines:</strong> a line ties two tables together. The
+    <code>||</code> end means "exactly one", <code>o{</code> means "many", and
+    <code>o|</code> means "zero or one (optional)". So "USERS ||--o{ SAVED_VIEWS"
+    reads as <em>one user owns many saved views</em>. Tables with no lines
+    (<code>USER_SESSIONS</code>, <code>SETTINGS</code>, <code>SCHEMA_MIGRATIONS</code>)
+    are plumbing — they stand alone and don't point at anything.
+  </p>
+
+  <h2>The new tables (5)</h2>
+  <ul>
+    <li><span class="new-tag">TEACHER_ASSIGNMENTS</span> — connects a teacher (a user) to
+      <em>either</em> a single student <em>or</em> a whole group. This is what lets a
+      teacher see "only my students".</li>
+    <li><span class="new-tag">PARAMETER_ASSIGNMENTS</span> — says which parameters apply to
+      which group or student, instead of every parameter applying to everyone.</li>
+    <li><span class="new-tag">TASKS</span> — a to-do/skill item, optionally linked to a
+      parameter. Columns kept deliberately loose for now.</li>
+    <li><span class="new-tag">TASK_ASSIGNMENTS</span> — hands a task to a group or a
+      student (same either/or shape as parameter assignments).</li>
+    <li><span class="new-tag">USER_FIELD_DEFINITIONS</span> — the mirror of
+      student custom fields, but for user accounts (e.g. a restrictable "created on" field).</li>
+  </ul>
+
+  <h2>The new columns on old tables</h2>
+  <ul>
+    <li><code>students.user_id</code> — links a student-person to their login account.</li>
+    <li><code>students.period_interval</code> / <code>period_anchor</code> — that student's
+      own rhythm (a group they're in can override it).</li>
+    <li><code>student_groups.period_interval</code> / <code>period_anchor</code> —
+      a group's <em>optional</em> rhythm.</li>
+    <li><code>users.extra</code> — the values for the new user custom fields.</li>
+    <li><code>evaluations.group_id</code> (required) and <code>evaluations.student_id</code>
+      (now nullable) — every score sits under a group; a null student means it is the
+      group's own direct score.</li>
+    <li><code>audit_log.deleted_at</code> / <code>delete_reason</code> — a log line can be
+      soft-deleted, but only with a written reason.</li>
+  </ul>
+  <h2>Two things that are independent options on a group</h2>
+  <p class="note">
+    A group's <strong>period</strong> (its rhythm) and its <strong>parameters</strong>
+    (what it's scored on) are <em>separate</em> optional settings. Any of these four is
+    valid: a group with <em>neither</em>, a group with a period but <em>no</em>
+    parameters, a group with parameters but <em>no</em> period, or a group with both.
+    Because both are optional, they can be filled in later — nothing forces a group to
+    have either one.
+  </p>
+
+  <h2>How the tree roll-up works</h2>
+  <p class="note">
+    Groups form a tree (everything → education / performance / … → sub-groups → students).
+    Only <em>direct</em> scores are stored in <code>evaluations</code>. A group's
+    rolled-up number (its students plus its sub-groups, all the way down) is
+    <em>calculated when you look</em>, by walking the <code>parent_id</code> tree — it is
+    not saved. A group's <em>own</em> direct score is always shown separately from that
+    rolled-up number.
+  </p>
+
+  <h2>Every table, in one line each</h2>
+  <h3>People &amp; access</h3>
+  <ul>
+    <li><code>roles</code> — named bundles of permissions (Administrator, Handler, …).</li>
+    <li><code>role_permissions</code> — which permission keys each role holds.</li>
+    <li><code>users</code> — login accounts; each points at one role.</li>
+    <li><code>user_field_definitions</code> <span class="new-tag">NEW</span> — extra custom fields for user accounts.</li>
+    <li><code>user_preferences</code> — per-user settings (theme, sort, …).</li>
+    <li><code>saved_views</code> — a user's saved result filters.</li>
+    <li><code>user_sessions</code> — active login sessions (plumbing).</li>
+  </ul>
+  <h3>Students, groups &amp; the tree</h3>
+  <ul>
+    <li><code>students</code> — the people being evaluated (now optionally linked to a login + own rhythm).</li>
+    <li><code>student_field_definitions</code> — extra custom fields for students.</li>
+    <li><code>student_groups</code> — the group tree (self-linked by <code>parent_id</code>; now with an optional rhythm).</li>
+    <li><code>student_group_members</code> — which students are in which groups.</li>
+    <li><code>teacher_assignments</code> <span class="new-tag">NEW</span> — ties a teacher to a student or a group.</li>
+  </ul>
+  <h3>Scoring, parameters &amp; tasks</h3>
+  <ul>
+    <li><code>parameters</code> — the things you measure (with min/max).</li>
+    <li><code>parameter_changes</code> — history of parameter edits per period.</li>
+    <li><code>parameter_assignments</code> <span class="new-tag">NEW</span> — which parameters apply to which group/student.</li>
+    <li><code>evaluations</code> — the scores themselves; always under a group, optionally for a named student.</li>
+    <li><code>tasks</code> <span class="new-tag">NEW</span> — to-do/skill items, optionally about a parameter.</li>
+    <li><code>task_assignments</code> <span class="new-tag">NEW</span> — which tasks go to which group/student.</li>
+  </ul>
+  <h3>System</h3>
+  <ul>
+    <li><code>audit_log</code> — record of every change (now soft-deletable with a reason).</li>
+    <li><code>settings</code> — app-wide settings (plumbing).</li>
+    <li><code>schema_migrations</code> — which DB migrations have run (plumbing).</li>
+  </ul>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, securityLevel: "strict" });
+  </script>
+</div>
+</body>
+</html>

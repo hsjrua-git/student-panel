@@ -1,0 +1,181 @@
+===============================================================================
+  STUDENT PANEL - TUTORING ROADMAP  (our path, and how we walk it)
+  Owner: hsjrua        Started: 2026-09-28        Reference build: student-panel
+  Your build (you type it): student-panel-I
+===============================================================================
+
+This is the "main tutoring" document: the plan, the way we work, and a running
+log. It is meant to be EDITED. If a phase is in the wrong order or too big, say
+so and we move it. You asked to see the schedule first and change it before we
+execute - that request is honoured here: nothing below is fixed until you agree.
+
+
+-------------------------------------------------------------------------------
+  1.  HOW WE WORK TOGETHER  (the contract)
+-------------------------------------------------------------------------------
+These are YOUR rules, written down so they survive across sessions:
+
+  - You are learning to DESIGN and BUILD databases (and eventually the app)
+    yourself. The goal is your understanding and judgement, not finished code.
+
+  - Biggest picture first, then major -> minor - and that same descent again
+    INSIDE each phase. Before any piece: what is it, how does it work, what could
+    or could not be done with it, and should it exist at all.
+
+  - What and why BEFORE how. We never jump to commands/steps before you
+    understand the thing and have had room to think, question, and decide.
+
+  - I do NOT modify your project for you. I teach and explain; when you are
+    ready, YOU do it in student-panel-I; you report what you did; we continue
+    from there.
+
+  - We COMPARE your choices against the reference build and surface every place
+    you would design differently - not to correct you, but so both of us can see
+    the decision clearly. Different is often fine.
+
+  - Pace is yours. "Don't rush, take as long as you need." We can stop, loop
+    back, or go deeper anytime.
+
+
+-------------------------------------------------------------------------------
+  2.  THE PHASE SCHEDULE  (adjustable - tell me what to change)
+-------------------------------------------------------------------------------
+Note the deliberate ordering: INSTALLATION IS LAST. You asked to treat setup as
+"for the end", so we learn the whole design first and only stand it up on a real
+machine once it will mean something.
+
+  PHASE 0 - ORIENTATION  (mostly reading; you are here)
+     Read the database lesson. Do the Part 7 contemplations, especially the
+     blank-page design. Agree on this roadmap (edit it). No tools, no building.
+
+  PHASE 0.5 - DESIGN FOUNDATIONS  (the general craft, before student-panel specifics)
+     Added at your request ("I need to first understand ER designing... learn
+     designing first. it is my first time."). Read database-design-primer.txt end
+     to end - it teaches how to DESIGN any database from a blank page (entities,
+     attributes, relationships, cardinality, keys, ER diagrams, the hard patterns,
+     normalisation, and a repeatable 10-step method), using small fresh examples,
+     not student-panel. Do its Part 10 practice on paper. Then we re-derive the
+     student-panel schema together using that same method - which flows straight
+     into Phase 1 and your read-through questions.
+
+  PHASE 1 - THE BUILDING BLOCKS + YOUR BLANK-PAGE DESIGN
+     Work through the ~11 core ideas (Part 2 of the lesson) until they are
+     yours: keys, foreign keys, relationship shapes, null, constraints, indexes,
+     soft-delete, jsonb, derive-don't-store, migrations. Then lay YOUR sketch
+     beside the reference and study the differences together.
+  PHASE 2 - THE BIG PICTURE: FACTS AND DIMENSIONS
+     The heart of the schema: evaluations is a FACT; students/groups,
+     parameters, periods are its DIMENSIONS. We make sure you can look at the ER
+     diagram and narrate the whole system from the middle outward, in your own
+     words, before touching any table detail.
+
+  PHASE 3 - DESIGN THE DIMENSIONS YOURSELF  (first hands-on, in student-panel-I)
+     You design and create the dimension tables one at a time: students (+ the
+     custom-fields idea), the student_groups TREE and its membership bridge,
+     the parameters TREE, and periods. For each: we contemplate it first, you
+     write it in student-panel-I, you report, we compare to the reference.
+
+  PHASE 4 - THE CORE: EVALUATIONS
+     The richest table. Nullability (group required, student optional and what
+     that means), the group-or-student XOR, the two partial-unique "one score
+     per who/what/when" rules, value validation living in the app, and locking.
+     You design it, build it, and we compare carefully.
+
+  PHASE 5 - ASSIGNMENTS, TASKS, AND DERIVED VALUES
+     The three XOR assignment tables (parameter/period/task) and the tasks pair;
+     then the "derive, don't store" machinery - averaging leaf parameters into a
+     parent at read time - and the tree-walking queries (Part 5 walkthroughs).
+
+  PHASE 6 - MIGRATIONS & STORAGE REALITY
+     How the schema is actually built and evolved: forward-only migrations,
+     schema_migrations bookkeeping, transactions; and the PGlite-vs-PostgreSQL
+     story plus the adapter seam. You write and run your own migration.
+
+  PHASE 7 - INSTALLATION & RUNNING IT FOR REAL  (LAST, as you asked)
+     Treat it as a fresh Linux device, end to end: prerequisites, getting the
+     schema created, seeding, and running - the "how" that only now, at the end,
+     is worth its time because you understand every piece it stands up.
+
+  (Every phase runs the same major->minor, contemplate-first loop from section 3.
+   Phases can split or merge as we go.)
+
+
+-------------------------------------------------------------------------------
+  3.  THE PER-PHASE LOOP
+-------------------------------------------------------------------------------
+Inside every phase we repeat:
+
+     (a) CONTEMPLATE - I pose what/why/could/should questions; you think first.
+     (b) TEACH       - I explain the piece, big picture then details.
+     (c) YOU DO      - when you are ready, you build that piece in student-panel-I.
+     (d) REPORT      - you tell me what you did and what puzzled you.
+     (e) COMPARE     - we lay your version beside the reference and name the
+                       differences and the reasons.
+     (f) ADJUST      - we update this roadmap and the progress log, then continue.
+
+-------------------------------------------------------------------------------
+  4.  DELIVERABLES & WHERE THINGS LIVE
+-------------------------------------------------------------------------------
+This tutoring folder (student-panel-tutoring) holds:
+  - database-design-primer.txt           GENERAL "how to design a database" course
+                                          (ER design from scratch, small examples).
+                                          Read this for Phase 0.5.
+  - student-panel-database-lesson.txt    the full read-through lesson (Part 0-7).
+  - student-panel-ER-diagram.mermaid      the diagram source; renders in the app,
+                                          offline. Good for reading on screen.
+  - student-panel-ER-diagram.html         the same diagram, styled to PRINT from a
+                                          browser (landscape, "fit to page").
+  - student-panel-tutoring-roadmap.txt    this file.
+
+Project folders:
+  - student-panel               the REFERENCE build we learn from (read-only for
+                                us; we never modify it).
+  - student-panel-compacted     the mounted copy of the reference I read.
+  - student-panel-I             YOUR build - where YOU do the hands-on work.
+
+  NOTE ON THE DIAGRAM FORMAT: you asked for a PNG. My sandbox that renders images
+  is temporarily unavailable, so the diagram is delivered as (1) a .mermaid source
+  that renders inside the app with no internet, and (2) a print-ready .html. Both
+  show the identical diagram. Ask me and I will produce a true PNG/SVG the moment
+  the sandbox is back.
+
+
+-------------------------------------------------------------------------------
+  5.  DECISIONS LOG
+-------------------------------------------------------------------------------
+  2026-09-28  You chose to receive the FULL materials upfront, to print and read
+              before returning with questions. (Delivered: this folder.)
+  2026-09-28  The app currently runs, but we treat setup as if fresh - and we do
+              it at the END, not the start.
+  2026-09-28  Tutoring materials live in their own separate folder (this one).
+  2026-09-28  Teaching source of truth = the migration files / live schema, NOT
+              the repo's CLAUDE.md prose (which describes a larger, older design).
+  2026-09-29  You decided to learn ER/database DESIGN as a general craft FIRST,
+              before dissecting student-panel ("it is my first time"). Chose a
+              printable primer to read on your own; asked that it be a COMPLETE
+              teaching. Added as Phase 0.5; plan is to then re-derive student-panel
+              with the primer's method.
+
+
+-------------------------------------------------------------------------------
+  6.  OPEN QUESTIONS / TO REVISIT
+-------------------------------------------------------------------------------
+  - Confirm this phase order works for you (especially install-last).
+  - Decide how deep to go on SQL syntax itself vs. design thinking (we can add a
+    "SQL basics" mini-phase before Phase 3 if you want to write it comfortably).
+  - Your blank-page design from Part 3 - bring it to Phase 1.
+
+
+-------------------------------------------------------------------------------
+  7.  PROGRESS LOG
+-------------------------------------------------------------------------------
+  2026-09-28  Set up the tutoring folder and delivered the three core materials
+              (lesson, ER diagram in two formats, this roadmap). Schedule drafted
+              with installation moved to the final phase. Awaiting your read-
+              through and any edits to this plan before we begin Phase 0/1.
+  2026-09-29  Wrote database-design-primer.txt (general ER-design course, Parts
+              0-10 + glossary) at your request to learn designing first. Inserted
+              Phase 0.5. Next: you read the primer + do its Part 10 practice; then
+              we re-derive student-panel together with its 10-step method.
+-------------------------------------------------------------------------------
+

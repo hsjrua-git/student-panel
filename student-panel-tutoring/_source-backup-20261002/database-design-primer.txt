@@ -1,0 +1,811 @@
+===============================================================================
+  HOW TO DESIGN A DATABASE  -  a from-scratch primer on ER design
+  For: hsjrua        Written: 2026-09-29        By: your tutor
+  Companion to the student-panel materials - but this one is GENERAL.
+===============================================================================
+
+This primer teaches the CRAFT of designing a database: how you get from "here is
+a situation in the real world" to "here are the tables, and here is why they
+look like this." It uses small, everyday examples - a library, a school, a shop
+- on purpose. student-panel is an advanced, finished design; you will design far
+better once you have built the method here first, on things small enough to hold
+in your head.
+
+Nothing here asks you to touch a computer. Design happens on paper, in your head,
+in conversation. Read slowly. Keep a pencil and a blank sheet beside you.
+
+
+-------------------------------------------------------------------------------
+  PART 0 - HOW TO USE THIS PRIMER
+-------------------------------------------------------------------------------
+
+WHAT THIS IS
+  A complete beginner's course in database DESIGN and, at its heart, in ER
+  ("entity-relationship") modelling - the standard way people think about and
+  draw a database before they build it. We go biggest-picture first, then
+  descend from major ideas to minor details, and we do that descent again inside
+  each part. Before every piece we pause on four questions: what is it, how does
+  it work, what could (and could not) be done with it, and should it exist at
+  all.
+
+WHAT THIS IS NOT
+  It is not about student-panel yet, and it is not a SQL syntax manual. You will
+  meet a little SQL near the end, only to show how a design becomes real tables.
+  The thinking comes first; the typing comes much later.
+
+THE CALLOUTS  (watch for these)
+  >> CONTEMPLATE - stop reading. Think, or better, sketch, before you read on.
+                   Your own answer first; mine second. This is the real work.
+  TRY IT        - a small design to attempt on your blank sheet.
+  KEY IDEA      - the one sentence from a section worth memorising.
+  >> PITFALL    - a mistake almost every beginner makes here. Now you won't.
+
+HOW TO READ IT
+  Once, straight through, to see the shape. Then again, slowly, doing the
+  CONTEMPLATE and TRY IT prompts for real. When you come back, bring your
+  sketches and your disagreements - disagreeing well is how designers are made.
+
+-------------------------------------------------------------------------------
+  PART 1 - WHAT "DESIGNING A DATABASE" ACTUALLY MEANS  (the biggest picture)
+-------------------------------------------------------------------------------
+
+Start as high up as we can. A database is a place that remembers facts for you,
+in an organised way, so a program can store them and ask questions of them
+later. Designing one means deciding WHAT facts you will keep and HOW they are
+arranged. That is it. Everything technical below serves those two decisions.
+
+Here is the mental move at the centre of all of it: a database is a small,
+deliberate MODEL of a slice of the real world. The real world is infinitely
+detailed; your model keeps only the parts your program cares about and throws
+the rest away. A library's database "knows" a book has a title and an author,
+but not that its cover is scuffed or that it smells of coffee. Design is the art
+of choosing what to keep.
+
+WHY NOT JUST ONE BIG SPREADSHEET?
+  Because facts repeat, and repetition rots. Put a member's phone number next to
+  every book they borrow, and the day they change numbers you must find and fix
+  it in twenty places - miss one and your data now disagrees with itself. A good
+  design stores each fact ONCE, in the one place it belongs, and links to it from
+  everywhere else. Most of this primer is really about that single sentence.
+
+THE THREE LEVELS OF A DESIGN
+  Designers deliberately think at three heights, from ideas down to storage:
+    1. CONCEPTUAL - the ideas and their connections, in plain language, with no
+       thought of any particular database product. "A member borrows many
+       copies; a copy belongs to one book." This is where ER modelling lives.
+    2. LOGICAL - those ideas turned into tables, columns, keys and links, still
+       without worrying which database engine runs it.
+    3. PHYSICAL - the real thing on a real engine: exact data types, indexes,
+       storage. This is last, and it is the least interesting part of design.
+  We spend almost all our time at levels 1 and 2. Beginners rush to level 3
+  (typing commands); good designers linger at level 1 (getting the ideas right).
+
+WHERE "ER" COMES FROM
+  In 1976 Peter Chen proposed describing data as ENTITIES (things) joined by
+  RELATIONSHIPS (how the things relate). It stuck because it matches how people
+  already talk: nouns and verbs. An ER diagram is just a picture of nouns and
+  verbs. You already think this way; we are only making it precise.
+
+  KEY IDEA: a database is a chosen model of reality; design is deciding what to
+  keep and how to arrange it so every fact lives in exactly one place.
+
+WHAT MAKES A DESIGN "GOOD"?
+  Four things, roughly in order of importance:
+    - FAITHFUL: it can represent every real situation you care about, and it
+      forbids situations that can't really happen (a loan with no book).
+    - NON-REDUNDANT: each fact is stored once, so it can never contradict itself.
+    - ANSWERABLE: the questions you will actually ask are easy and fast to ask.
+    - SIMPLE: no table, column, or link exists without a reason you can state.
+  Notice these can pull against each other - chasing zero redundancy can make
+  questions harder to ask. Design is the judgement that balances them. There is
+  rarely one "right" schema, only better and worse trade-offs for a purpose.
+
+BEGIN FROM THE QUESTIONS, NOT THE TABLES
+  The single most useful habit: before drawing anything, write down the questions
+  the system must answer and the actions it must support. "Which books is this
+  member holding right now?" "How many copies of this title do we own?" "Who had
+  this book before it was returned damaged?" A design is good exactly to the
+  degree it answers ITS questions well. Tables you can't tie back to a real
+  question are usually tables that shouldn't exist.
+
+  >> CONTEMPLATE: imagine a tiny system for a coffee shop's loyalty cards. Before
+     reading on, write five questions it must answer and two actions it must
+     support. Keep the list - we test designs against lists like this.
+
+  >> PITFALL: starting by asking "what columns do I need?" That is level-3
+     thinking wearing a disguise. Start at level 1: what THINGS exist, and how do
+     they relate? Columns come later and almost fall out on their own.
+
+-------------------------------------------------------------------------------
+  PART 2 - THE THREE PRIMITIVES: ENTITIES, ATTRIBUTES, RELATIONSHIPS
+-------------------------------------------------------------------------------
+
+Almost every ER model is built from just three kinds of thing. Learn these three
+deeply and the rest of design is refinement. We take them major-to-minor.
+
+  2.1  ENTITIES - the "things"
+  ----------------------------
+  An entity is a thing your system needs to remember: a Member, a Book, an Order,
+  a Student, a Room. If you can point at it and say "we keep facts about that,"
+  it is a candidate entity. In speech, entities are usually the NOUNS.
+
+  Two words you must not confuse:
+    - ENTITY TYPE (or entity set): the KIND of thing - "Book". This becomes a
+      TABLE. When people say "entity" they usually mean this.
+    - ENTITY INSTANCE: one particular one - "Book #4417, 'Dune'". This becomes a
+      ROW in that table.
+  A table is the type; each row is an instance. Hold that distinction; a lot of
+  confusion later is really this confusion.
+
+  WHAT IS *NOT* AN ENTITY (yet)
+    - A mere property of something else ("a book's title") - that is an ATTRIBUTE,
+      not an entity of its own... usually. See the contemplation below; the line
+      moves.
+    - An action ("borrowing") - that is usually a RELATIONSHIP. But actions worth
+      remembering in detail often become entities too (a "Loan"). Judgement again.
+
+  >> CONTEMPLATE: is COLOUR an entity or an attribute? For a car-rental app,
+     colour is probably just an attribute of Car. For a paint manufacturer, Colour
+     is a full entity with a code, a formula, a supplier. Same word, different
+     model - because the PURPOSE differs. What decides it? Ask: do we keep facts
+     ABOUT the colour itself? If yes, it wants to be an entity.
+
+  KEY IDEA: entity type = table = a kind of thing; entity instance = row = one
+  specific thing. Entities are the nouns you keep facts about.
+
+  2.2  ATTRIBUTES - what we know about a thing
+  --------------------------------------------
+  An attribute is a fact stored about an entity: a Member's name, a Book's title,
+  a Student's birthdate. In tables, attributes become COLUMNS. Choosing good
+  attributes is choosing what your model notices about the world.
+
+  Attributes come in kinds worth naming, because each changes how you model it:
+
+    - ATOMIC (simple) vs COMPOSITE. Atomic means "one indivisible value" - a
+      price, a title. Composite means it is really several values wearing one
+      name - "address" is street + city + postcode. Composites usually get split
+      into separate columns, because you will want to search or sort by the parts.
+
+    - SINGLE-VALUED vs MULTI-VALUED. A person has one birthdate (single) but may
+      have many phone numbers (multi). This one matters enormously: a table cell
+      holds ONE value, so a multi-valued attribute CANNOT simply be a column. It
+      almost always signals a new entity or a link table. Remember this; it is the
+      seed of the most common design pattern of all (Part 5).
+
+    - STORED vs DERIVED. Some facts are stored directly (birthdate); others can be
+      COMPUTED from stored ones (age = today - birthdate). Derived facts are best
+      NOT stored - you recompute them when asked, so they can never drift out of
+      date. "Derive, don't store" is a rule you will meet again and again.
+
+    - KEY attributes - the ones that identify the thing. Important enough to get
+      their own part (Part 3).
+
+  >> CONTEMPLATE: "full name" - atomic or composite? If you will ever sort by
+     surname or greet someone by first name, it is composite: store the parts.
+     If you truly only ever print it whole, atomic is fine. The USE decides.
+
+  >> PITFALL: a column holding "555-1234, 555-9988" (two phone numbers jammed in
+     one cell). That is a multi-valued attribute in disguise, and it breaks the
+     first rule of tidy tables (Part 6). One value per cell, always.
+
+  2.3  RELATIONSHIPS - how the things connect
+  -------------------------------------------
+  A relationship is an association between entities: a Member BORROWS a Copy; a
+  Book HAS a Publisher; a Student ENROLS IN a Course. In speech, relationships are
+  the VERBS joining your nouns.
+
+  A relationship's DEGREE is how many entity types it joins:
+    - UNARY (recursive): an entity related to itself. An Employee MANAGES another
+      Employee; a Category is the PARENT OF another Category. This is how trees and
+      hierarchies are built, and it looks strange the first time - one box with a
+      line looping back to itself. (Part 5 returns to it; student-panel leans on
+      it heavily.)
+    - BINARY: two entity types - by far the most common. Member-Loan, Book-Author.
+    - TERNARY (and higher): three at once. "A Doctor prescribes a Drug to a
+      Patient" links three things in one fact. These are rarer and usually get
+      re-expressed as an entity in the middle (Part 5).
+
+  Relationships can carry attributes of their OWN. "Member borrows Copy" - but the
+  borrow DATE and the due DATE belong to neither the member nor the copy; they
+  belong to the borrowing itself. A relationship with its own facts is a strong
+  hint that the relationship wants to become an entity (an associative entity -
+  here, a "Loan"). Spotting this early saves redesigns later.
+
+  >> CONTEMPLATE: "A Student has a Grade in a Course." Whose fact is the grade?
+     Not the student alone (they have many), not the course alone (it gives many).
+     It belongs to the student-and-course PAIR. Where, then, must it be stored?
+
+  KEY IDEA: entities are nouns, attributes are their adjectives, relationships are
+  the verbs - and verbs can have facts of their own.
+
+  2.4  CARDINALITY - the most important question about any relationship
+  ---------------------------------------------------------------------
+  For every relationship you must answer: how many of each side relate to how
+  many of the other? This is CARDINALITY, and it decides the whole table layout.
+
+  Ask it in BOTH directions, one side at a time, in plain English:
+    "One member borrows how many copies?"  -> many.
+    "One copy is borrowed by how many members (at once)?" -> one.
+  That pair of answers ("many" / "one") makes this a ONE-TO-MANY relationship.
+
+  The three shapes you will meet, with a test question for each:
+    - ONE-TO-ONE (1:1). One country has one capital city; one capital belongs to
+      one country. Rare, and often a hint the two entities could be one - or are
+      split on purpose (optional or sensitive data kept apart).
+    - ONE-TO-MANY (1:N). One publisher prints many books; each book has one
+      publisher. The workhorse of database design; most links are these.
+    - MANY-TO-MANY (M:N). One student takes many courses; one course has many
+      students. These CANNOT be stored directly and always need a helper table -
+      the single most important pattern in Part 5.
+
+  PARTICIPATION (the "minimum" side of cardinality)
+    Cardinality has a maximum (one/many) AND a minimum (must there be at least
+    one, or is zero allowed?). "Must every loan have a book?" - yes, MANDATORY.
+    "Must every member have a loan?" - no, a new member has zero, OPTIONAL. The
+    minimum is what NULL and "optional" are really about, and it is where a design
+    says which situations are allowed to exist at all.
+
+  So each end of a relationship carries a (minimum, maximum) pair. Four little
+  symbols in the next part encode exactly these pairs. Get cardinality right and
+  the diagram almost draws itself; get it wrong and no amount of later cleverness
+  saves the design.
+
+  >> CONTEMPLATE: for your coffee-shop loyalty system - one card belongs to how
+     many customers? one customer holds how many cards? Is a customer allowed to
+     exist with zero cards? Your answers ARE the design of that link.
+
+-------------------------------------------------------------------------------
+  PART 3 - KEYS: HOW A DATABASE KNOWS "WHICH ONE"
+-------------------------------------------------------------------------------
+
+Two rows that look alike are a disaster waiting to happen. Keys are how a database
+tells things apart and how one table points reliably at a row in another. Identity
+is the quiet foundation everything else stands on.
+
+  CANDIDATE KEYS - any attribute (or set of attributes) whose value is unique for
+  every row and never empty could serve to identify the row. A member might have
+  several: their membership number, and perhaps their email. Each is a CANDIDATE.
+
+  PRIMARY KEY - you pick ONE candidate to be the official identifier. Every table
+  gets exactly one primary key; it is unique, never NULL, and ideally never
+  changes. Everything that points at this row will point using this value.
+
+  WHAT MAKES A GOOD PRIMARY KEY? It should be:
+    - UNIQUE (by definition), and guaranteed so, not just "probably".
+    - STABLE - it should never need to change. (This rules out a lot of tempting
+      choices, see below.)
+    - MINIMAL and MEANINGLESS is often best - the less real-world baggage it
+      carries, the less reason it will ever have to change.
+
+  >> CONTEMPLATE: should a person's name be the primary key? Names repeat (two
+     John Smiths), names change (marriage), names have no guaranteed format. Every
+     property of a good key is violated. So - almost never. What about email?
+     Unique-ish, but people change emails, and then everything pointing at them
+     breaks. This tension leads straight to the next idea.
+
+  NATURAL vs SURROGATE KEYS - a real design fork
+    A NATURAL key is a real-world value that already identifies the thing: an
+    ISBN for a book, a country code, a membership number printed on the card.
+    A SURROGATE key is a meaningless value the system invents purely to identify
+    the row: an auto-incrementing number (1, 2, 3...) or a random UUID like
+    3f2a...-.... It means nothing outside the database.
+
+    Trade-offs:
+      - Natural keys need no extra column and read meaningfully, BUT they change
+        (and then every reference must change too), and "guaranteed unique
+        forever" is rarer than it looks.
+      - Surrogate keys never change and are always clean, BUT they carry no
+        meaning, so you still keep the natural value as an ordinary (indexed,
+        unique) column for humans to search by.
+    Most modern designs use a surrogate primary key (auto-number or UUID) AND keep
+    the natural identifier as a separate UNIQUE column - best of both. student-panel
+    does exactly this: UUID primary keys, plus a human "student_code" kept unique.
+
+  COMPOSITE KEYS - sometimes identity takes more than one column. In a table that
+  records "student X is a member of group Y", the pair (student, group) together
+  is the identity - neither alone is unique. A key made of several columns is a
+  COMPOSITE key, and it is completely normal, especially in the link tables of
+  Part 5.
+
+  >> CONTEMPLATE: UUID vs a simple counting number for a primary key. The counter
+     is smaller and human-readable but reveals how many rows exist and collides if
+     you ever merge two databases. A UUID is bulky and ugly but unique across every
+     machine on earth and leaks nothing. Which fits a small library? Which fits an
+     app that might sync between devices? (This is a real student-panel choice.)
+
+  FOREIGN KEYS - how a relationship becomes real
+    A relationship in your head becomes, in tables, a FOREIGN KEY: a column in one
+    table that holds the primary-key value of a row in another table. The Loan
+    table has a book_id column whose value is the id of some row in Book. That
+    column is a foreign key; it POINTS. Following it is how the database re-joins
+    what your design split apart.
+
+    REFERENTIAL INTEGRITY is the promise the database enforces: a foreign key must
+    point at a row that actually exists (or be empty, if the link is optional). It
+    will refuse to store a loan for book #9999 if no such book exists, and it will
+    stop you deleting a book that still has loans - unless you tell it what should
+    happen instead. Those "what happens on delete" rules (cascade the delete,
+    set the link empty, or forbid the delete) are themselves design decisions
+    about what the world allows.
+
+  WHERE DOES THE FOREIGN KEY GO? A rule you can lean on:
+    - In a ONE-TO-MANY, the key goes on the MANY side. Each book has one publisher,
+      so book carries publisher_id - not the other way round. (Put it on the "one"
+      side and you would need many values in one cell, which we forbade.)
+    - In a ONE-TO-ONE, it can go on either side; put it where participation is
+      optional, or where it reads most naturally.
+    - In a MANY-TO-MANY, neither side can hold it - which forces the helper table
+      of Part 5, and the foreign keys live THERE.
+
+  KEY IDEA: a primary key is a row's name; a foreign key is another row saying
+  that name to point at it. Relationships are just keys pointing at keys.
+
+-------------------------------------------------------------------------------
+  PART 4 - READING AND DRAWING ER DIAGRAMS
+-------------------------------------------------------------------------------
+
+A picture lets you see a whole design at once and spot what is wrong. There are a
+couple of notations; we use the CROW'S FOOT style, because it is the most common
+today and it is what your student-panel diagram uses.
+
+  THE PIECES
+    - Each ENTITY is a box. Inside, one line per attribute (many tools also tag
+      the key attributes). The box is the table.
+    - A RELATIONSHIP is a LINE between two boxes.
+    - The ENDS of the line carry the cardinality - read each end as the (minimum,
+      maximum) pair from Part 2.4. Three little symbols say it all:
+         a single bar   |    means "one"          (the maximum is one)
+         a crow's foot  <    means "many"          (the maximum is many)
+         a circle       o    means "zero/optional" (the minimum is zero)
+      Combine the inner (min) and outer (max) symbol at each end:
+         |o  = "zero or one"      (optional, at most one)
+         ||  = "exactly one"      (mandatory, exactly one)
+         o<  = "zero or many"     (optional, many)
+         |<  = "one or many"      (mandatory, at least one)
+
+  READING A LINE
+    You read a crow's-foot line from each side toward the other. For
+       Publisher ||--o< Book
+    read left-to-right: "one publisher has zero-or-many books," and right-to-left:
+    "each book has exactly one publisher." Both sentences must be TRUE of the real
+    world - saying them aloud is the best test of your own diagram.
+
+  THE COMMON SHAPES, DRAWN
+    1:1   Country ||--|| Capital        one and only one each way
+    1:N   Publisher ||--o< Book          one publisher, many books
+    M:N   Student >o--o< Course          many each way - needs a helper (Part 5)
+    optional 1:N  Member ||--o< Loan, but Loan ||--|| Copy: a member may have no
+          loans (o), yet every loan must have exactly one copy (||). The little
+          circle vs bar near the box is where "is this allowed to be empty?" lives.
+
+  A TINY WORKED DIAGRAM (in text)
+    Author ||--o< Book           one author writes many books; each book, one author
+    Book   ||--o< Copy           a title has many physical copies; each copy, one title
+    Read those four sentences aloud. If any is false for a real library (maybe a
+    book has several authors?), the diagram is wrong and must change - better to
+    find it now, on paper, than after building.
+
+  ANOTHER NOTATION YOU'LL SEE (Chen)
+    The older Chen notation draws relationships as DIAMONDS between the boxes, with
+    numbers (1, N, M) on the lines, and attributes as ovals. It is common in
+    textbooks. You don't need to draw it, only to recognise it: a diamond labelled
+    "borrows" between Member and Copy is the same idea as a crow's-foot line.
+
+  TRY IT: on your blank sheet, draw Customer, Order, and Product as three boxes.
+    A customer places many orders; each order belongs to one customer. An order
+    contains many products, and a product appears on many orders. Draw the lines,
+    put the right symbols on the ends, and say all four sentences aloud. You will
+    find one line you cannot draw cleanly - hold that feeling; Part 5 is its cure.
+
+-------------------------------------------------------------------------------
+  PART 5 - THE PATTERNS BEGINNERS TRIP ON
+-------------------------------------------------------------------------------
+
+Everything so far handles the easy links. A handful of situations need a specific
+move each. Learn these five and very little in real design will surprise you.
+
+  5.1  MANY-TO-MANY NEEDS A BRIDGE TABLE  (the big one)
+  ----------------------------------------------------
+  A student takes many courses; a course holds many students. Try to store this
+  with a foreign key and you fail both ways: you cannot list many course-ids in a
+  student's single cell, nor many student-ids in a course's. A table cell holds
+  one value - so a direct many-to-many is impossible.
+
+  The cure: invent a THIRD table that holds one row per pairing. Call it Enrolment.
+  Each row has one student_id and one course_id - two foreign keys - and together
+  they identify the row (a composite key, Part 3). Now:
+       Student ||--o< Enrolment >o--|| Course
+  The impossible M:N has become two easy 1:N links through a table in the middle.
+  This helper is called a BRIDGE, JUNCTION, LINK, or ASSOCIATIVE table - same thing.
+
+  THE BONUS: this bridge is the natural home for facts about the PAIRING itself -
+  the enrolment date, the final grade, whether it was dropped. Remember from Part
+  2.3 that a relationship can have its own attributes; the bridge is WHERE they
+  live. When a relationship earns its own facts, it has quietly become an entity.
+
+  >> CONTEMPLATE: your Customer-Order-Product sketch from Part 4. Order-to-Product
+     is many-to-many. What is the bridge? (It is the order LINE: one row per "this
+     order, this product, this quantity, this price".) Notice the bridge holds
+     facts - quantity, price - that belong to neither the order nor the product
+     alone. That is the tell that it deserved to exist.
+
+  5.2  ONE-TO-ONE: usually a question, sometimes a choice
+  -------------------------------------------------------
+  A true 1:1 is uncommon. When you find one, ask first: should these be one
+  entity? A Person and their Passport-details might just be more columns on Person.
+  But 1:1 splits are made ON PURPOSE when: the extra data is rarely present (keep
+  it out of the main table so most rows stay lean), or it is sensitive and kept
+  separate for access control, or it is huge (a profile photo) and you don't want
+  to drag it along every time you read the main row. So 1:1 = "merge, unless you
+  have a reason to split" - and know your reason.
+
+  5.3  SELF-REFERENCING RELATIONSHIPS: trees and hierarchies
+  ----------------------------------------------------------
+  Sometimes an entity relates to OTHERS OF ITS OWN KIND. An employee has a manager
+  who is another employee. A category has a parent category. A comment replies to
+  another comment. You model this with a foreign key that points back into the
+  SAME table: employee.manager_id points at another employee.id.
+
+  This builds a TREE: a top row whose parent is empty (NULL - the root), rows
+  beneath it, rows beneath those, to any depth. It is how you store "folders inside
+  folders" shapes with no fixed number of levels. student-panel uses this twice -
+  student groups can nest inside groups, and parameters inside parameters - so it
+  is worth getting comfortable with now.
+
+  >> CONTEMPLATE: why can't you just make columns parent, grandparent,
+     great-grandparent? Because you would have to guess the maximum depth forever,
+     and most rows would leave them empty. A single self-pointing parent_id handles
+     ANY depth with one column. Recursion beats a fixed guess. (Asking "give me the
+     whole branch under this node" then needs a special looping query - a real cost
+     of this elegant trick, and a fair thing to weigh.)
+
+  5.4  WEAK / DEPENDENT ENTITIES
+  ------------------------------
+  Some things cannot exist on their own. An order-line has no meaning without its
+  order; a room has no meaning without its building. These are WEAK entities: they
+  depend on a "parent" (the strong entity) for their very existence, and often for
+  part of their identity too (order-line #3 only makes sense as "line 3 OF order
+  #88"). In practice you model a weak entity as its own table with a mandatory
+  foreign key to its parent, and usually an ON-DELETE rule that removes the
+  children when the parent goes (the lines die with their order). The design
+  question a weak entity answers is "can this ever stand alone?" - and the answer
+  shapes both its key and its delete behaviour.
+
+  5.5  TERNARY RELATIONSHIPS: prefer an entity in the middle
+  ----------------------------------------------------------
+  "A supplier supplies a part to a project" links three entities in one fact. You
+  CAN draw a three-way relationship, but it is hard to read and harder to add facts
+  to. The usual move is the same as for many-to-many: create an entity in the
+  middle - a "Supply" row with three foreign keys (supplier, part, project) plus
+  its own facts (quantity, price, date). Almost every messy multi-way relationship
+  becomes clean once you let the relationship itself become a table.
+
+  KEY IDEA: whenever a link is many-to-many, self-referencing, or carries its own
+  facts, the answer is almost always the same shape - a table in the middle whose
+  rows are the pairings (or triplings), holding foreign keys and any facts of their
+  own. Learn that one move and most "hard" designs become routine.
+
+-------------------------------------------------------------------------------
+  PART 6 - NORMALISATION: PUTTING EACH FACT IN ONE PLACE
+-------------------------------------------------------------------------------
+
+Normalisation sounds intimidating and is actually one idea repeated: organise
+your tables so that each fact is stored exactly once. Everything below is that
+idea, made progressively stricter.
+
+  THE DISEASE: redundancy and its "anomalies"
+    Picture one wide table, one row per loan, repeating the member's name, phone,
+    and address on every single loan they ever make:
+
+      loan_id | member_name | member_phone | book_title | due_date
+      --------+-------------+--------------+------------+---------
+      1       | Sara Adib   | 555-1020     | Dune       | ...
+      2       | Sara Adib   | 555-1020     | Emma       | ...
+
+    Three illnesses follow, and they are worth naming because you will feel them:
+      - UPDATE ANOMALY: Sara changes her phone. You must edit every one of her
+        rows; miss one and the database now says two different phones are hers.
+      - INSERT ANOMALY: you want to record a new member who hasn't borrowed
+        anything yet - but the table is about loans, so there is nowhere to put
+        her. Her existence depends on an unrelated fact.
+      - DELETE ANOMALY: a member returns their only book and you delete that loan -
+        and accidentally erase the only record that the member (and her phone)
+        ever existed.
+    All three come from ONE mistake: two different KINDS of fact (facts about the
+    member, facts about the loan) crammed into one table. The cure is to split
+    them so each kind of fact lives in its own table, linked by a key.
+
+  THE CURE, IN STEPS (the "normal forms")
+    Each form fixes one kind of muddle. You mostly aim for the third.
+
+    FIRST NORMAL FORM (1NF) - atomic values, no repeating groups.
+      Every cell holds ONE value, and no row has "columns" like phone1, phone2,
+      phone3. If a thing has many values, it belongs in its own rows/table (the
+      multi-valued attribute of Part 2.2, and the bridge of Part 5). Tidy cells.
+
+    SECOND NORMAL FORM (2NF) - no partial dependency on part of a composite key.
+      Only bites when your key is composite. In an Enrolment keyed by (student,
+      course), the student's NAME depends on the student alone - only part of the
+      key - so it does not belong here; it belongs in Student. Every non-key fact
+      must depend on the WHOLE key, not half of it.
+
+    THIRD NORMAL FORM (3NF) - no transitive dependency.
+      A non-key column must depend on the key, not on ANOTHER non-key column. If a
+      Book table stores publisher_id AND publisher_address, the address really
+      depends on the publisher, not on the book - so it belongs in a Publisher
+      table. Facts about a publisher live with the publisher.
+
+    (There is a stricter cousin, BCNF, and higher forms for rare cases. For almost
+    all real work, "clean to 3NF" is the target and the rest is specialist.)
+
+    THE MNEMONIC: every non-key fact must depend on "the key, the whole key, and
+    nothing but the key." That single line is 1NF-2NF-3NF in a sentence.
+
+  WHEN TO STOP - and even step back
+    Normalisation splits data into more, smaller tables. That is good for
+    correctness but means more links to re-join when you ask questions, which can
+    be slower. Sometimes, deliberately and knowingly, designers DENORMALISE - keep
+    a little redundancy - for speed on read-heavy systems. Do it consciously, never
+    by accident, and never before you have a measured reason. Correct first; fast
+    later, only if needed.
+
+  >> CONTEMPLATE: go back to the loan table above and split it into clean tables.
+     How many do you get, and what is the key and the foreign key of each? (You
+     should reach Member, Book, and Loan - the bridge - with Loan carrying member_id
+     and book_id. You just normalised a design by yourself.)
+
+-------------------------------------------------------------------------------
+  PART 7 - THE METHOD: A REPEATABLE RECIPE
+-------------------------------------------------------------------------------
+
+Now that you own the pieces, here is the order to use them. Follow it top to
+bottom the first few times; later it becomes instinct. Notice it moves from ideas
+(steps 1-4) to tables (steps 8-9), exactly the level-1-to-level-2 descent of Part 1.
+
+  STEP 1  STATE THE PURPOSE. Write, in sentences, what the system is for, who uses
+          it, and - crucially - the QUESTIONS it must answer and ACTIONS it must
+          support (Part 1). This list is your ruler for everything after.
+
+  STEP 2  FIND THE ENTITIES. Underline the NOUNS in your sentences. Group synonyms,
+          drop the ones you keep no facts about. What's left are your candidate
+          entity types (tables-to-be).
+
+  STEP 3  FIND THE ATTRIBUTES. For each entity, list what you know about it. Mark
+          which are composite (split them), which are multi-valued (they will
+          become their own table), and which are derived (don't store them).
+
+  STEP 4  FIND THE RELATIONSHIPS. Underline the VERBS joining nouns. For each, ask
+          cardinality in BOTH directions and its participation (min/max, Part 2.4).
+          Say each relationship aloud as two sentences and check both are true.
+
+  STEP 5  CHOOSE KEYS. Give each entity a primary key (usually a surrogate; keep
+          natural identifiers as unique columns). Note where composite keys arise.
+
+  STEP 6  DRAW IT. Put the entities in boxes, draw the relationship lines, mark the
+          crow's-foot ends. Now you can SEE the whole model and critique it.
+
+  STEP 7  RESOLVE THE HARD PATTERNS. Turn every many-to-many into a bridge table;
+          handle self-references, weak entities, and ternaries (Part 5). Move each
+          relationship's own facts onto its bridge.
+
+  STEP 8  NORMALISE. Check each table to 3NF: "the key, the whole key, and nothing
+          but the key" (Part 6). Split out any fact that is in the wrong place.
+
+  STEP 9  MAP TO TABLES. Apply the mapping rules below to write the final table
+          list: names, columns, types, primary keys, foreign keys, and delete rules.
+
+  STEP 10 REVIEW AGAINST STEP 1. Walk every question and action from your purpose
+          list through the design. Can each be answered? Iterate. First drafts are
+          never final - good designs are rewritten, not born.
+
+  THE MAPPING RULES (ER model -> tables), collected in one place
+    - Each ENTITY becomes a TABLE; each of its atomic attributes becomes a COLUMN.
+    - Each entity's PRIMARY KEY becomes the table's primary key.
+    - A ONE-TO-MANY relationship becomes a FOREIGN KEY column on the MANY side,
+      pointing at the one side's primary key.
+    - A ONE-TO-ONE becomes a foreign key on either side (put it on the optional
+      side), often with a UNIQUE rule so it stays one-to-one.
+    - A MANY-TO-MANY becomes a NEW bridge table whose primary key is the pair of
+      foreign keys (plus any facts about the pairing).
+    - A MULTI-VALUED attribute becomes its own table, one row per value, linked by
+      a foreign key back to the owner.
+    - A SELF-REFERENCE becomes a foreign key column pointing back into the same
+      table (parent_id), NULL at the root.
+    - For each foreign key, decide the ON-DELETE rule: cascade (children die with
+      the parent), set-null (link clears, child survives), or restrict (forbid
+      deleting while children exist). This encodes what the world allows.
+
+  KEY IDEA: the recipe never changes - purpose, entities, attributes, relationships,
+  keys, draw, resolve patterns, normalise, map, review. Memorise the ten steps and
+  you can design anything, because you will always know what to do next.
+
+-------------------------------------------------------------------------------
+  PART 8 - A COMPLETE WORKED EXAMPLE: A SMALL COMMUNITY LIBRARY
+-------------------------------------------------------------------------------
+
+Let us run the whole recipe once, start to finish, on something small. Read it
+with your own sheet and try each step before reading my version.
+
+  STEP 1 - PURPOSE. A small library lends books to members. It must answer:
+    "which books does this member have out now?", "is any copy of this title
+    available?", "who is overdue?", "how many times has this title been borrowed?"
+    Actions: register a member, lend a copy, take a return.
+
+  STEP 2 - ENTITIES (nouns underlined in the purpose): MEMBER, BOOK (the title/work),
+    COPY (a physical volume - a title can have several), and - foreseeing a verb
+    with its own facts - LOAN. Four entities.
+
+  STEP 3 - ATTRIBUTES.
+    MEMBER: id, full name (composite - store given/family), email (unique),
+            joined_on. (Age? derived from nothing stored - skip; we don't need it.)
+    BOOK:   id, title, author, isbn (natural, unique). (One author, to stay small;
+            note the simplification - a real library would make Author an entity.)
+    COPY:   id, the book it is a copy of (link), shelf code, acquired_on.
+    LOAN:   id, which copy, which member, borrowed_on, due_on, returned_on (NULL
+            until returned - its emptiness MEANS "still out").
+
+  STEP 4 - RELATIONSHIPS and their cardinality (say each aloud, both ways):
+    BOOK ||--o< COPY      one title has many copies; each copy is of one title.
+    MEMBER ||--o< LOAN     a member may have many loans (and zero); each loan, one
+                           member.
+    COPY ||--o< LOAN       a copy has many loans over time; each loan, one copy.
+    Notice LOAN sits at the "many" end of two 1:N links - it is the bridge between
+    MEMBER and COPY, and it carries its own facts (the dates). It earned its place.
+
+  STEP 5 - KEYS. Surrogate id on each table (member_id, book_id, copy_id, loan_id).
+    Keep email UNIQUE on member and isbn UNIQUE on book as natural identifiers.
+
+  STEP 6 - DRAW IT (in text):
+       Member ||---o< Loan >o---|| Copy >o---|| Book
+    Read the chain: a member has zero-or-many loans; each loan has exactly one
+    copy; a copy has zero-or-many loans and belongs to exactly one book; a book has
+    zero-or-many copies. Every sentence is true of a real library - the design holds.
+
+  STEP 7 - HARD PATTERNS. The Member-Copy many-to-many (a member borrows many
+    copies over time; a copy is borrowed by many members) is already resolved: LOAN
+    is its bridge, and it holds the pairing's own facts (the dates). Nothing else to
+    resolve - no self-reference, no ternary here.
+
+  STEP 8 - NORMALISE. Check "the key, the whole key, nothing but the key":
+    Loan holds copy_id, member_id, and dates - all facts about THAT loan: good.
+    The member's name is NOT on Loan (it depends on the member, not the loan): good.
+    The book's title is NOT on Copy (it depends on the book): good. We are at 3NF.
+
+  STEP 9 - THE FINAL TABLES:
+    member(member_id PK, given_name, family_name, email UNIQUE, joined_on)
+    book(book_id PK, title, author, isbn UNIQUE)
+    copy(copy_id PK, book_id FK->book, shelf_code, acquired_on)
+    loan(loan_id PK, copy_id FK->copy, member_id FK->member,
+         borrowed_on, due_on, returned_on NULL)
+
+  STEP 10 - REVIEW against Step 1's questions:
+    "Books this member has out now?" loans where member_id = ? and returned_on is
+      NULL, joined to copy and book. Answerable.
+    "Is a copy of this title available?" copies of the book with no open loan.
+      Answerable. "Who is overdue?" open loans with due_on in the past. Answerable.
+    "How many times borrowed?" count loans joined to this book. Answerable. It
+    passes - and every table traces back to a real question. That is a finished
+    small design, built by the recipe. student-panel is this same method, larger.
+
+-------------------------------------------------------------------------------
+  PART 9 - DESIGN JUDGEMENT: THE DECISIONS WITH NO SINGLE RIGHT ANSWER
+-------------------------------------------------------------------------------
+
+The recipe gives you a correct design. Judgement makes it a GOOD one. These are the
+recurring trade-offs - the "what could we do differently, and should this exist at
+all?" layer. None has one universal answer; each has a question to ask yourself.
+
+  DERIVE vs STORE. If a fact can be computed from others (a total, an age, a count),
+    prefer to compute it when asked, so it can never fall out of step. Store it only
+    when computing it is genuinely too slow AND you accept the duty to keep it
+    fresh. Ask: "can this contradict the facts it is derived from?" If yes, don't
+    store it.
+
+  WHAT NULL MEANS. An empty (NULL) value is not zero and not "" - it is "unknown or
+    not-applicable." Before you allow a column to be empty, decide what its
+    emptiness will MEAN (loan.returned_on being NULL means "still out"). A NULL you
+    can't explain in words is a design you haven't finished thinking about.
+
+  SOFT vs HARD DELETE. Deleting a row really removes it (hard). Sometimes you instead
+    mark it "deleted_at = now" and hide it (soft delete), so history and references
+    survive and mistakes are recoverable. Soft delete keeps the past but complicates
+    every query ("...and not deleted"). Ask: "will anyone ever need to know this
+    existed?" student-panel soft-deletes students and archives parameters for exactly
+    this reason.
+
+  A FLEXIBLE (JSON) COLUMN vs PROPER COLUMNS. Most engines let one column hold a
+    free-form bag of data (JSON). It is tempting for "extra, varies-per-row" fields.
+    But data in there can't be checked, keyed, or easily searched by the database.
+    Rule of thumb: facts you will filter, sort, or enforce deserve real columns;
+    only genuinely open-ended extras belong in a flexible column. Reach for it
+    rarely and on purpose.
+
+  NAMING. Consistent, boring names are a feature: singular-or-plural table names
+    (pick one), id for the primary key, thing_id for a foreign key, lower_snake_case
+    throughout. Future-you reads the schema far more often than you write it.
+
+  KEY IDEA: correctness is teachable in ten steps; judgement grows by making these
+    calls, stating your reason, and later seeing how it played out. That is exactly
+    what our compare-against-the-reference loop is for.
+
+-------------------------------------------------------------------------------
+  PART 10 - PRACTICE (do these before we meet again)
+-------------------------------------------------------------------------------
+
+Reading built the vocabulary; only designing builds the skill. Take a blank sheet
+and run the full ten-step recipe on ONE of these. Don't aim for perfect - aim for
+reasons you can defend.
+
+  DESIGN-FROM-SCRATCH (pick one):
+    A. A gym: members, membership plans, classes, and which members booked which
+       class sessions. (Watch for a many-to-many and a bridge that carries a
+       "booked_on" date.)
+    B. A recipe app: recipes, ingredients, and how much of each ingredient a recipe
+       uses. (The quantity is a fact about the recipe-and-ingredient PAIR - where
+       does it go?)
+    C. A simple ticketing system: customers, tickets, and replies on a ticket.
+       (Look for a weak entity and a possible self-reference among replies.)
+
+  CRITIQUE-A-DESIGN:
+    D. Someone models a school as ONE table:
+         (student_name, class1, class2, class3, teacher_name, teacher_phone)
+       Name every problem you can using Parts 2, 5, and 6 - the repeating class
+       columns, the multi-valued smell, the teacher facts in the wrong place - then
+       redraw it properly. Write WHY each change removes an anomaly.
+
+  FOR EACH, KEEP: your purpose sentences and question list, your ER sketch with
+  crow's-foot ends, your final tables with keys, and - most valuable - a note of any
+  decision you were UNSURE about. Those uncertainties are precisely what we'll talk
+  through together.
+
+  WHERE THIS LEADS
+    Once this method is yours, we point it straight at your real goal: we will run
+    these same ten steps to RE-DERIVE the student-panel schema from a blank page,
+    and watch it arrive (mostly) at the reference design - with every difference a
+    conversation. After that, your questions from the read-through will have a
+    frame to land in. No rush. Bring your sheets.
+
+-------------------------------------------------------------------------------
+  GLOSSARY - quick reference
+-------------------------------------------------------------------------------
+  ENTITY (TYPE)     a kind of thing you keep facts about; becomes a TABLE.
+  ENTITY INSTANCE   one specific such thing; becomes a ROW.
+  ATTRIBUTE         a fact about an entity; becomes a COLUMN.
+    atomic          holds one indivisible value.
+    composite       really several values (address -> street, city, postcode).
+    multi-valued    has many values at once -> needs its own rows/table.
+    derived         computable from other facts -> prefer not to store.
+  RELATIONSHIP      an association between entities; the VERB. Degree = how many
+                    entity types it joins (unary/binary/ternary).
+  CARDINALITY       how many relate to how many: 1:1, 1:N, M:N (the maximum side).
+  PARTICIPATION     the minimum side: is zero allowed (optional) or required
+                    (mandatory)?
+  CANDIDATE KEY     any attribute set that uniquely identifies a row.
+  PRIMARY KEY       the one candidate chosen as the official identifier; unique,
+                    never empty, ideally never changing.
+  NATURAL KEY       a real-world identifier (ISBN, email).
+  SURROGATE KEY     a meaningless invented identifier (auto-number, UUID).
+  COMPOSITE KEY     a key made of more than one column.
+  FOREIGN KEY       a column holding another table's primary-key value; a pointer.
+  REFERENTIAL       the database's guarantee that a foreign key points at a real
+    INTEGRITY       row (or is empty, if optional).
+  BRIDGE / JUNCTION /  a table in the middle that resolves a many-to-many into two
+    ASSOCIATIVE table    one-to-manys; holds the pairing's own facts.
+  WEAK ENTITY       a thing that cannot exist without its parent (order-line).
+  SELF-REFERENCE    a foreign key pointing back into the same table (parent_id);
+                    builds trees/hierarchies of any depth.
+  NORMALISATION     organising tables so each fact lives in exactly one place.
+    1NF             atomic cells, no repeating columns.
+    2NF             no non-key fact depends on only PART of a composite key.
+    3NF             no non-key fact depends on another non-key fact.
+  ANOMALY           an update/insert/delete problem caused by redundancy.
+  DENORMALISE       deliberately keep some redundancy for read speed (with care).
+  SOFT DELETE       mark a row deleted (deleted_at) instead of removing it.
+  NULL              "unknown or not-applicable" - decide what each NULL MEANS.
+  CONCEPTUAL /      the three design heights: ideas -> tables -> real storage.
+    LOGICAL / PHYSICAL
+
+===============================================================================
+  END. Next: bring your practice sheets; we re-derive student-panel with this
+  same ten-step method, then your questions.
+===============================================================================

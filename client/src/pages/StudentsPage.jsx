@@ -4,6 +4,7 @@ import { listStudents } from '../api/students.js';
 import { listFieldDefinitions } from '../api/fields.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import ExportButton from '../components/ExportButton.jsx';
+import ExportLink from '../components/ExportLink.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
 import StudentForm from '../components/StudentForm.jsx';
 import StudentsTable from '../components/StudentsTable.jsx';
@@ -87,6 +88,11 @@ function StudentsPage() {
               }}
             />
           )}
+          <ExportLink
+            prefill={{
+              students: groupId ? { mode: 'group', groupId } : undefined,
+            }}
+          />
         </div>
         <StudentsTable
           search={search}

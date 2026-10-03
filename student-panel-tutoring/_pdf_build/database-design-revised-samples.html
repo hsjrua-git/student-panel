@@ -1,0 +1,1816 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Database Design — Samples (Revised)</title>
+<style>
+@page { size: A4; margin: 16mm 15mm 18mm; }
+
+:root { --ink:#1c2230; --muted:#5b6475; --accent:#2f5bdb; --rule:#d9dee8;
+        --code-bg:#f4f6fa; --quote-bg:#eef3fb; --quote-bar:#2f5bdb;
+        --th-bg:#eef1f7; --zebra:#f7f9fc; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  font-family: Georgia, "DejaVu Serif", "Times New Roman", serif;
+  color: var(--ink); font-size: 11pt; line-height: 1.55;
+  margin: 0; padding: 0;
+}
+.doc { max-width: 100%; }
+h1, h2, h3, h4 {
+  font-family: "Helvetica Neue", Arial, "DejaVu Sans", sans-serif;
+  color: #16203a; line-height: 1.25; font-weight: 700;
+  margin: 1.4em 0 0.5em; page-break-after: avoid;
+}
+h1 { font-size: 22pt; margin-top: 0; padding-bottom: .25em;
+     border-bottom: 3px solid var(--accent); }
+h2 { font-size: 15.5pt; margin-top: 1.6em; padding-bottom: .18em;
+     border-bottom: 1px solid var(--rule); }
+h3 { font-size: 12.5pt; color: #26324e; }
+h4 { font-size: 11pt; color: var(--muted); text-transform: uppercase;
+     letter-spacing: .04em; }
+p { margin: .55em 0; }
+em { color: #2a3550; }
+strong { color: #14213d; }
+a { color: #28459c; text-decoration: none; }
+ul, ol { margin: .5em 0 .7em; padding-left: 1.5em; }
+li { margin: .22em 0; }
+li > ul, li > ol { margin: .2em 0; }
+hr { border: none; border-top: 1px solid var(--rule); margin: 1.8em 0; }
+code {
+  font-family: "DejaVu Sans Mono", "Courier New", monospace;
+  font-size: 9pt; background: var(--code-bg); color: #233; padding: .08em .35em;
+  border-radius: 3px; border: 1px solid #e5e9f2;
+}
+pre {
+  background: var(--code-bg); border: 1px solid #e1e6f0; border-left: 4px solid var(--accent);
+  border-radius: 6px; padding: .7em .9em; overflow: hidden;
+  white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; margin: .8em 0;
+}
+pre code { background: none; border: none; padding: 0; font-size: 8.7pt; line-height: 1.45; }
+blockquote {
+  background: var(--quote-bg); border-left: 4px solid var(--quote-bar);
+  margin: 1em 0; padding: .6em 1em; border-radius: 0 6px 6px 0; color: #223;
+}
+blockquote p:first-child { margin-top: 0; }
+blockquote p:last-child { margin-bottom: 0; }
+table {
+  border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 9.6pt;
+  page-break-inside: avoid; font-family: "Helvetica Neue", Arial, "DejaVu Sans", sans-serif;
+}
+th, td { border: 1px solid var(--rule); padding: .4em .6em; text-align: left; vertical-align: top; }
+th { background: var(--th-bg); color: #1a2744; font-weight: 700; }
+tbody tr:nth-child(even) { background: var(--zebra); }
+td code, th code { font-size: 8.6pt; }
+.mermaid { text-align: center; margin: 1.1em 0; page-break-inside: avoid; }
+.mermaid svg { max-width: 100%; height: auto; }
+
+</style></head>
+<body><div class="doc"><!--
+  FORMAT NOTE
+  This file is Markdown. The boxes marked ```mermaid are crow's-foot ER
+  diagrams written in Mermaid's erDiagram syntax; a Markdown viewer (or the
+  model you hand this to) renders them as real diagrams. The tables with | pipes
+  render as grids of sample rows. When you convert this to PDF, keep a renderer
+  that understands Mermaid so the diagrams appear as pictures, not code.
+-->
+
+<h1>Database Design — Samples (Revised): Tables and ER Diagrams</h1>
+<h2>About this edition</h2>
+<p>This is the corrected companion to the revised lesson. It is the "picture book":
+every idea is shown as a <strong>real table with sample rows</strong> and as a <strong>crow's-foot
+diagram</strong>. It faithfully follows the uploaded samples file (which I could read in
+full) and folds in the Task-2 corrections. Anything I changed or added is marked
+<strong>[correction]</strong> so you can see exactly what moved.</p>
+<p>Corrections applied here: <strong>C1</strong> a note that INTEGER ids and UUIDs are two kinds
+of the same surrogate-key idea; <strong>C2</strong> the prescription ternary now decides
+whether its natural triple is UNIQUE; <strong>C3</strong> clear "pick the pair-key vs a
+surrogate-id bridge when…" guidance; <strong>C4</strong> every good original addition kept
+(frozen fact, reserved words, crow's-foot mirroring); <strong>C5</strong> the two ten-step
+methods replaced by one pointer to the merged routine in the revised lesson.</p>
+<p>The sample rows here are the <strong>same rows</strong> used in the revised lesson, so the two
+files tell one connected story: the same members, books, copies, loans, groups,
+students, orders and products appear in both.</p>
+<h2>How to read the ER diagrams (crow's-foot in one box)</h2>
+<p>Each line between two boxes has a symbol at <strong>each end</strong>. Read the symbol at the
+<em>far</em> end to learn "how many of that thing."</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>\|\|</code></td>
+<td>exactly one</td>
+</tr>
+<tr>
+<td><code>o\|</code></td>
+<td>zero or one (optional)</td>
+</tr>
+<tr>
+<td><code>\|{</code></td>
+<td>one or many</td>
+</tr>
+<tr>
+<td><code>o{</code></td>
+<td>zero or many (optional, many)</td>
+</tr>
+</tbody>
+</table>
+<p>In Mermaid the two ends are written together, e.g. <code>||--o{</code>:</p>
+<ul>
+<li><code>A ||--o{ B</code> → one A has zero-or-many B; each B has exactly one A.</li>
+<li><code>A ||--|{ B</code> → one A has one-or-many B; each B has exactly one A.</li>
+<li><code>A }o--o{ B</code> → many-to-many (both optional).</li>
+<li><code>A ||--|| B</code> → one-to-one.</li>
+</ul>
+<p>A tiny gallery you can read back as sentences:</p>
+<pre class="mermaid">erDiagram
+    GROUP  ||--o{ STUDENT  : &quot;has&quot;
+    BOOK   ||--|{ COPY     : &quot;has copies&quot;
+    PERSON ||--o| PASSPORT : &quot;holds&quot;
+    STUDENT }o--o{ COURSE  : &quot;takes&quot;</pre>
+<table>
+<thead>
+<tr>
+<th>Line</th>
+<th>Sentence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GROUP ||--o{ STUDENT</code></td>
+<td>one group has zero-or-many students; each student has exactly one group</td>
+</tr>
+<tr>
+<td><code>BOOK ||--|{ COPY</code></td>
+<td>one book has one-or-many copies; each copy is of exactly one book</td>
+</tr>
+<tr>
+<td><code>PERSON ||--o| PASSPORT</code></td>
+<td>one person holds zero-or-one passport; each passport is of one person</td>
+</tr>
+<tr>
+<td><code>STUDENT }o--o{ COURSE</code></td>
+<td>many-to-many — resolve it with a bridge (Lesson 7)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>[correction] Mirroring note.</strong> The symbols are <em>mirrored</em> on the two ends.
+<code>o{</code> on the right end and <code>}o</code> on the left end mean the same thing (zero-or-many);
+you read whichever one is nearest the box you are asking about.</p>
+<h2>A note on id style (read once)</h2>
+<p><strong>[correction C1]</strong> Every sample below uses small INTEGER ids (1, 2, 3) because
+they are easy to read while learning. student-panel instead uses a <strong>UUID</strong> (a
+long random id) as the primary key, plus a short unique human code (e.g.
+<code>student_code</code>). These are <strong>the same idea</strong> — a surrogate key the system
+invents — in two costumes. When you see <code>member_id = 1</code> here and a long random id
+in student-panel, that is not a conflict; it is the same decision made two ways.</p>
+<p>The same <code>student</code> row in both costumes, so you can see they are the same design:</p>
+<table>
+<thead>
+<tr>
+<th>costume</th>
+<th>id column</th>
+<th>sample value</th>
+<th>human code kept UNIQUE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>INT (here)</td>
+<td>student_id</td>
+<td>1</td>
+<td>STU-0001</td>
+</tr>
+<tr>
+<td>UUID (student-panel)</td>
+<td>id</td>
+<td>7f3a1c2e-9b55-4a0e-8d21-0c2b9c2b7a10</td>
+<td>STU-0001</td>
+</tr>
+</tbody>
+</table>
+<h2>A note on reserved words</h2>
+<p><strong>[correction C4, kept]</strong> Some words are reserved in SQL — <code>order</code>, <code>group</code>,
+<code>user</code> are the common traps. Name tables safely (<code>orders</code>, <code>groups</code>, <code>app_user</code>)
+so the database does not mis-read your table name as a command. student-panel
+(Postgres) does exactly this.</p>
+<table>
+<thead>
+<tr>
+<th>Reserved word</th>
+<th>Safe table name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order</code></td>
+<td><code>orders</code></td>
+</tr>
+<tr>
+<td><code>group</code></td>
+<td><code>groups</code></td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td><code>app_user</code></td>
+</tr>
+</tbody>
+</table>
+<p>That is why the many-to-many lesson below uses <code>orders</code>, not <code>order</code>.</p>
+<hr />
+<h2>Lesson 1 — Entity vs attribute</h2>
+<p>An <strong>entity</strong> is a kind of thing worth its own table. An <strong>attribute</strong> is a
+property of it (a column). Test: does it have its <em>own</em> facts that others point
+at? → entity. Is it just a value <em>of</em> something? → attribute.</p>
+<p><code>member</code> table (sample rows):</p>
+<table>
+<thead>
+<tr>
+<th>member_id</th>
+<th>full_name</th>
+<th>email</th>
+<th>joined_on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada Lovelace</td>
+<td>ada@example.com</td>
+<td>2024-01-10</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Alan Turing</td>
+<td>alan@example.com</td>
+<td>2024-02-02</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Grace Hopper</td>
+<td>grace@example.com</td>
+<td>2024-02-15</td>
+</tr>
+</tbody>
+</table>
+<p>Here <code>full_name</code>, <code>email</code>, <code>joined_on</code> are <strong>attributes</strong> of the <strong>entity</strong>
+<code>member</code>. "Ada Lovelace" is not a table — it is a value in one row.</p>
+<p>Sorting the same nouns into entity vs attribute:</p>
+<table>
+<thead>
+<tr>
+<th>Thing in the world</th>
+<th>Entity or attribute?</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>member</td>
+<td><strong>entity</strong></td>
+<td>its own facts; many loans point at it</td>
+</tr>
+<tr>
+<td>full_name</td>
+<td><strong>attribute</strong></td>
+<td>a single value belonging to one member</td>
+</tr>
+<tr>
+<td>email</td>
+<td><strong>attribute</strong></td>
+<td>one value per member (kept UNIQUE)</td>
+</tr>
+<tr>
+<td>group (that a member belongs to)</td>
+<td><strong>entity</strong></td>
+<td>shared by many members; has its own name</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    MEMBER {
+        int member_id PK
+        text full_name
+        text email
+        date joined_on
+    }</pre>
+<h2>Lesson 2 — Keys: candidate, primary, natural vs surrogate</h2>
+<p>A <strong>candidate key</strong> uniquely identifies a row. The one you choose is the
+<strong>primary key</strong>. A <strong>natural key</strong> is real-world data (an ISBN); a <strong>surrogate
+key</strong> is a system-made id with no meaning.</p>
+<p><code>book</code> table — <code>isbn</code> is a natural candidate key, <code>book_id</code> is the surrogate PK:</p>
+<table>
+<thead>
+<tr>
+<th>book_id (PK)</th>
+<th>title</th>
+<th>author</th>
+<th>isbn</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>The Pragmatic Programmer</td>
+<td>Hunt &amp; Thomas</td>
+<td>9780135957059</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Clean Code</td>
+<td>R. C. Martin</td>
+<td>9780132350884</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Structure and Interpretation</td>
+<td>Abelson &amp; Sussman</td>
+<td>9780262510875</td>
+</tr>
+</tbody>
+</table>
+<p>The keys sorted out:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Which column(s)</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>candidate</td>
+<td><code>book_id</code> <em>and</em> <code>isbn</code></td>
+<td>each could identify a row on its own</td>
+</tr>
+<tr>
+<td>primary</td>
+<td><code>book_id</code></td>
+<td>the one we chose — never changes, never repeats</td>
+</tr>
+<tr>
+<td>natural</td>
+<td><code>isbn</code></td>
+<td>real-world id; kept as <code>UNIQUE</code> so you can still look up by it</td>
+</tr>
+<tr>
+<td>surrogate</td>
+<td><code>book_id</code></td>
+<td>invented by the system, no business meaning</td>
+</tr>
+</tbody>
+</table>
+<p><strong>[correction C1]</strong> <code>book_id</code> is shown as INT here; student-panel would use a
+UUID. Both are surrogate keys. Keeping the natural key too (as <code>UNIQUE isbn</code>)
+lets you still look a book up by its real-world identifier.</p>
+<h2>Lesson 3 — Translating words into a model</h2>
+<p>A quick habit for turning a sentence into a design:</p>
+<table>
+<thead>
+<tr>
+<th>In the sentence…</th>
+<th>Becomes…</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a <strong>noun</strong> you keep facts about</td>
+<td>an <strong>entity</strong> (table)</td>
+</tr>
+<tr>
+<td>a <strong>property</strong> of that noun</td>
+<td>an <strong>attribute</strong> (column)</td>
+</tr>
+<tr>
+<td>a <strong>verb</strong> linking two nouns</td>
+<td>a <strong>relationship</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Example: "A <strong>member</strong> <em>borrows</em> a <strong>copy</strong> of a <strong>book</strong>; each loan has a
+<strong>due date</strong>." → entities <code>member</code>, <code>copy</code>, <code>book</code>; relationship <em>borrows</em>
+(a <code>loan</code>); attribute <code>due_on</code>.</p>
+<p>The same sentence, parsed word by word:</p>
+<table>
+<thead>
+<tr>
+<th>Word in the sentence</th>
+<th>Part of speech</th>
+<th>Becomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>member</td>
+<td>noun (we keep facts)</td>
+<td>entity <code>member</code></td>
+</tr>
+<tr>
+<td>borrows</td>
+<td>verb</td>
+<td>relationship → the <code>loan</code> table</td>
+</tr>
+<tr>
+<td>copy</td>
+<td>noun (we keep facts)</td>
+<td>entity <code>copy</code></td>
+</tr>
+<tr>
+<td>book</td>
+<td>noun (we keep facts)</td>
+<td>entity <code>book</code></td>
+</tr>
+<tr>
+<td>due date</td>
+<td>property of the loan</td>
+<td>attribute <code>due_on</code></td>
+</tr>
+</tbody>
+</table>
+<h2>Lesson 4 — Relationships and cardinality</h2>
+<p>The three shapes, each shown with sample rows and a diagram.</p>
+<p><strong>1:N — one group, many students</strong> (FK on the many side):</p>
+<p><code>group</code> table:</p>
+<table>
+<thead>
+<tr>
+<th>group_id</th>
+<th>name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Morning</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Evening</td>
+</tr>
+</tbody>
+</table>
+<p><code>student</code> table (FK <code>group_id</code> on the many side):</p>
+<table>
+<thead>
+<tr>
+<th>student_id</th>
+<th>full_name</th>
+<th>group_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Alan</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Grace</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    GROUP ||--o{ STUDENT : &quot;has&quot;</pre>
+<p>"One group has zero-or-many students; each student has exactly one group." See
+how students 1 and 2 both carry <code>group_id = 1</code> — that is "many students, one
+group" on the page.</p>
+<p><strong>1:1 — one person, one passport.</strong> FK goes on the side that is never empty,
+with <code>UNIQUE</code> + <code>NOT NULL</code>:</p>
+<p><code>person</code>:</p>
+<table>
+<thead>
+<tr>
+<th>person_id</th>
+<th>full_name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Alan</td>
+</tr>
+</tbody>
+</table>
+<p><code>passport</code> (FK <code>person_id</code>, UNIQUE so no person has two):</p>
+<table>
+<thead>
+<tr>
+<th>passport_id</th>
+<th>person_id (UNIQUE)</th>
+<th>number</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>X1234567</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    PERSON ||--o| PASSPORT : &quot;holds&quot;</pre>
+<p>"One person holds zero-or-one passport; each passport belongs to exactly one
+person." The <code>UNIQUE</code> on <code>person_id</code> is what blocks a second passport for Ada —
+without it, this would be a 1:N.</p>
+<p><strong>M:N — students and courses.</strong> Neither side can hold the FK, so a <strong>table in
+the middle</strong> carries one FK to each — see Lesson 7.</p>
+<h2>Lesson 5 — Referential integrity (no orphans)</h2>
+<p>Every foreign key must point at a row that exists. If <code>loan.member_id = 9</code> but
+there is no member 9, that loan is an <strong>orphan</strong>, and the database refuses it.</p>
+<p><code>loan</code> with a bad FK (rejected):</p>
+<table>
+<thead>
+<tr>
+<th>loan_id</th>
+<th>member_id</th>
+<th>copy_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>9</strong></td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<p>The rule is enforced by the engine, not by hope: declare <code>member_id</code> as a foreign
+key <code>REFERENCES member(member_id)</code> and the insert of loan 2 fails.</p>
+<p>The reverse protection is the delete rule. Because loan 1 points at member 1, the
+database will not silently let member 1 vanish — it either blocks the delete
+(RESTRICT), removes the loans too (CASCADE), or blanks the pointer (SET NULL).
+Those three choices are Lesson 17.</p>
+<table>
+<thead>
+<tr>
+<th>If you try to delete member 1 …</th>
+<th>RESTRICT</th>
+<th>CASCADE</th>
+<th>SET NULL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>… while loan 1 still points at them</td>
+<td>blocked</td>
+<td>loan 1 deleted too</td>
+<td>loan 1 kept, <code>member_id</code> → NULL</td>
+</tr>
+</tbody>
+</table>
+<h2>Lesson 6 — Foreign-key placement</h2>
+<p>The FK lives on the <strong>many</strong> side of a 1:N, and on the <strong>never-empty</strong> side of a
+1:1. A quick check: "which row can there be <em>many</em> of for one of the other?" —
+that row carries the pointer. One group → many students, so <code>group_id</code> sits on
+<code>student</code> (Lesson 4), never the reverse.</p>
+<p>Worked both ways, to show why the reverse fails:</p>
+<table>
+<thead>
+<tr>
+<th>Put <code>group_id</code> on …</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>student</code> (correct)</td>
+<td>many students share one <code>group_id</code> → "one group, many students" ✓</td>
+</tr>
+<tr>
+<td><code>group</code> (wrong)</td>
+<td>one group could name only one student → breaks the "many" ✗</td>
+</tr>
+</tbody>
+</table>
+<p>The same check across our examples:</p>
+<table>
+<thead>
+<tr>
+<th>Relationship</th>
+<th>"Many of which for one of the other?"</th>
+<th>FK goes on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>group ↔ student</td>
+<td>many students per group</td>
+<td><code>student.group_id</code></td>
+</tr>
+<tr>
+<td>book ↔ copy</td>
+<td>many copies per book</td>
+<td><code>copy.book_id</code></td>
+</tr>
+<tr>
+<td>member ↔ loan</td>
+<td>many loans per member</td>
+<td><code>loan.member_id</code></td>
+</tr>
+<tr>
+<td>person ↔ passport (1:1)</td>
+<td>never-empty side is passport</td>
+<td><code>passport.person_id</code> UNIQUE</td>
+</tr>
+</tbody>
+</table>
+<h2>Lesson 7 — The M:N bridge: orders and products</h2>
+<p>An order contains many products; a product appears on many orders. That M:N is
+resolved by a bridge, <code>order_line</code>. (Note the table is <code>orders</code>, not <code>order</code> —
+reserved word.)</p>
+<p><code>orders</code>:</p>
+<table>
+<thead>
+<tr>
+<th>order_id</th>
+<th>ordered_on</th>
+<th>customer_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>2024-03-01</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2024-03-04</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<p><code>product</code>:</p>
+<table>
+<thead>
+<tr>
+<th>product_id</th>
+<th>name</th>
+<th>list_price</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Blue pen</td>
+<td>1.50</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Red pen</td>
+<td>1.50</td>
+</tr>
+</tbody>
+</table>
+<p><code>order_line</code> (the bridge — one row per product on an order):</p>
+<table>
+<thead>
+<tr>
+<th>order_id</th>
+<th>product_id</th>
+<th>quantity</th>
+<th>unit_price_at_sale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>3</td>
+<td>1.50</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2</td>
+<td>2</td>
+<td>1.20</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1</td>
+<td>1</td>
+<td>1.50</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    ORDERS      ||--|{ ORDER_LINE : &quot;contains&quot;
+    PRODUCT     ||--o{ ORDER_LINE : &quot;appears on&quot;</pre>
+<p>Reading it: one order contains one-or-many lines (an order with no lines is not
+really an order → <code>|{</code>); one product appears on zero-or-many lines. The pair
+<code>(order_id, product_id)</code> is the key, so a product can appear at most once per
+order — order 1 lists the blue pen once, with a quantity of 3, not three rows.</p>
+<p><strong>[correction C4, kept] Frozen fact.</strong> <code>unit_price_at_sale</code> is stored on purpose
+— it is the price paid <em>at that moment</em>. Even if <code>product.list_price</code> changes
+tomorrow, the old order must still show 1.20. This is <em>not</em> a "derive, don't
+store" violation; it is a captured historical fact.</p>
+<p>Look at the rows: the red pen's list price is 1.50, but order 1 paid 1.20 (a
+one-off discount). If the line did not freeze its own price, that discount would
+be lost the moment anyone looked at the order again.</p>
+<p><strong>[correction C3] Which key for the bridge?</strong></p>
+<ul>
+<li>Use the <strong>pair as the key</strong> — <code>PRIMARY KEY(order_id, product_id)</code> — when the
+  pairing is naturally unique (a product appears at most once per order) and
+  nothing else needs to point <em>at</em> a line.</li>
+<li>Give the bridge <strong>its own surrogate id</strong> (<code>order_line_id</code>) <strong>when</strong> something
+  else must reference a single line (e.g. a returns table), <strong>and</strong> keep
+  <code>UNIQUE(order_id, product_id)</code> so you still cannot list the same product twice
+  on one order. Decide this on purpose, not by habit.</li>
+</ul>
+<p>The surrogate-id variant, when a <code>return</code> must point at one specific line:</p>
+<p><code>order_line</code> (now with its own id, <code>UNIQUE(order_id, product_id)</code> still enforced):</p>
+<table>
+<thead>
+<tr>
+<th>order_line_id</th>
+<th>order_id</th>
+<th>product_id</th>
+<th>quantity</th>
+<th>unit_price_at_sale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100</td>
+<td>1</td>
+<td>1</td>
+<td>3</td>
+<td>1.50</td>
+</tr>
+<tr>
+<td>101</td>
+<td>1</td>
+<td>2</td>
+<td>2</td>
+<td>1.20</td>
+</tr>
+</tbody>
+</table>
+<p><code>return</code> (points at a single line):</p>
+<table>
+<thead>
+<tr>
+<th>return_id</th>
+<th>order_line_id</th>
+<th>returned_qty</th>
+<th>reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>101</td>
+<td>1</td>
+<td>faulty</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    ORDERS     ||--|{ ORDER_LINE : &quot;contains&quot;
+    PRODUCT    ||--o{ ORDER_LINE : &quot;appears on&quot;
+    ORDER_LINE ||--o{ RETURN     : &quot;may be returned on&quot;</pre>
+<table>
+<thead>
+<tr>
+<th>Choose</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pair key <code>(order_id, product_id)</code></td>
+<td>the pairing is unique and nothing points at a line</td>
+</tr>
+<tr>
+<td>surrogate <code>order_line_id</code> + <code>UNIQUE(order_id, product_id)</code></td>
+<td>something else (a return) references one line</td>
+</tr>
+</tbody>
+</table>
+<h2>Lesson 8 — Enrolment and course offerings (two valid models)</h2>
+<p>Students enrol in courses, but a course runs in different semesters. There are
+two correct ways to model "the running of a course," and the samples show both.</p>
+<p><strong>Model A — a <code>teaching</code> bridge keyed by the natural pair</strong> <code>(course, semester)</code>:</p>
+<p><code>teaching</code>:</p>
+<table>
+<thead>
+<tr>
+<th>course_id</th>
+<th>semester</th>
+<th>teacher_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>2024-Fall</td>
+<td>7</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2025-Spr.</td>
+<td>9</td>
+</tr>
+</tbody>
+</table>
+<p>Key = <code>(course_id, semester)</code>.</p>
+<p><strong>Model B — a <code>course_offering</code> with its own surrogate id</strong> (so enrolments and
+timetables can point at <em>one</em> offering):</p>
+<p><code>course_offering</code>:</p>
+<table>
+<thead>
+<tr>
+<th>offering_id</th>
+<th>course_id</th>
+<th>semester</th>
+<th>teacher_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>2024-Fall</td>
+<td>7</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1</td>
+<td>2025-Spr.</td>
+<td>9</td>
+</tr>
+</tbody>
+</table>
+<p><code>enrolment</code> then references <code>offering_id</code>:</p>
+<table>
+<thead>
+<tr>
+<th>offering_id</th>
+<th>student_id</th>
+<th>grade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>A</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2</td>
+<td>B</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    COURSE          ||--o{ COURSE_OFFERING : &quot;runs as&quot;
+    TEACHER         ||--o{ COURSE_OFFERING : &quot;teaches&quot;
+    COURSE_OFFERING ||--o{ ENROLMENT       : &quot;has&quot;
+    STUDENT         ||--o{ ENROLMENT       : &quot;makes&quot;</pre>
+<p><strong>[correction C4] Pick-when.</strong> Choose <strong>Model A</strong> (the pair-key) when the pairing
+is naturally unique and nothing else points at it. Choose <strong>Model B</strong> (surrogate
+id) when other tables must reference one offering — then keep
+<code>UNIQUE(course_id, semester)</code> on it. Same rule as the order_line bridge.</p>
+<p>The decision in one line each — this is the "pick this model when…" guide:</p>
+<table>
+<thead>
+<tr>
+<th>Pick</th>
+<th>When</th>
+<th>Must also add</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model A — pair key <code>(course_id, semester)</code></td>
+<td>nothing else points at a single running of the course</td>
+<td>nothing extra</td>
+</tr>
+<tr>
+<td>Model B — surrogate <code>offering_id</code></td>
+<td>enrolments / timetables must reference one offering</td>
+<td><code>UNIQUE(course_id, semester)</code></td>
+</tr>
+</tbody>
+</table>
+<p>Notice Model B is just the order_line surrogate choice again (Lesson 7): the same
+rule governs <em>every</em> bridge you ever build, so once you can make this call you can
+make it everywhere.</p>
+<h2>Lesson 9 — Ternary relationships: prescriptions</h2>
+<p>A fact that genuinely needs <strong>three</strong> things at once. "Doctor D prescribes drug G
+to patient P." Dropping any one noun destroys the fact — that is the <strong>disguise
+test</strong> (if the sentence is still true after you remove a noun, it was not really
+a ternary).</p>
+<p><code>prescription</code>:</p>
+<table>
+<thead>
+<tr>
+<th>prescription_id</th>
+<th>doctor_id</th>
+<th>patient_id</th>
+<th>drug_id</th>
+<th>prescribed_on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>7</td>
+<td>1</td>
+<td>3</td>
+<td>2024-03-01</td>
+</tr>
+<tr>
+<td>2</td>
+<td>7</td>
+<td>1</td>
+<td>3</td>
+<td>2024-06-01</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    DOCTOR  ||--o{ PRESCRIPTION : &quot;writes&quot;
+    PATIENT ||--o{ PRESCRIPTION : &quot;receives&quot;
+    DRUG    ||--o{ PRESCRIPTION : &quot;names&quot;</pre>
+<p>The disguise test applied, drop each noun in turn:</p>
+<table>
+<thead>
+<tr>
+<th>Drop …</th>
+<th>What's left</th>
+<th>Still a complete fact?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the doctor</td>
+<td>"drug G given to patient P"</td>
+<td>no — <em>who ordered it?</em></td>
+</tr>
+<tr>
+<td>the patient</td>
+<td>"doctor D prescribes drug G"</td>
+<td>no — <em>to whom?</em></td>
+</tr>
+<tr>
+<td>the drug</td>
+<td>"doctor D treats patient P"</td>
+<td>no — <em>with what?</em></td>
+</tr>
+</tbody>
+</table>
+<p>All three are load-bearing, so it is a true ternary — a middle table with three
+FKs.</p>
+<p><strong>[correction C2] Decide the UNIQUE on purpose.</strong> With its own <code>prescription_id</code>,
+ask: should the natural triple <code>(doctor_id, patient_id, drug_id)</code> be UNIQUE?
+Here <strong>no</strong> — the same doctor may prescribe the same drug to the same patient
+again later (rows 1 and 2 differ only by date), so the date is part of what makes
+each prescription distinct. If repeats were <em>not</em> allowed, you would add
+<code>UNIQUE(doctor_id, patient_id, drug_id)</code>. Either way, make the choice consciously
+— exactly as you did for <code>order_line</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Does the real world allow a repeat triple?</th>
+<th>Then …</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>yes (same doctor, drug, patient on a later date)</td>
+<td><strong>no</strong> triple-UNIQUE; the date distinguishes rows (our case)</td>
+</tr>
+<tr>
+<td>no (each combination may occur once)</td>
+<td>add <code>UNIQUE(doctor_id, patient_id, drug_id)</code></td>
+</tr>
+</tbody>
+</table>
+<h2>Lesson 10 — Self-reference: a category tree</h2>
+<p>A category can sit inside another category. One table points at itself.</p>
+<p><code>category</code>:</p>
+<table>
+<thead>
+<tr>
+<th>category_id</th>
+<th>name</th>
+<th>parent_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Books</td>
+<td><em>(null)</em></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Fiction</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Science</td>
+<td>1</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Physics</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    CATEGORY ||--o{ CATEGORY : &quot;parent of&quot;</pre>
+<p><code>parent_id IS NULL</code> marks a <strong>root</strong> (Books). Never use <code>parent, grandparent,
+great_grandparent</code> columns — that caps the depth and repeats the pattern.
+student-panel uses exactly this self-reference shape for its group and parameter
+trees.</p>
+<p>Reading the rows as a tree, each row names only its <em>immediate</em> parent:</p>
+<pre><code>Books (1, root)
+├─ Fiction (2 → 1)
+└─ Science (3 → 1)
+   └─ Physics (4 → 3)
+</code></pre>
+<p>Add a fifth level ("Quantum Physics" under Physics) and you insert one row with
+<code>parent_id = 4</code> — no schema change, ever. That is the whole point of the single
+<code>parent_id</code> column.</p>
+<h2>Lesson 11 — Weak (dependent) entity</h2>
+<p>A weak entity cannot be identified on its own; it only exists as part of a
+parent. An <code>order_line</code> is weak — "line 2" means nothing without its order.
+Another classic: a building's <code>room</code>.</p>
+<p><code>room</code> (identified by its building <strong>plus</strong> its own number):</p>
+<table>
+<thead>
+<tr>
+<th>building_id</th>
+<th>room_no</th>
+<th>capacity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>101</td>
+<td>30</td>
+</tr>
+<tr>
+<td>1</td>
+<td>102</td>
+<td>25</td>
+</tr>
+<tr>
+<td>2</td>
+<td>101</td>
+<td>40</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid">erDiagram
+    BUILDING ||--|{ ROOM : &quot;contains&quot;</pre>
+<p>Key = <code>(building_id, room_no)</code>. Room 101 exists twice — once per building — and
+that is correct, because the building is part of its identity.</p>
+<p>For contrast, the <code>building</code> parent that gives those rooms their identity:</p>
+<table>
+<thead>
+<tr>
+<th>building_id</th>
+<th>name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Science Hall</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Arts Hall</td>
+</tr>
+</tbody>
+</table>
+<p>So "room 101" is ambiguous, but "room 101 in building 1 (Science Hall)" is exact.
+The delete rule here is almost always CASCADE: demolish the building (delete it)
+and its rooms go with it — a room has no meaning once its building is gone.</p>
+<h2>Lesson 12 — The five hard patterns, and "the one move"</h2>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>The fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M:N (many-to-many)</td>
+<td>a table in the middle (a bridge)</td>
+</tr>
+<tr>
+<td>a link with its own facts</td>
+<td>that link becomes a table</td>
+</tr>
+<tr>
+<td>a three-way fact (ternary)</td>
+<td>a table joining all three</td>
+</tr>
+<tr>
+<td>1:1</td>
+<td>usually merge into one table, unless a reason to split</td>
+</tr>
+<tr>
+<td>self-reference (tree)</td>
+<td>one table with a <code>parent_id</code> FK to itself</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The one move:</strong> whenever a relationship is M:N, <em>has its own facts</em>, or joins
+three or more things, it becomes <strong>a table in the middle</strong>. Learn that one move
+and most "hard" designs become routine.</p>
+<p>Each pattern tied to an example you have already seen in this file:</p>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Seen as</th>
+<th>The middle/extra table</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M:N</td>
+<td>students ↔ courses (Lesson 4, 7)</td>
+<td><code>enrolment</code> / <code>order_line</code></td>
+</tr>
+<tr>
+<td>link with its own facts</td>
+<td>a loan's dates, an enrolment's grade</td>
+<td><code>loan</code> / <code>enrolment</code></td>
+</tr>
+<tr>
+<td>ternary</td>
+<td>doctor × patient × drug (Lesson 9)</td>
+<td><code>prescription</code></td>
+</tr>
+<tr>
+<td>1:1</td>
+<td>person ↔ passport (Lesson 4)</td>
+<td>usually merged; else FK on <code>passport</code></td>
+</tr>
+<tr>
+<td>self-reference</td>
+<td>category tree (Lesson 10)</td>
+<td><code>category.parent_id</code></td>
+</tr>
+</tbody>
+</table>
+<h2>Lesson 13 — First normal form (1NF): one value per cell</h2>
+<p><strong>Broken</strong> — a list stuffed into one cell:</p>
+<table>
+<thead>
+<tr>
+<th>member_id</th>
+<th>full_name</th>
+<th>phones</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada</td>
+<td>555-1111, 555-2222</td>
+</tr>
+</tbody>
+</table>
+<p>You cannot ask "who has 555-2222?" cleanly. <strong>Fix</strong> — one phone per row, in its
+own table:</p>
+<p><code>member</code>:</p>
+<table>
+<thead>
+<tr>
+<th>member_id</th>
+<th>full_name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada</td>
+</tr>
+</tbody>
+</table>
+<p><code>phone</code>:</p>
+<table>
+<thead>
+<tr>
+<th>phone_id</th>
+<th>member_id</th>
+<th>number</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>555-1111</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1</td>
+<td>555-2222</td>
+</tr>
+</tbody>
+</table>
+<p><pre class="mermaid">erDiagram
+    MEMBER {
+        int member_id PK
+        text full_name
+        text email
+        date joined_on
+    }</pre>0</p>
+<p>Now "who has 555-2222?" is a single lookup in <code>phone</code>, and counting a member's
+phones is just counting rows. The broken version also silently decides how many
+phones fit; the fixed version has no limit.</p>
+<h2>Lesson 14 — Second normal form (2NF): the whole key</h2>
+<p>2NF matters when the key is <strong>composite</strong>. A non-key column must depend on the
+<em>whole</em> key, not part of it.</p>
+<p><strong>Broken</strong> — <code>order_line</code> keyed by <code>(order_id, product_id)</code> but carrying
+<code>product_name</code> (which depends on <code>product_id</code> alone):</p>
+<table>
+<thead>
+<tr>
+<th>order_id</th>
+<th>product_id</th>
+<th>product_name</th>
+<th>quantity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>Blue pen</td>
+<td>3</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1</td>
+<td>Blue pen</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fix</strong> — move <code>product_name</code> to <code>product</code>, where it depends on the full key
+<code>product_id</code>. <code>order_line</code> keeps only <code>quantity</code> (and the frozen
+<code>unit_price_at_sale</code>).</p>
+<p><code>product</code>:</p>
+<table>
+<thead>
+<tr>
+<th>product_id</th>
+<th>name</th>
+<th>list_price</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Blue pen</td>
+<td>1.50</td>
+</tr>
+</tbody>
+</table>
+<p><code>order_line</code>:</p>
+<table>
+<thead>
+<tr>
+<th>order_id</th>
+<th>product_id</th>
+<th>quantity</th>
+<th>unit_price_at_sale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>3</td>
+<td>1.50</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1</td>
+<td>1</td>
+<td>1.50</td>
+</tr>
+</tbody>
+</table>
+<p>The repeated "Blue pen" was the warning sign: rename the product and the broken
+table would need fixing on every line. In the fixed shape the name lives in one
+place.</p>
+<h2>Lesson 15 — Third normal form (3NF): nothing but the key</h2>
+<p>No non-key column may depend on another non-key column.</p>
+<p><strong>Broken</strong> — <code>student</code> carrying its group's name:</p>
+<table>
+<thead>
+<tr>
+<th>student_id</th>
+<th>full_name</th>
+<th>group_id</th>
+<th>group_name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada</td>
+<td>1</td>
+<td>Morning</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Alan</td>
+<td>1</td>
+<td>Morning</td>
+</tr>
+</tbody>
+</table>
+<p><code>group_name</code> depends on <code>group_id</code>, not on <code>student_id</code>. <strong>Fix</strong> — keep
+<code>group_name</code> only in <code>group</code>; <code>student</code> holds just the FK <code>group_id</code>.</p>
+<p><code>group</code>:</p>
+<table>
+<thead>
+<tr>
+<th>group_id</th>
+<th>name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Morning</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Evening</td>
+</tr>
+</tbody>
+</table>
+<p><code>student</code>:</p>
+<table>
+<thead>
+<tr>
+<th>student_id</th>
+<th>full_name</th>
+<th>group_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada</td>
+<td>1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Alan</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Grace</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<p>Rename group 1 to "AM" in the broken table and you must edit two student rows (and
+miss one at your peril); in the fixed shape you edit a single row of <code>group</code>.</p>
+<p>The mnemonic for all three: <strong>"the key, the whole key, and nothing but the key."</strong></p>
+<table>
+<thead>
+<tr>
+<th>Form</th>
+<th>Catch</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1NF</td>
+<td>the key</td>
+<td>one value per cell, no repeating columns</td>
+</tr>
+<tr>
+<td>2NF</td>
+<td>the whole key</td>
+<td>no dependency on part of a composite key</td>
+</tr>
+<tr>
+<td>3NF</td>
+<td>nothing but the key</td>
+<td>no dependency on another non-key column</td>
+</tr>
+</tbody>
+</table>
+<p><strong>[correction C5] The design routine.</strong> The samples file and the primer each had
+their own ten-step method. They are the same method sliced differently; this
+edition replaces both with <strong>one merged, numbered routine</strong> — see <strong>Part 9 of the
+revised lesson</strong> (<code>database-design-revised-lesson.md</code>). Use that single list.</p>
+<h2>Lesson 16 — Derive, don't store (and the one exception)</h2>
+<p>A value you can recompute from others should <strong>not</strong> be stored — storing it lets
+it drift out of step. But a value captured <em>at a moment in time</em> is a <strong>frozen
+fact</strong> and must be kept.</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Store it?</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>an order's total</td>
+<td><strong>No</strong> — derive</td>
+<td>it is just the sum of its lines</td>
+</tr>
+<tr>
+<td>a student's age</td>
+<td><strong>No</strong> — derive</td>
+<td>compute from <code>born_on</code> and today</td>
+</tr>
+<tr>
+<td><code>unit_price_at_sale</code></td>
+<td><strong>Yes</strong> — store</td>
+<td>the price paid then; must not change</td>
+</tr>
+<tr>
+<td>an invoice's issued amount</td>
+<td><strong>Yes</strong> — store</td>
+<td>a legal record of that moment</td>
+</tr>
+</tbody>
+</table>
+<p>The test: <em>can I always recompute it from data that will not change?</em> If yes,
+derive. If the source can change but this value must not, freeze it.</p>
+<p>Seen in rows — the order total is <em>not</em> a column; it is read off the lines:</p>
+<p><code>order_line</code> for order 1:</p>
+<table>
+<thead>
+<tr>
+<th>order_id</th>
+<th>product_id</th>
+<th>quantity</th>
+<th>unit_price_at_sale</th>
+<th>(line value)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>3</td>
+<td>1.50</td>
+<td>4.50</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2</td>
+<td>2</td>
+<td>1.20</td>
+<td>2.40</td>
+</tr>
+</tbody>
+</table>
+<p>Order 1's total is <strong>6.90</strong>, computed on demand (3×1.50 + 2×1.20). Store it and
+the day someone edits a line, the stored total lies. The <code>unit_price_at_sale</code>
+values, by contrast, are frozen on each line precisely so that computation stays
+true to what was actually paid.</p>
+<h2>Lesson 17 — ON DELETE rules (say the rule as a sentence)</h2>
+<p>When a parent row is deleted, what happens to its children?</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Say it aloud</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RESTRICT</code></td>
+<td>"you may not delete a member who still has loans"</td>
+<td>the child must not be orphaned or silently lost</td>
+</tr>
+<tr>
+<td><code>CASCADE</code></td>
+<td>"deleting an order deletes its order lines too"</td>
+<td>the children have no life without the parent</td>
+</tr>
+<tr>
+<td><code>SET NULL</code></td>
+<td>"deleting a teacher leaves the course with no teacher"</td>
+<td>the link is optional and may simply become empty</td>
+</tr>
+</tbody>
+</table>
+<p><strong>[correction C4, kept]</strong> Always read your chosen rule as a plain sentence before
+accepting it — the sentence tells you instantly whether it is the behaviour you
+want. student-panel leans on <code>RESTRICT</code> + soft-delete (an <code>archived_at</code> flag)
+rather than hard <code>CASCADE</code>, so history is never truly lost.</p>
+<p>The three rules against the <em>same</em> parent delete, so the difference is concrete —
+delete order 1, which has two <code>order_line</code> children:</p>
+<table>
+<thead>
+<tr>
+<th>Rule on <code>order_line.order_id</code></th>
+<th>What happens to order 1's lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RESTRICT</td>
+<td>the delete is blocked while the two lines exist</td>
+</tr>
+<tr>
+<td>CASCADE</td>
+<td>both lines are deleted along with the order</td>
+</tr>
+<tr>
+<td>SET NULL</td>
+<td>(needs a nullable FK) the lines survive but point at no order — rarely what you want for a weak child</td>
+</tr>
+</tbody>
+</table>
+<p>For a weak child like <code>order_line</code>, CASCADE is the honest choice; for history you
+want to keep, RESTRICT + soft-delete wins. Match the rule to the sentence.</p>
+<h2>Lesson 18 — A full worked design: a small gym</h2>
+<p>Requirement: "Members join the gym. Trainers run classes. A class happens at a
+time and has a capacity. Members book a place in a class."</p>
+<p>Entities: <code>member</code>, <code>trainer</code>, <code>gym_class</code>, and a booking bridge (M:N member↔
+class, with its own fact <code>booked_on</code>).</p>
+<p>Final tables:</p>
+<pre><code>member(member_id PK, full_name, email UNIQUE, joined_on)
+trainer(trainer_id PK, full_name)
+gym_class(class_id PK, title, starts_at, capacity, trainer_id FK -&gt; trainer)
+booking(member_id FK -&gt; member, class_id FK -&gt; gym_class, booked_on,
+        PRIMARY KEY(member_id, class_id))
+</code></pre>
+<p><pre class="mermaid">erDiagram
+    MEMBER {
+        int member_id PK
+        text full_name
+        text email
+        date joined_on
+    }</pre>1</p>
+<p>Reading it: one trainer runs zero-or-many classes; one class has zero-or-many
+bookings; one member makes zero-or-many bookings. The <code>(member_id, class_id)</code>
+key stops a member booking the same class twice. "Capacity" is a plain attribute;
+"places left" is <strong>derived</strong> (capacity minus booked rows), so it is <em>not</em> stored.</p>
+<p>Now the same design filled with rows so you can answer real questions.</p>
+<p><code>member</code>:</p>
+<table>
+<thead>
+<tr>
+<th>member_id</th>
+<th>full_name</th>
+<th>email</th>
+<th>joined_on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Ada Lovelace</td>
+<td>ada@example.com</td>
+<td>2024-01-10</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Alan Turing</td>
+<td>alan@example.com</td>
+<td>2024-02-02</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Grace Hopper</td>
+<td>grace@example.com</td>
+<td>2024-02-15</td>
+</tr>
+</tbody>
+</table>
+<p><code>trainer</code>:</p>
+<table>
+<thead>
+<tr>
+<th>trainer_id</th>
+<th>full_name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>7</td>
+<td>Lin Zhao</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Marco Rossi</td>
+</tr>
+</tbody>
+</table>
+<p><code>gym_class</code> (FK <code>trainer_id</code>):</p>
+<table>
+<thead>
+<tr>
+<th>class_id</th>
+<th>title</th>
+<th>starts_at</th>
+<th>capacity</th>
+<th>trainer_id</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Spin</td>
+<td>2024-04-10 18:00</td>
+<td>12</td>
+<td>7</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Yoga</td>
+<td>2024-04-11 09:00</td>
+<td>10</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<p><code>booking</code> (bridge; key <code>(member_id, class_id)</code>):</p>
+<table>
+<thead>
+<tr>
+<th>member_id</th>
+<th>class_id</th>
+<th>booked_on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>2024-04-01</td>
+</tr>
+<tr>
+<td>2</td>
+<td>1</td>
+<td>2024-04-02</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2</td>
+<td>2024-04-03</td>
+</tr>
+</tbody>
+</table>
+<p>Questions answered against these rows:</p>
+<ul>
+<li><strong>Who is booked into Spin (class 1)?</strong> <code>booking</code> rows with <code>class_id = 1</code> →
+  members 1 and 2 → <strong>Ada and Alan</strong>.</li>
+<li><strong>How many places are left in Spin?</strong> <code>capacity</code> 12 minus 2 booked rows →
+  <strong>10 left</strong> (derived, never stored).</li>
+<li><strong>Which trainer runs Yoga (class 2)?</strong> <code>gym_class.trainer_id = 8</code> → <strong>Marco</strong>.</li>
+<li><strong>Can Ada book Spin again?</strong> No — the key <code>(1, 1)</code> already exists, so the
+  duplicate is refused. That is the composite key doing its job.</li>
+</ul>
+<h2>Lesson 19 — Eight self-check tests</h2>
+<p>Cover the answers; say yours aloud first.</p>
+<ol>
+<li><strong>Is <code>colour</code> an entity or an attribute?</strong> → Depends on purpose: an attribute
+   when it is just a value; an entity when colours have their own facts others
+   share. <em>(The corner shop keeps no facts about "red", so it is a value; the
+   paint factory records red's code, base and supplier, so it earns a table.)</em></li>
+<li><strong>Where does the FK go in a 1:N?</strong> → On the <strong>many</strong> side. <em>(One group, many
+   students → <code>group_id</code> on <code>student</code>.)</em></li>
+<li><strong>Where does the FK go in a 1:1?</strong> → On the <strong>never-empty</strong> side, <code>UNIQUE</code> +
+   <code>NOT NULL</code>. <em>(On <code>passport.person_id</code>, UNIQUE so no person gets two.)</em></li>
+<li><strong>How do you resolve an M:N?</strong> → A table in the middle (a bridge), one FK to
+   each side. <em>(students ↔ courses → <code>enrolment</code>.)</em></li>
+<li><strong>What does <code>parent_id IS NULL</code> mean in a tree?</strong> → That row is a <strong>root</strong>
+   (no parent). <em>(Books in the category tree of Lesson 10.)</em></li>
+<li><strong>Which normal form does a comma-separated list in a cell break?</strong> → <strong>1NF</strong>.
+   <em>(One value per cell; split the phones into their own table.)</em></li>
+<li><strong>Should you store an order's total?</strong> → No — <strong>derive</strong> it. (But <em>do</em> store
+   <code>unit_price_at_sale</code> — a frozen fact.) <em>(The total is the sum of lines, which
+   are already stored; the sale price is captured against a price that will move.)</em></li>
+<li><strong>Read <code>MEMBER ||--o{ LOAN</code>.</strong> → "One member has zero-or-many loans; each loan
+   has exactly one member." <em>(The zero lets a brand-new member exist with no
+   loans; the exactly-one forbids an orphan loan.)</em></li>
+</ol>
+<h2>Glossary</h2>
+<p>See the full glossary in <code>database-design-revised-lesson.md</code>. The terms used most
+here: <strong>entity</strong> (a table/type), <strong>attribute</strong> (a column), <strong>relationship</strong> (a
+verb between entities), <strong>cardinality</strong> (how many on each side), <strong>primary key</strong>
+(the chosen unique id), <strong>foreign key</strong> (a pointer to another table's PK, on the
+many side), <strong>surrogate key</strong> (a system-made id — INT or UUID), <strong>bridge</strong> (the
+table in the middle of an M:N), <strong>referential integrity</strong> (no orphan FKs),
+<strong>normalisation</strong> (one fact in one place), <strong>frozen fact</strong> (a value captured at a
+moment in time and kept, not re-derived).</p>
+<p>A one-line reminder for each, so this file stands on its own too:</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>In one line</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>entity</td>
+<td>a kind of thing worth its own table (a type)</td>
+</tr>
+<tr>
+<td>attribute</td>
+<td>one fact about an entity (a column)</td>
+</tr>
+<tr>
+<td>relationship</td>
+<td>a verb joining entities; a line in the diagram</td>
+</tr>
+<tr>
+<td>cardinality</td>
+<td>one/many on each side, stated both ways</td>
+</tr>
+<tr>
+<td>participation</td>
+<td>optional (min 0) or mandatory (min 1)</td>
+</tr>
+<tr>
+<td>primary key</td>
+<td>the chosen unique id for a row</td>
+</tr>
+<tr>
+<td>foreign key</td>
+<td>a pointer to another table's PK; lives on the many side</td>
+</tr>
+<tr>
+<td>surrogate key</td>
+<td>a system-made id with no meaning — INT or UUID</td>
+</tr>
+<tr>
+<td>natural key</td>
+<td>a real-world id (ISBN, email), kept UNIQUE</td>
+</tr>
+<tr>
+<td>bridge</td>
+<td>the middle table that resolves an M:N</td>
+</tr>
+<tr>
+<td>referential integrity</td>
+<td>every FK points at a row that exists</td>
+</tr>
+<tr>
+<td>normalisation</td>
+<td>one fact in one place (1NF/2NF/3NF)</td>
+</tr>
+<tr>
+<td>frozen fact</td>
+<td>a point-in-time value kept on purpose, not re-derived</td>
+</tr>
+<tr>
+<td>self-reference</td>
+<td>a <code>parent_id</code> pointing back at the same table (a tree)</td>
+</tr>
+<tr>
+<td>weak entity</td>
+<td>one that needs its parent to be identified</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>End of the revised samples companion. Read alongside
+<code>database-design-revised-lesson.md</code> (the full lesson), the hands-on
+<code>database-design-practice-lesson.txt</code>, and the concept bridge
+<code>database-design-companion-lesson.txt</code>.</em></p></div></body></html>

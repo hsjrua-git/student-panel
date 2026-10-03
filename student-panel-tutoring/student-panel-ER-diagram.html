@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Student Panel — Database ER Diagram</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 24px; color: #1f2937; background: #ffffff; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 16px; color: #4b5563; font-size: 13px; }
+  .legend { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 14px; font-size: 12px; margin: 0 0 18px; background: #f9fafb; }
+  .legend b { color: #111827; }
+  .legend ul { margin: 6px 0 0; padding-left: 18px; }
+  .legend li { margin: 3px 0; }
+  .mermaid { width: 100%; overflow-x: auto; }
+  code { background: #eef2ff; padding: 0 3px; border-radius: 3px; }
+  .note { font-size: 12px; color: #6b7280; margin-top: 16px; }
+  @media print {
+    body { margin: 0; }
+    .legend { break-inside: avoid; }
+    @page { size: A3 landscape; margin: 10mm; }
+  }
+</style>
+</head>
+<body>
+  <h1>Student Panel &mdash; Database ER Diagram</h1>
+  <p class="sub">The 16 tables of the single-operator (PGlite) build. PK = primary key, FK = foreign key, UK = unique. Generated from server/src/db/migrations/001&ndash;008.</p>
+
+  <div class="legend">
+    <b>How to read this:</b>
+    <ul>
+      <li>Each box is a <b>table</b>; each line inside is a <b>column</b> &mdash; data type on the left, column name next, key tag last.</li>
+      <li>A connector between two tables is a <b>foreign key</b> (a link the database enforces). The crow's-foot end means "many"; a single bar (|) means "one"; a circle (o) means "optional / zero".</li>
+      <li><b>target (XOR)</b> links: an assignment row points at <i>either</i> a group <i>or</i> a student &mdash; exactly one, never both.</li>
+      <li><b>student_field_definitions</b> has no connector on purpose: a student's values live in <code>students.extra</code> (JSONB) keyed by a definition's id &mdash; a <i>logical</i> link, not a database foreign key.</li>
+      <li>The five boxes with no connectors (settings, preferences, saved_views, user_sessions, audit_log) are standalone "plumbing".</li>
+    </ul>
+    <b>To print:</b> print in landscape with "Fit to page" (A3 gives the most readable result).
+  </div>
+
+  <pre class="mermaid">
+erDiagram
+  settings {
+    text key PK
+    text value
+    timestamptz updated_at
+  }
+  preferences {
+    smallint id PK
+    jsonb settings
+    timestamptz updated_at
+  }
+  saved_views {
+    uuid id PK
+    text name
+    jsonb config
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  user_sessions {
+    varchar sid PK
+    json sess
+    timestamp expire
+  }
+  audit_log {
+    bigint id PK
+    timestamptz occurred_at
+    text actor
+    text action
+    text entity_type
+    text entity_id
+    jsonb details
+  }
+  students {
+    uuid id PK
+    text student_code UK
+    text full_name
+    date birthdate
+    text gender
+    jsonb extra
+    timestamptz created_at
+    timestamptz deleted_at
+  }
+  student_field_definitions {
+    uuid id PK
+    text label
+    text field_type
+    jsonb choices
+    boolean is_restricted
+    integer sort_order
+    timestamptz archived_at
+    timestamptz created_at
+  }
+  student_groups {
+    uuid id PK
+    text name
+    uuid parent_id FK
+    integer sort_order
+    timestamptz archived_at
+    timestamptz created_at
+  }
+  student_group_members {
+    uuid student_id PK, FK
+    uuid group_id PK, FK
+    timestamptz added_at
+  }
+  parameters {
+    uuid id PK
+    uuid parent_id FK
+    text name
+    text unit
+    numeric min_value
+    numeric max_value
+    numeric norm_min
+    numeric norm_max
+    jsonb extra
+    integer sort_order
+    timestamptz archived_at
+    timestamptz created_at
+  }
+  parameter_assignments {
+    uuid id PK
+    uuid parameter_id FK
+    uuid group_id FK
+    uuid student_id FK
+    timestamptz created_at
+  }
+  periods {
+    uuid id PK
+    text name
+    date start_date
+    date end_date
+    integer sort_order
+    timestamptz archived_at
+    timestamptz created_at
+  }
+  period_assignments {
+    uuid id PK
+    uuid period_id FK
+    uuid group_id FK
+    uuid student_id FK
+    timestamptz created_at
+  }
+  evaluations {
+    uuid id PK
+    uuid group_id FK
+    uuid student_id FK
+    uuid parameter_id FK
+    uuid period_id FK
+    numeric value
+    text comment
+    timestamptz locked_at
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  tasks {
+    uuid id PK
+    text title
+    text description
+    uuid parameter_id FK
+    jsonb extra
+    integer sort_order
+    timestamptz archived_at
+    timestamptz created_at
+  }
+  task_assignments {
+    uuid id PK
+    uuid task_id FK
+    uuid group_id FK
+    uuid student_id FK
+    uuid period_id FK
+    boolean done
+    timestamptz done_at
+    timestamptz created_at
+  }
+
+  students ||--o{ student_group_members : "member in"
+  student_groups ||--o{ student_group_members : "contains"
+  student_groups |o--o{ student_groups : "parent of"
+  parameters |o--o{ parameters : "parent of"
+  parameters ||--o{ parameter_assignments : "applies"
+  student_groups |o--o{ parameter_assignments : "target (XOR)"
+  students |o--o{ parameter_assignments : "target (XOR)"
+  periods ||--o{ period_assignments : "scheduled"
+  student_groups |o--o{ period_assignments : "target (XOR)"
+  students |o--o{ period_assignments : "target (XOR)"
+  student_groups ||--o{ evaluations : "scored in"
+  students |o--o{ evaluations : "scored (optional)"
+  parameters ||--o{ evaluations : "measures"
+  periods ||--o{ evaluations : "during"
+  parameters |o--o{ tasks : "relates to (optional)"
+  tasks ||--o{ task_assignments : "given via"
+  student_groups |o--o{ task_assignments : "target (XOR)"
+  students |o--o{ task_assignments : "target (XOR)"
+  periods |o--o{ task_assignments : "scope (optional)"
+  </pre>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+  </script>
+  <p class="note">If the diagram doesn't appear: this file fetches the Mermaid drawing library from a CDN the first time it opens, so it needs internet once. The same diagram is also saved as <code>student-panel-ER-diagram.mermaid</code>, which renders offline inside the app. Ask me for a PNG/SVG and I'll produce one when my sandbox is back.</p>
+</body>
+</html>

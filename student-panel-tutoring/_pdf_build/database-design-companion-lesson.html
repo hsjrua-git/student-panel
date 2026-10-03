@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Database Design — Companion Lesson</title>
+<style>
+@page { size: A4; margin: 14mm 12mm 16mm; }
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; color: #1b2230;
+       font-family: "Helvetica Neue", Arial, "DejaVu Sans", sans-serif; }
+.titlecard { border-bottom: 3px solid #2f5bdb; margin: 0 0 14pt;
+             padding-bottom: 8pt; page-break-after: avoid; }
+.titlecard .kicker { font-size: 8.5pt; letter-spacing: .12em; text-transform: uppercase;
+             color: #2f5bdb; font-weight: 700; }
+.titlecard h1 { font-size: 18pt; margin: 3pt 0 0; color: #16203a; line-height: 1.2; }
+.titlecard .file { font-size: 8.5pt; color: #7a8398;
+             font-family: "DejaVu Sans Mono", monospace; margin-top: 4pt; }
+pre.ascii {
+  font-family: "DejaVu Sans Mono", "Courier New", monospace;
+  font-size: 9pt; line-height: 1.36; color: #1f2733;
+  white-space: pre; margin: 0; tab-size: 4;
+}
+
+</style></head>
+<body><div class="titlecard"><div class="kicker">Database Design · Tutoring</div><h1>Database Design — Companion Lesson</h1><div class="file">database-design-companion-lesson.txt</div></div><pre class="ascii">===============================================================================
+ DATABASE DESIGN - COMPANION LESSON
+ A bridge between the primer (paper design) and a real, touchable database
+===============================================================================
+
+ Read the primer first (database-design-primer.txt). This file does not
+ replace it. It stands next to it and does three jobs the primer, on purpose,
+ does not do:
+
+   1. It shows you how ALL your learning materials fit together, so you never
+      feel lost about &quot;which file am I supposed to be in right now.&quot;
+   2. It makes the abstract ideas concrete: what a database, a table, a row,
+      a column, and a query actually ARE as real things - still without asking
+      you to install anything.
+   3. It clears up the handful of confusions that trip up almost every
+      beginner, and for each one it points at exactly where it lives in the
+      primer and in the samples PDF, and tells you how the student-panel
+      project does it (which is sometimes different - and that is fine).
+
+ Everything here is still READING. You will not touch a computer in this file.
+ The touching-a-computer work has its own file: database-design-practice-lesson.txt.
+ Do that one AFTER this one.
+
+ This is the FULLER edition of the companion: the same six Parts and the ten
+ core confusions as before - plus four more that trip up newcomers nearly as
+ often - now with far more drawn-out pictures. Wherever an
+ idea can be shown as a real little table with sample rows, or as a diagram you
+ can read aloud, it is drawn here rather than only described. Because this is a
+ monospace (fixed-width) text file, every table and diagram is hand-drawn so the
+ columns line up on screen; read it in a monospace font and the boxes stay square.
+
+ Style note: this file uses the same four signposts as the primer, so they
+ should already feel familiar:
+
+   &gt;&gt; CONTEMPLATE   stop and think before reading on. No rush.
+   TRY IT          a tiny thing to do on paper.
+   KEY IDEA        the one sentence to remember.
+   &gt;&gt; PITFALL       a common mistake, named so you can dodge it.
+
+ Take your time. There is no prize for finishing fast. If a part does not
+ click, mark it and bring it to me - that is exactly what these files are for.
+
+-------------------------------------------------------------------------------
+ PART 1 - THE BIG PICTURE: HOW YOUR MATERIALS FIT TOGETHER
+-------------------------------------------------------------------------------
+
+ Before any detail, the map. You now have several documents, written at
+ different times and by different helpers. They are not competing. They are
+ layers around one idea: how to design a database well. Here is the whole set
+ and the single job each one has.
+
+   (1) database-design-primer.txt   &lt;- MY main course. General ER design,
+       from scratch, on paper. Parts 0-10 plus a glossary. This is the trunk
+       of the tree. If two files ever seem to disagree, we settle it here or
+       by thinking it through together - not by picking whichever file we read
+       last.
+
+   (2) database-design-companion-lesson.txt   &lt;- THIS file. The bridge. It
+       makes the primer concrete and clears up confusions. Read it second.
+
+   (3) database-design-practice-lesson.txt   &lt;- hands-on. You open a free,
+       in-browser database and actually build small tables. Read it third,
+       and do it with the sandbox open.
+
+   (4) database-design-lessons-1....docx   &lt;- a lessons notebook written by
+       another AI. Prose lessons (its &quot;Lesson 1&quot; ... &quot;Lesson 19&quot;), plus ten
+       practice questions with answers at the end. It covers the SAME ground
+       as the primer, with the same examples, in a different voice.
+
+   (5) Database Design - Samples ... .PDF   &lt;- the picture-book companion to
+       (4). Every example from the notebook, drawn as real tables (with sample
+       rows) and as crow&#x27;s-foot diagrams. This is the best &quot;show me what it
+       actually looks like&quot; reference you have.
+
+   (6) the student-panel project itself   &lt;- the FINISHED, real design we are
+       working toward understanding and re-deriving. We look at it, we do NOT
+       change it. You build your own version in student-panel-I.
+
+ Here is the same six, drawn as layers around the one idea - method at the top,
+ the real thing we measure against at the bottom:
+
+                 THE ONE IDEA: &quot;design a database well, on paper first&quot;
+                                      |
+            THE METHOD (how to decide anything):
+                 (1) database-design-primer.txt   &lt;- the trunk
+                        /                        \
+       SHOWN in prose + pictures            TURNED INTO understanding + skill
+       (4) lessons .docx                    (2) THIS companion .txt
+       (5) Samples PDF                      (3) practice lesson .txt
+                        \                        /
+                     MEASURED AGAINST (read-only):
+                 (6) the student-panel project - the real design
+
+ KEY IDEA: the primer teaches the method, the notebook+PDF show the same method
+ in pictures and prose, the companion+practice turn it into understanding and
+ skill, and student-panel is the real thing we measure our understanding against.
+
+ A QUICK &quot;WHICH FILE DO I OPEN?&quot; LOOKUP. Stuck, and not sure where to look?
+ Match the SHAPE of your question to a file:
+
+   When your question sounds like...        reach for...
+   ---------------------------------------  ------------------------------------
+   &quot;HOW do I decide X?&quot;                     the primer (the method)
+   &quot;What does X LOOK like, with rows?&quot;      the samples PDF (the pictures)
+   &quot;What ARE these things, really?&quot;         this companion, Part 2
+   &quot;How do I READ this little diagram?&quot;     this companion, Part 3
+   &quot;Which beginner trap am I in?&quot;           this companion, Part 4
+   &quot;Do my materials actually agree?&quot;        this companion Part 5, then
+                                            database-design-AI-pieces-review.txt
+   &quot;Let me actually BUILD one and see.&quot;     the practice lesson (sandbox open)
+   &quot;What does the finished design do?&quot;      the student-panel project (look only)
+
+ &gt;&gt; CONTEMPLATE: which of these do you reach for when you are stuck on &quot;HOW do I
+ decide X?&quot; (the primer) versus &quot;what does X LOOK like?&quot; (the samples PDF)?
+ Knowing which tool answers which kind of question saves hours.
+
+ A reading order that works well, drawn as a path so you can see the
+ back-and-forth is on purpose, not you going in circles:
+
+   [primer 0-4] --&gt; [companion 1-4] --&gt; [practice lesson] --&gt; [primer 5-10]
+         ^                                                          |
+         |                                                          v
+   (settle disputes here) &lt;----- [re-derive student-panel] &lt;-- [samples PDF]
+
+ You do not have to follow it exactly; it is a suggestion, and you are allowed
+ to change it. Tell me if you want to.
+
+-------------------------------------------------------------------------------
+ PART 2 - FROM PAPER TO A REAL DATABASE: WHAT THESE THINGS ACTUALLY ARE
+-------------------------------------------------------------------------------
+
+ The primer talks about entities, attributes, and relationships. Those are
+ PAPER ideas - they live in your head and in your pencil drawing. But a real
+ database is a real thing on a real computer. This part connects the two, so
+ the words stop being abstract. We will still only READ here; the practice
+ lesson is where you make these with your own hands.
+
+ Start from the biggest thing and go smaller.
+
+ A DATABASE is a labelled box that holds tables. One project, one box. The
+ student-panel project has exactly one database inside it. Think &quot;a filing
+ cabinet.&quot;
+
+ A TABLE is a single grid inside that box: columns across the top, rows going
+ down. One table holds one KIND of thing - a &quot;students&quot; table, a &quot;parameters&quot;
+ table. On paper you called this an ENTITY TYPE. Think &quot;one sheet in the filing
+ cabinet, with a printed header row.&quot;
+
+ A COLUMN is one labelled slot that every row fills in the same way: &quot;name&quot;,
+ &quot;email&quot;, &quot;joined_on&quot;. On paper you called this an ATTRIBUTE. Think &quot;one
+ heading on the sheet.&quot;
+
+ A ROW is one actual thing: one real student, one real parameter. On paper you
+ called this an ENTITY INSTANCE. Think &quot;one line filled in on the sheet.&quot;
+
+ Here is the whole vocabulary on one real grid:
+
+      a DATABASE is one labelled box that holds TABLES. Inside it, the table
+      &quot;student&quot; (paper word: ENTITY TYPE) is a grid of columns and rows:
+
+      +------------+-------------+------------+
+      | student_id | full_name   | joined_on  |  &lt;- the COLUMNS (attributes)
+      +------------+-------------+------------+
+      |     1      | Sara Ahmadi | 2026-09-01 |  &lt;- one ROW = one instance
+      |     2      | Omid Karimi | 2026-09-03 |     (one real student)
+      |     3      | Lena Hassan | 2026-09-05 |
+      +------------+-------------+------------+
+
+      - the whole grid is the TABLE (entity type)
+      - each line of data is a ROW (entity instance)
+      - each heading is a COLUMN (attribute)
+      - one cell (a column within one row) holds exactly one VALUE
+
+   KEY IDEA: table = the kind of thing (entity type). row = one of them
+   (instance). column = one fact you keep about each (attribute). If you only
+   remember one mapping from paper to database, remember this one.
+
+ A SCHEMA is the blueprint: the list of tables, their columns, and the rules
+ (which column is the key, which column points at another table). The schema is
+ the DESIGN - the exact thing the primer is teaching you to produce. The rows
+ are the DATA that later flows into that design. Design the schema well and the
+ data behaves; design it badly and no amount of careful typing saves you.
+
+ A QUERY is a question you ask the database in a language called SQL. You will
+ meet four verbs, and only four, for a long time:
+     CREATE TABLE ...   -&gt; &quot;make a new sheet with these headings&quot; (build design)
+     INSERT ...         -&gt; &quot;add one filled-in line&quot;               (add a row)
+     SELECT ...         -&gt; &quot;show me the lines that match this&quot;    (ask a question)
+     UPDATE / DELETE ...-&gt; &quot;change or remove lines&quot;               (edit data)
+
+ You do not need to memorise SQL now. You need to see that a QUERY is just you
+ talking to the grid, and that CREATE TABLE is literally your paper design
+ becoming real. In the practice lesson you will type each of these once and
+ watch it happen.
+
+ ONE SMALL THING, SHOWN IN ALL THREE FORMS  (the core teaching of this Part)
+
+ Here is a single idea - &quot;we keep students, each with a name and a join date&quot; -
+ shown as (a) the paper attribute list, (b) the grid it becomes, and (c) the
+ CREATE TABLE that builds it. Same idea, three costumes.
+
+ TRIPLE 1 - a plain table (no pointers yet)
+
+   (a) ON PAPER (primer style):
+       student = (student_id [key], full_name, joined_on)
+
+   (b) AS A GRID (samples-PDF style):
+       +------------+-------------+------------+
+       | student_id | full_name   | joined_on  |   &lt;- columns (attributes)
+       +------------+-------------+------------+
+       |     1      | Sara Ahmadi | 2026-09-01 |   &lt;- a row (one instance)
+       |     2      | Omid Karimi | 2026-09-03 |   &lt;- another row
+       +------------+-------------+------------+
+
+   (c) AS SQL (practice-lesson style):
+       CREATE TABLE student (
+         student_id  INTEGER PRIMARY KEY,
+         full_name   TEXT NOT NULL,
+         joined_on   DATE
+       );
+
+ Read (a), (b), (c) top to bottom and notice they are the SAME three columns
+ every time. The primer draws (a). The samples PDF draws (b). The practice
+ lesson has you type (c) and then watch the rows from (b) appear. Nothing new
+ is added as you move across - only the costume changes.
+
+ The next triples build a tiny LIBRARY whose rows all connect. A member table
+ has the same shape as the student table above (an id, a name, a join date), so
+ we will not redraw it; take members 1 Sara Ahmadi, 2 Omid Karimi, 3 Lena
+ Hassan - the very same three people. Now the new shapes: a book, its physical
+ copies, and the loans that tie members to copies. Keep these ids in mind:
+ members 1-3, books 100-101, copies 500-502, loans 1-3.
+
+ TRIPLE 2 - a second plain table, with a natural key kept UNIQUE
+
+   (a) ON PAPER:
+       book = (book_id [key], title, author, isbn [unique])
+
+   (b) AS A GRID:
+       +---------+----------------+-------------+-------------+
+       | book_id | title          | author      | isbn        |
+       +---------+----------------+-------------+-------------+
+       |   100   | The Blue Door  | R. Mehta    | 978-0-11-1  |
+       |   101   | Quiet Rivers   | A. Lindgren | 978-0-22-2  |
+       +---------+----------------+-------------+-------------+
+
+   (c) AS SQL:
+       CREATE TABLE book (
+         book_id  INTEGER PRIMARY KEY,
+         title    TEXT NOT NULL,
+         author   TEXT,
+         isbn     TEXT UNIQUE
+       );
+
+ New thing shown: isbn is a NATURAL key (a real-world identifier). We still make
+ book_id the primary key (a surrogate), and keep isbn UNIQUE so two rows can
+ never claim the same ISBN. That &quot;surrogate PK + unique natural value&quot; pattern
+ is confusion number 3, drawn in full in Part 4.
+
+ TRIPLE 3 - a table that POINTS at another (a foreign key)
+
+   (a) ON PAPER:
+       copy = (copy_id [key], book_id [FK -&gt; book], shelf_code, acquired_on)
+
+   (b) AS A GRID (watch book_id - every value is a real book_id from Triple 2):
+       +---------+---------+------------+-------------+
+       | copy_id | book_id | shelf_code | acquired_on |
+       +---------+---------+------------+-------------+
+       |   500   |   100   | A-12       | 2026-01-10  |
+       |   501   |   100   | A-13       | 2026-01-10  |
+       |   502   |   101   | B-04       | 2026-02-02  |
+       +---------+---------+------------+-------------+
+
+   (c) AS SQL:
+       CREATE TABLE copy (
+         copy_id      INTEGER PRIMARY KEY,
+         book_id      INTEGER NOT NULL REFERENCES book(book_id),
+         shelf_code   TEXT,
+         acquired_on  DATE
+       );
+
+ New thing shown: book_id in COPY is a FOREIGN KEY. It is not new data about the
+ copy; it is a POINTER at a row in BOOK. Copies 500 and 501 both point at book
+ 100 (&quot;The Blue Door&quot;), so that title has two physical copies. The word
+ REFERENCES in (c) is the database promising to refuse any copy whose book_id is
+ not a real book. This is the one-to-many of Part 4, confusion 4, made of rows.
+
+ HOW A POINTER LOOKS ACROSS TWO GRIDS. Read copy.book_id, then find that id up
+ in book:
+     copy 500 -&gt; book_id 100 -&gt; &quot;The Blue Door&quot;
+     copy 501 -&gt; book_id 100 -&gt; &quot;The Blue Door&quot;   (same title, a second copy)
+     copy 502 -&gt; book_id 101 -&gt; &quot;Quiet Rivers&quot;
+ The pointer lives on COPY (the many side) and aims at BOOK (the one side).
+
+ TRIPLE 4 - the bridge: a table with TWO pointers and a meaningful NULL
+
+   (a) ON PAPER:
+       loan = (loan_id [key], member_id [FK -&gt; member], copy_id [FK -&gt; copy],
+               borrowed_on, returned_on [NULL = still out])
+
+   (b) AS A GRID (returned_on is empty on purpose for a loan still out):
+       +---------+-----------+---------+-------------+-------------+
+       | loan_id | member_id | copy_id | borrowed_on | returned_on |
+       +---------+-----------+---------+-------------+-------------+
+       |    1    |     1     |   500   | 2026-09-10  |   (NULL)    |
+       |    2    |     1     |   502   | 2026-09-02  | 2026-09-09  |
+       |    3    |     2     |   501   | 2026-09-13  |   (NULL)    |
+       +---------+-----------+---------+-------------+-------------+
+
+   (c) AS SQL:
+       CREATE TABLE loan (
+         loan_id      INTEGER PRIMARY KEY,
+         member_id    INTEGER NOT NULL REFERENCES member(member_id),
+         copy_id      INTEGER NOT NULL REFERENCES copy(copy_id),
+         borrowed_on  DATE NOT NULL,
+         returned_on  DATE               -- NULL until the copy comes back
+       );
+
+ Two new things shown at once:
+   - LOAN carries TWO foreign keys (member_id and copy_id). It sits at the
+     &quot;many&quot; end of two one-to-many links, which is what makes it the bridge
+     between members and copies. (That is confusion 8, &quot;the one move.&quot;)
+   - returned_on is NULL for loans 1 and 3. That blank is not missing data by
+     accident; it MEANS &quot;not returned yet - still out.&quot; Loan 2 has a date, so
+     that copy is back. (That is confusion 5, &quot;what NULL means.&quot;)
+ Sara (member 1) appears on two loans; one is still out, one is returned. The
+ rows connect to Triples 2-3: copy 500 and 502 are real copies, of real books.
+
+ TRIPLE 5 - a table that points at ITSELF (a tree)
+
+   (a) ON PAPER:
+       student_group = (group_id [key], name, parent_id [FK -&gt; student_group,
+                        NULL at the root])
+
+   (b) AS A GRID (parent_id points back into THIS same table; NULL = the root):
+       +----------+----------------------+-----------+
+       | group_id | name                 | parent_id |
+       +----------+----------------------+-----------+
+       |    1     | All Students         |  (NULL)   |   &lt;- the root
+       |    2     | Grade 10             |     1     |   -&gt; child of 1
+       |    3     | Grade 11             |     1     |   -&gt; child of 1
+       |    4     | Grade 10 - Section A |     2     |   -&gt; child of 2
+       |    5     | Grade 10 - Section B |     2     |   -&gt; child of 2
+       +----------+----------------------+-----------+
+
+   (c) AS SQL:
+       CREATE TABLE student_group (
+         group_id   INTEGER PRIMARY KEY,
+         name       TEXT NOT NULL,
+         parent_id  INTEGER REFERENCES student_group(group_id)  -- NULL = root
+       );
+
+ New thing shown: parent_id is a foreign key pointing back into the SAME table.
+ Read it as a tree:
+       All Students (1)
+         |-- Grade 10 (2)
+         |     |-- Grade 10 - Section A (4)
+         |     +-- Grade 10 - Section B (5)
+         +-- Grade 11 (3)
+ One self-pointing column stores a tree of ANY depth with no extra tables, and
+ the single NULL marks the one row with no parent. student-panel uses exactly
+ this shape twice (its groups tree and its parameters tree). It is confusion-
+ free once you have seen the rows: a pointer that happens to aim at its own
+ table.
+
+ &gt;&gt; PITFALL: beginners think SQL is &quot;the hard part&quot; and design is &quot;the easy
+ part.&quot; It is the reverse. CREATE TABLE is a near-mechanical translation of a
+ good paper design. If the design is right, the SQL is short and obvious. All
+ the hard thinking happens on paper, before you type anything. That is WHY the
+ primer keeps you on paper so long. Look back at the five triples: in every one,
+ the SQL (c) just re-states the paper line (a); the thinking was already done.
+
+ TRY IT (paper): pick any table from the samples PDF, cover its grid, and write
+ its (a) paper attribute-list line yourself. Then uncover the grid and check you
+ named the same columns. If you can go (a) -&gt; (b) in your head, you can read any
+ table in your materials.
+
+ BEFORE WE LEAVE PART 2 - THREE SHORT BRIDGE NOTES
+
+ The five triples above showed you the WHAT. Here are three names the primer
+ leans on, dropped onto things you can already picture, so its words land.
+
+ (A) THE THREE HEIGHTS - AND THE MODEL YOU CHOSE
+
+ A database is not the world; it is a small, deliberate MODEL of the slice of
+ the world you care about. The library model &quot;knows&quot; a book has a title and an
+ isbn and nothing of its coffee stains. Design is choosing what to keep and
+ letting the rest go. You make that choice at three HEIGHTS, highest first:
+
+   +------------+-------------------------------+---------------------------+
+   | height     | what you decide               | the triple costume above  |
+   +------------+-------------------------------+---------------------------+
+   | conceptual | the ideas: the things and     | (a) the paper line        |
+   |            | how they connect, plain words |     student = ( ... )     |
+   | logical    | tables, columns, keys, links  | (b) the grid of rows      |
+   | physical   | the real engine: types,       | (c) the CREATE TABLE, and |
+   |            | indexes, where bytes sit      |     where the bytes live  |
+   +------------+-------------------------------+---------------------------+
+
+ Beginners dive to the physical (typing commands); good designers linger at the
+ conceptual (getting the ideas right first). This whole companion lives at the
+ top two heights; the practice lesson is where you finally touch the third.
+
+ (B) THE PAPER PIECES, NAMED PRECISELY (nouns, adjectives, verbs)
+
+ The three primitives map onto parts of speech - which is why good ER modelling
+ sounds like plain talking:
+   - ENTITIES are the NOUNS        (student, book, copy)    -&gt; become TABLES
+   - ATTRIBUTES are the ADJECTIVES (its name, its date)     -&gt; become COLUMNS
+   - RELATIONSHIPS are the VERBS   (borrows, belongs to)    -&gt; become LINKS/FKs
+
+ Attributes come in four kinds, and each forces a different move. Three you have
+ already met: ATOMIC (one plain column); MULTI-VALUED (its own table - confusion
+ 7); DERIVED (do not store it - confusion 6). The fourth is COMPOSITE: one name
+ hiding several values. SPLIT it into the parts you will search or sort by:
+
+   LUMPED (cannot sort by city, cannot greet by first name):
+   +---------+-------------+------------------------+
+   | memb_id | full_name   | address                |
+   +---------+-------------+------------------------+
+   | M-1001  | Sara Ahmadi | 14 Rose Lane, Brighton |
+   +---------+-------------+------------------------+
+   SPLIT (each searchable part is its own column):
+   +---------+------------+--------+--------------+----------+
+   | memb_id | given_name | family | street       | city     |
+   +---------+------------+--------+--------------+----------+
+   | M-1001  | Sara       | Ahmadi | 14 Rose Lane | Brighton |
+   +---------+------------+--------+--------------+----------+
+
+ And every relationship (verb) has a DEGREE - how many kinds of thing it joins:
+   - UNARY  : one table points at itself. Triple 5&#x27;s student_group tree.
+   - BINARY : two tables - the everyday case. Every link in Triples 2-4.
+   - TERNARY: three at once. Confusion 8&#x27;s doctor + drug + patient.
+ Naming the degree is just counting the boxes the verb reaches.
+
+ (C) A LAST WORD ON KEYS (candidate, composite, and a bridge&#x27;s own id)
+
+ CANDIDATE KEY: often several columns could each identify a row - each unique and
+ never empty. In Triple 2 both book_id and isbn qualify; each is a CANDIDATE. You
+ crown ONE as the PRIMARY key - it must be unique, never empty, and STABLE (never
+ needing to change) - and you keep the rest under a UNIQUE rule so they still
+ cannot duplicate. (That is exactly confusion 3&#x27;s surrogate id + unique code.)
+
+ COMPOSITE KEY: a key may be MORE THAN ONE column. A bridge of pairs is keyed by
+ the pair itself - (student_id, course_id) together identify the enrolment, and
+ neither alone is unique. Normal and common; most bridge tables look like this:
+
+   enrolment  (PK = the PAIR (student_id, course_id)):
+   +------------+-----------+-------------+
+   | student_id | course_id | enrolled_on |
+   +------------+-----------+-------------+
+   |     1      |    10     | 2026-09-01  |   student 1 appears twice - fine
+   |     1      |    11     | 2026-09-01  |   course 10 appears twice - fine
+   |     2      |    10     | 2026-09-02  |   but no PAIR ever repeats
+   +------------+-----------+-------------+
+
+ A BRIDGE (also called a junction, link, or associative table) may instead be
+ given its OWN surrogate id - tidy to point at from elsewhere. If you do, you
+ MUST add a UNIQUE rule on the natural combination, or duplicate pairings creep
+ back in. student-panel does exactly this: its scores bridge a student and a
+ parameter for a period, carry their own id, and keep that combination unique so
+ the same thing is never scored twice for the same period.
+
+-------------------------------------------------------------------------------
+ PART 3 - READING THE DIAGRAMS FLUENTLY (A CROW&#x27;S-FOOT CHEAT-SHEET)
+-------------------------------------------------------------------------------
+
+ The primer (Part 4) and the samples PDF both draw relationships in &quot;crow&#x27;s-
+ foot&quot; notation. Most beginners can follow the words but freeze at the little
+ symbols on the connecting line. This part is a cheat-sheet you can keep open
+ beside any diagram. It also explains one thing neither file spells out loudly:
+ the symbols are written MIRRORED on the two ends of a line, which is why the
+ same relationship can show &quot;o&lt;&quot; at one end and &quot;&gt;o&quot; at the other.
+
+ THE FOUR SYMBOLS. A line connects two tables. Near EACH end there are up to
+ two marks. The mark CLOSEST to the table says the MAXIMUM (one, or many); the
+ mark just before it says the MINIMUM (zero = optional, or one = mandatory).
+
+     |    a single bar      -&gt; &quot;one&quot;        (exactly one on this side)
+     o    a small circle    -&gt; &quot;zero&quot;       (this side is OPTIONAL; may be none)
+     &lt;    a crow&#x27;s foot      -&gt; &quot;many&quot;       (this side can be many)
+     ||   bar-bar            -&gt; &quot;one and only one&quot;      (min 1, max 1)
+     |&lt;   bar then foot      -&gt; &quot;one or many&quot;           (min 1, max many)
+     o&lt;   circle then foot   -&gt; &quot;zero or many&quot;          (min 0, max many)
+     o|   circle then bar     -&gt; &quot;zero or one&quot;           (min 0, max 1)
+
+   KEY IDEA: read the symbols from the OUTSIDE in toward the table: the far
+   mark is the minimum (o = optional, | = mandatory), the near mark is the
+   maximum (| = one, crow&#x27;s foot = many).
+
+ THE COMPLETE REFERENCE TABLE. Every combination you will meet, with its
+ right-end form, its mirrored left-end form, the (min,max) it encodes, and the
+ plain-English reading. &quot;Right-end form&quot; is how it looks when the table sits to
+ the RIGHT of the line; &quot;left-end form&quot; is the mirror, table on the LEFT.
+
+   right-end   left-end   min   max    reads as
+   ---------   --------   ---   -----  --------------------------------------
+      ||          ||       1     1     &quot;one and only one&quot; (exactly one)
+      o|          |o       0     1     &quot;zero or one&quot; (optional, at most one)
+      |&lt;          &gt;|       1     many  &quot;one or many&quot; (at least one)
+      o&lt;          &gt;o       0     many  &quot;zero or many&quot; (optional, many)
+
+ Notice &quot;||&quot; mirrored is still &quot;||&quot; - it is symmetric. The other three flip:
+ the circle and the foot swap to the far side when the table moves to the left.
+
+ A TINY TWO-BOX EXAMPLE FOR EACH (read the mark nearest the RIGHT box):
+
+   one and only one (||):
+       Loan  &gt;o-----------||  Copy
+       &quot;each loan is of exactly one copy.&quot;
+
+   zero or one (o|):
+       Employee  ||-------o|  ParkingSpot
+       &quot;an employee has zero or one parking spot (maybe none, never two).&quot;
+
+   one or many (|&lt;):
+       Order  ||----------|&lt;  OrderLine
+       &quot;an order has one or many lines - never zero (an empty order is silly).&quot;
+
+   zero or many (o&lt;):
+       Member  ||---------o&lt;  Loan
+       &quot;a member has zero or many loans (a brand-new member has none yet).&quot;
+
+ THE MIRRORING, SHOWN. Here is the SAME fact - &quot;a member has zero-or-many loans;
+ each loan has exactly one member&quot; - drawn both ways round. The meaning does not
+ change; only which side the circle-and-foot face:
+
+   member on the LEFT:          Member  ||--------o&lt;  Loan
+   member on the RIGHT:         Loan   &gt;o--------||   Member
+
+ In the first, &quot;o&lt;&quot; sits by Loan. In the second, its mirror &quot;&gt;o&quot; sits by Loan.
+ Same loan end, same &quot;zero or many,&quot; just facing the line from the other side.
+ Do not let &quot;&gt;o&quot; and &quot;o&lt;&quot; look like two different ideas - they are one idea
+ seen from the two ends.
+
+ WORKED READING 1 - the primer&#x27;s library line (keep this one; it is the model):
+
+     Member  ||-----o&lt;  Loan  &gt;o-----||  Copy
+
+ Read it in two halves, each outward-to-inward toward its table:
+   - Member side:  &quot;||&quot; next to Member = one-and-only-one Member.
+                   &quot;o&lt;&quot; next to Loan   = zero-or-many Loans.
+     =&gt; &quot;one member has zero or many loans; each loan belongs to exactly one
+        member.&quot;
+   - Copy side:   &quot;&gt;o&quot; next to Loan = zero-or-many Loans (mirrored o&lt;).
+                  &quot;||&quot; next to Copy = one-and-only-one Copy.
+     =&gt; &quot;one copy has zero or many loans; each loan is of exactly one copy.&quot;
+
+ Put together: a loan links exactly one member to exactly one copy; a member or
+ a copy may have no loans yet (the &quot;o&quot; = optional side), which is why a brand-
+ new member and a brand-new copy both still fit the diagram.
+
+ WORKED READING 2 - the simplest one-to-many:
+
+     Publisher  ||-----o&lt;  Book
+
+   - &quot;||&quot; next to Publisher = one-and-only-one publisher.
+   - &quot;o&lt;&quot; next to Book       = zero-or-many books.
+   =&gt; &quot;one publisher has zero or many books; each book has exactly one
+      publisher.&quot; The crow&#x27;s foot is by BOOK, so BOOK carries publisher_id - the
+      foot sits where the foreign key lives.
+
+ WORKED READING 3 - a many-to-many, and why it cannot stay a single line:
+
+     Student  &gt;o---------o&lt;  Course
+
+   - &quot;&gt;o&quot; next to Student = zero-or-many students (mirrored o&lt;).
+   - &quot;o&lt;&quot; next to Course   = zero-or-many courses.
+   =&gt; &quot;a student takes zero or many courses; a course has zero or many
+      students.&quot; Both ends are crow&#x27;s feet - a many-to-many. Neither side can
+      hold the pointer (one cell cannot hold many ids), so this line MUST become
+      a middle table. Resolved, it reads:
+
+     Student  ||-----o&lt;  Enrolment  &gt;o-----||  Course
+
+   =&gt; &quot;a student has zero-or-many enrolments; each enrolment is for exactly one
+      student; each enrolment is for exactly one course; a course has zero-or-
+      many enrolments.&quot; The impossible single line became two clean one-to-
+      manys through Enrolment. (That is confusion 8.)
+
+ WORKED READING 4 - a self-reference (a table pointing at itself):
+
+      A self-reference is ONE box with a line that loops back to itself:
+
+           +-------------------------------------------+
+           |        &quot;is the parent of&quot;   (o&lt;)          |
+           v                                           |
+      [ student_group:  group_id (PK) | name | parent_id (FK) ]
+           |                                           ^
+           |        &quot;has as parent&quot;      (o|)          |
+           +-------------------------------------------+
+
+ Read the loop aloud: &quot;a group is the parent of zero-or-many child groups; each
+ group has zero-or-one parent.&quot; The root (&#x27;All Students&#x27;) has parent_id = NULL -
+ no parent. Part 2&#x27;s Triple 5 shows this exact tree as rows. One box, one line
+ looping back: that is how a tree is drawn.
+
+ WORKED READING 5 - the full library chain from the primer&#x27;s worked example:
+
+     Member  ||--o&lt;  Loan  &gt;o--||  Copy  &gt;o--||  Book
+
+ Read it as one sentence per segment:
+   - &quot;a member has zero or many loans; each loan has exactly one member.&quot;
+   - &quot;a copy has zero or many loans; each loan is of exactly one copy.&quot;
+   - &quot;a book has zero or many copies; each copy is of exactly one book.&quot;
+ Every sentence is true of a real library, so the chain is sound. If any
+ sentence were false (say a copy could belong to two books), the diagram would
+ be wrong - and saying it aloud is how you catch that before building.
+
+ TRY IT (paper): take any diagram in the samples PDF, cover the prose, and read
+ the symbols aloud as full sentences the way we just did. If your sentence
+ matches the PDF&#x27;s caption, you can read crow&#x27;s-foot. If not, bring the diagram
+ to me and we will read it together.
+
+ &gt;&gt; PITFALL: forgetting that the crow&#x27;s foot (many) sits on the end that holds
+ the FOREIGN KEY. &quot;Many loans per member&quot; means the LOAN table carries
+ member_id, not the other way around. The foot points at the table that does
+ the pointing. We cover this again in Part 4, number 4.
+
+-------------------------------------------------------------------------------
+ PART 4 - THE CONFUSIONS ALMOST EVERY BEGINNER HITS
+-------------------------------------------------------------------------------
+
+ For each one: the confusion in plain words, the fix, WHERE it lives in your
+ other materials, and HOW student-panel handles it (so you are not surprised
+ later). Where the practice lesson or your own future design will differ from
+ student-panel, I say so - that is a rule we keep. New in this edition: each
+ confusion is also DRAWN, so the idea is a picture and not only a paragraph.
+
+ 1) TYPE vs INSTANCE  (table vs row)
+    Confusion: &quot;Is &#x27;student&#x27; one thing or many things?&quot;
+    Fix: &quot;student&quot; the TABLE is the KIND; each ROW is one real student. The
+    table is the cookie-cutter; the rows are the cookies. You design the
+    cutter, not each cookie.
+    Where: primer Part 2.1; samples PDF Lessons 1-2.
+    student-panel: a &quot;students&quot; table (the cutter); every enrolled student is a
+    row (a cookie).
+
+    PICTURE - one cutter, many cookies:
+
+      THE CUTTER (the table design = the TYPE; the shape, no people yet)
+      +------------+-------------+------------+
+      | student_id | full_name   | joined_on  |
+      +------------+-------------+------------+
+
+      THE COOKIES (the ROWS = instances; each one is a real student)
+      +------------+-------------+------------+
+      |     1      | Sara Ahmadi | 2026-09-01 |
+      |     2      | Omid Karimi | 2026-09-03 |
+      |     3      | Lena Hassan | 2026-09-05 |
+      +------------+-------------+------------+
+
+    You design the header once; the rows are stamped out from it. &quot;student&quot;
+    (singular, the design) is one thing; the students (the rows) are many.
+
+ 2) ENTITY vs ATTRIBUTE  (its own table, or just a column?)
+    Confusion: &quot;Should &#x27;group&#x27; be a column on student, or its own table?&quot;
+    Fix: ask &quot;do I keep facts ABOUT this thing, or will many rows share it?&quot;
+    If yes to either, it is an ENTITY (own table) and you point at it with a
+    foreign key. If it is just one plain value that belongs to this one row, it
+    is an ATTRIBUTE (a column). &quot;Colour&quot; is a column in a small shop and a
+    table in a paint factory - purpose decides.
+    Where: primer Part 2.1-2.2; samples PDF Lesson 2 (the colour example).
+    student-panel: &quot;group&quot; is its own table (groups have names, parents, and
+    members), so a student&#x27;s group is a foreign key, not a text column.
+
+    PICTURE - the same &quot;group&quot; done both ways:
+
+      AS A PLAIN COLUMN (ok only if a group is JUST a label, never shared):
+      +------------+-------------+--------------+
+      | student_id | full_name   | group        |
+      +------------+-------------+--------------+
+      |     1      | Sara Ahmadi | Grade 10 A   |
+      |     2      | Omid Karimi | Grade 10 A   |  &lt;- retyped; rename it once and
+      +------------+-------------+--------------+     these two now disagree
+
+      AS ITS OWN TABLE (needed once a group has facts, or is shared by many):
+      student_group:
+      +----------+------------+
+      | group_id | name       |
+      +----------+------------+
+      |    7     | Grade 10 A |
+      +----------+------------+
+      student (its group_id POINTS at student_group.group_id):
+      +------------+-------------+----------+
+      | student_id | full_name   | group_id |
+      +------------+-------------+----------+
+      |     1      | Sara Ahmadi |    7     |
+      |     2      | Omid Karimi |    7     |
+      +------------+-------------+----------+
+      The name &quot;Grade 10 A&quot; now lives in ONE row; rename it there and every
+      student follows - no retyping, no disagreement.
+
+ 3) NATURAL vs SURROGATE KEY  - and INT vs UUID
+    Confusion: &quot;What do I put in the id column, and why not just use the name
+    or the email?&quot;
+    Fix: a NATURAL key is real-world (email, ISBN, national id). A SURROGATE
+    key is invented by the system purely to be a stable handle. Natural keys
+    change and repeat; surrogate keys never do. Modern practice: give each
+    table a surrogate primary key AND keep the useful natural value under a
+    UNIQUE rule so it still cannot duplicate.
+    Two kinds of surrogate exist, and here is a real difference between your
+    materials:
+       - the samples PDF uses INTEGER auto-numbers (1, 2, 3 ...) everywhere.
+         Simple, and great for learning.
+       - the primer (Part 3) and student-panel use a UUID - a long random id
+         like 7f3a...-...-9c2b - PLUS a human-friendly unique code.
+    Both are surrogate keys; neither is wrong. INT is easier to read while
+    learning; UUID is better when ids must be unique across machines or must
+    not reveal &quot;how many&quot; or &quot;what order.&quot; This is a DIFFERENCE you will meet,
+    not a contradiction.
+    Where: primer Part 3 (it even notes student-panel&#x27;s UUID + student_code);
+    samples PDF Lessons 3-4 (INT ids).
+    student-panel: UUID primary keys, plus a unique human student_code. So when
+    you see &quot;1, 2, 3&quot; in the PDF and long random ids in student-panel, you are
+    seeing the same idea in two costumes. In the PRACTICE lesson we will use INT
+    ids (like the PDF) because they are easier to type and read - a place where
+    the practice deliberately differs from student-panel.
+
+    PICTURE - the SAME table, INT id vs UUID + human code:
+
+      INT surrogate (samples PDF / practice style):
+      +------------+--------------+
+      | student_id | full_name    |
+      +------------+--------------+
+      |     1      | Sara Ahmadi  |
+      |     2      | Omid Karimi  |
+      +------------+--------------+
+
+      UUID surrogate + a unique human code (primer / student-panel style):
+      +--------------------------------------+--------------+-------------+
+      | student_id (UUID)                    | student_code | full_name   |
+      +--------------------------------------+--------------+-------------+
+      | 7f3a1c6e-9b2d-4a51-8e07-2c9b1f4d6a30 | STU-0001     | Sara Ahmadi |
+      | b1d9e4a2-3c77-4f16-9a5e-6d8c0b2a1e55 | STU-0002     | Omid Karimi |
+      +--------------------------------------+--------------+-------------+
+
+      BOTH student_id columns are surrogate keys (invented, meaningless,
+      stable). student_code is the NATURAL value kept UNIQUE for humans to
+      search by. The INT and the UUID are the same idea - a stable handle - in
+      two costumes.
+
+ 4) WHERE THE FOREIGN KEY GOES  (which table carries the pointer?)
+    Confusion: &quot;Does the loan point at the member, or the member at the loan?&quot;
+    Fix: in a one-to-many, the foreign key lives on the MANY side. One member,
+    many loans -&gt; loan carries member_id. Rule of thumb: the child points at
+    the parent; the crow&#x27;s foot sits where the FK lives.
+    Where: primer Part 3 (FK placement); samples PDF Lessons 7-8.
+    student-panel: a score/evaluation row points at the student and the
+    parameter it is about; the &quot;many&quot; rows carry the pointers, exactly as the
+    rule says.
+
+    PICTURE - right vs wrong placement:
+
+      RIGHT - FK on the MANY side (each loan carries one member_id):
+      member (the &quot;one&quot; side):
+      +-----------+-------+
+      | member_id | name  |
+      +-----------+-------+
+      |     1     | Sara  |
+      |     2     | Omid  |
+      +-----------+-------+
+      loan (the &quot;many&quot; side - member_id is the pointer):
+      +---------+-----------+-------------+
+      | loan_id | member_id | borrowed_on |
+      +---------+-----------+-------------+
+      |    1    |     1     | 2026-09-10  |
+      |    2    |     1     | 2026-09-02  |
+      |    3    |     2     | 2026-09-13  |
+      +---------+-----------+-------------+
+      follow each loan&#x27;s member_id back to member: loans 1 &amp; 2 -&gt; Sara (1),
+      loan 3 -&gt; Omid (2). Many loans point at one member; one value per cell.
+
+      WRONG - FK on the ONE side (member tries to list its loans):
+      +-----------+-------+-----------+
+      | member_id | name  | loan_ids  |
+      +-----------+-------+-----------+
+      |     1     | Sara  | 1, 2      |  &lt;- a LIST in a cell: breaks 1NF, cannot
+      |     2     | Omid  | 3         |     be searched or kept honest
+      +-----------+-------+-----------+
+      The crow&#x27;s foot (many) sits on LOAN, so the pointer sits on LOAN.
+
+ 5) WHAT &quot;NULL&quot; MEANS  (empty on purpose, or missing by accident?)
+    Confusion: &quot;A blank cell - is that allowed? what does it mean?&quot;
+    Fix: NULL means &quot;no value here.&quot; You must DECIDE, per column, whether blank
+    is legal and what it means. loan.returned_on being NULL means &quot;not returned
+    yet&quot; - a real, useful meaning. A NULL email might mean &quot;we never collected
+    it.&quot; Give every nullable column a sentence of meaning; forbid NULL (NOT
+    NULL) where blank would be nonsense.
+    Where: primer Part 2.2 and Part 2.4 (participation = the optional/mandatory
+    choice); samples PDF Lesson 8 and the delete-rule tables.
+    student-panel: it uses NULL deliberately - e.g. an assignment can point at
+    EITHER a group OR a single student, so one of those two pointers is NULL at
+    a time (the &quot;either/or&quot; pattern). We will look closely at that when we
+    reach it.
+
+    PICTURE - two honest, meaningful NULLs:
+
+      (i) returned_on NULL = &quot;still out&quot; (a useful fact, not missing data):
+      +---------+-----------+-------------+-------------+
+      | loan_id | member_id | borrowed_on | returned_on |
+      +---------+-----------+-------------+-------------+
+      |    1    |     1     | 2026-09-10  |   (NULL)    |  &lt;- still out
+      |    2    |     1     | 2026-09-02  | 2026-09-09  |  &lt;- returned
+      +---------+-----------+-------------+-------------+
+
+      (ii) the EITHER/OR pattern (an assignment aims at a group OR one student):
+      +---------------+----------+------------+
+      | assignment_id | group_id | student_id |
+      +---------------+----------+------------+
+      |       1       |    7     |   (NULL)   |  &lt;- aimed at a whole group
+      |       2       |  (NULL)  |     3      |  &lt;- aimed at one single student
+      +---------------+----------+------------+
+      Exactly one of group_id / student_id is filled; the other is NULL ON
+      PURPOSE. The blank is doing real work: it says &quot;not this kind of target.&quot;
+
+ 6) DERIVE, DON&#x27;T STORE  - and the one big exception
+    Confusion: &quot;Should I keep a &#x27;total&#x27; column, or an &#x27;age&#x27; column?&quot;
+    Fix: if a value can be computed from other values, usually do NOT store it;
+    compute it when asked. Store birth_date, show age. Store line items, add up
+    the total. Storing a derived value means it can drift out of step with the
+    thing it came from.
+    THE EXCEPTION (important, and this is where the samples PDF ADDS something
+    the primer only hints at): a value you capture ON PURPOSE at a moment in
+    time, because it must never change afterward, is NOT a derived value - it
+    is a FROZEN FACT. The classic case is unit_price_at_sale on an order line.
+    The product&#x27;s price today is irrelevant; the order must remember what the
+    customer actually paid. Keep it. It only LOOKS like a redundancy.
+    Where: primer Part 2.2 and Part 6 (derive-don&#x27;t-store, denormalise);
+    samples PDF Lessons 9 and 16 (&quot;Not a break: unit_price_at_sale is a frozen
+    fact&quot;) - a genuinely good addition worth folding into your notes.
+    student-panel: a recorded score is a frozen fact of its period - once a
+    period is scored, that number stands even if the parameter&#x27;s setup later
+    changes. Same principle as unit_price_at_sale.
+
+    PICTURE - don&#x27;t store what you can compute; DO store what was true once:
+
+      DON&#x27;T store &#x27;age&#x27; (it is stale the next birthday; birth_date never is):
+      +------------+-------------+-------+
+      | student_id | birth_date  |  age  |
+      +------------+-------------+-------+
+      |     1      | 2008-05-01  |  18   |  &lt;- WRONG: wrong the day after a b-day
+      +------------+-------------+-------+
+      keep birth_date; compute age = (today - birth_date) only when asked.
+
+      DO store a FROZEN FACT (the price actually paid, captured on purpose):
+      product (its price TODAY):
+      +------------+-------+
+      | product_id | price |
+      +------------+-------+
+      |    100     | 12.00 |
+      +------------+-------+
+      order_line (the price captured AT THE SALE):
+      +---------+------------+-----+--------------------+
+      | line_id | product_id | qty | unit_price_at_sale |
+      +---------+------------+-----+--------------------+
+      |    1    |    100     |  2  |       10.00        |
+      +---------+------------+-----+--------------------+
+      product.price is 12.00 now; the sale remembers 10.00 - what was really
+      paid. That is not drift; it is history captured on purpose. In student-
+      panel a scored period is this same frozen fact: the number stands.
+
+ 7) ONE VALUE PER CELL  (first normal form, in plain words)
+    Confusion: &quot;Can I just put &#x27;math, science, art&#x27; in one subjects column?&quot;
+    Fix: no. One cell, one value. A list in a cell cannot be searched, counted,
+    or constrained properly (&quot;who takes science?&quot; becomes guesswork). Repeating
+    columns (phone1, phone2, phone3) are the same mistake wearing a different
+    hat. The fix is always: give the repeating thing its OWN table with a
+    foreign key back.
+    Where: primer Part 6 (1NF); samples PDF Lesson 14 (phone1/2/3 and the list-
+    in-a-cell break). You will FEEL this one in the practice lesson by trying to
+    query a comma-list and failing.
+    student-panel: multi-valued things (a student&#x27;s many scores, a group&#x27;s many
+    members) live in their own tables, never as lists in a cell.
+
+    PICTURE - the comma-list smell, and the child-table cure:
+
+      BAD - three values crammed into one cell (cannot be searched or counted):
+      +------------+-------------+---------------------+
+      | student_id | full_name   | subjects            |
+      +------------+-------------+---------------------+
+      |     1      | Sara Ahmadi | math, science, art  |  &lt;- 3 values, 1 cell
+      |     2      | Omid Karimi | math                |
+      +------------+-------------+---------------------+
+      &quot;who takes science?&quot; -&gt; you must pattern-match inside text and hope.
+
+      ALSO BAD - the same mistake as repeating columns:
+      +------------+-------------+----------+----------+----------+
+      | student_id | full_name   | subject1 | subject2 | subject3 |
+      +------------+-------------+----------+----------+----------+
+      |     1      | Sara Ahmadi | math     | science  | art      |  &lt;- a 4th?
+      +------------+-------------+----------+----------+----------+
+
+      FIXED - the repeating thing gets its OWN table, one value per row:
+      student:                      student_subject (one row per pair):
+      +------------+----------+     +------------+-----------+
+      | student_id | name     |     | student_id | subject   |
+      +------------+----------+     +------------+-----------+
+      |     1      | Sara     |     |     1      | math      |
+      |     2      | Omid     |     |     1      | science   |
+      +------------+----------+     |     1      | art       |
+                                    |     2      | math      |
+                                    +------------+-----------+
+      now &quot;who takes science?&quot; is one clean lookup: rows where subject=&#x27;science&#x27;.
+
+ 8) THE ONE MOVE: when to add a table &quot;in the middle&quot;
+    Confusion: &quot;This relationship feels messy - what do I do?&quot;
+    Fix: three different-looking problems all have the SAME solution - put a new
+    table between the two things:
+       - MANY-TO-MANY (students &lt;-&gt; courses): a bridge table (enrolment).
+       - A LINK THAT HAS ITS OWN FACTS (the enrolment has a grade and a date):
+         the same bridge, now carrying those facts.
+       - A THREE-WAY fact (doctor + drug + patient = a prescription): a table
+         in the middle holding all three pointers.
+    If a relationship has its own attributes, or joins more than two things, or
+    is many-to-many, it wants to BE a table, not a line.
+    Where: primer Part 5 (the five hard patterns); samples PDF Lessons 10-13
+    (&quot;three triggers, one idea&quot;).
+    student-panel: its scores/evaluations table is exactly this - a table in
+    the middle that links a student and a parameter for a period and carries the
+    score itself. The thing that felt like &quot;just a link&quot; is actually the most
+    important table in the design.
+
+    PICTURE - three messy shapes, one cure (a table in the middle):
+
+      (a) MANY-TO-MANY -&gt; a bridge table of pairs:
+          Student  &gt;o-----------o&lt;  Course     (cannot be stored as one line)
+          becomes
+          Student  ||--o&lt;  Enrolment  &gt;o--||  Course
+
+          enrolment  (one row per student-course pair):
+          +------------+-----------+
+          | student_id | course_id |
+          +------------+-----------+
+          |     1      |    10     |
+          |     1      |    11     |
+          |     2      |    10     |
+          +------------+-----------+
+
+      (b) A LINK WITH ITS OWN FACTS -&gt; the SAME bridge, carrying the facts:
+          +------------+-----------+-------+-------------+
+          | student_id | course_id | grade | enrolled_on |
+          +------------+-----------+-------+-------------+
+          |     1      |    10     |  A    | 2026-09-01  |
+          |     1      |    11     |  B    | 2026-09-01  |
+          +------------+-----------+-------+-------------+
+          grade and enrolled_on belong to the PAIR, so they live on the bridge.
+
+      (c) A THREE-WAY FACT -&gt; a middle table holding three pointers:
+          Doctor  ----\
+          Drug    -----)--- &quot;prescribes&quot; ---&gt;  prescription
+          Patient ----/
+          +-----------------+-----------+---------+------------+
+          | prescription_id | doctor_id | drug_id | patient_id |
+          +-----------------+-----------+---------+------------+
+          |        1        |    20     |   30    |     40     |
+          +-----------------+-----------+---------+------------+
+          one row ties a doctor, a drug, and a patient into a single fact.
+
+      All three: the &quot;link&quot; became a TABLE. student-panel&#x27;s scores table is
+      cases (b)+(c) at once - a middle table linking student x parameter x
+      period that carries the score.
+
+ 9) RESERVED WORDS  (why you cannot name a table &quot;order&quot; or &quot;group&quot;)
+    Confusion: none at first - then a baffling error when a table named &quot;order&quot;
+    or &quot;group&quot; or &quot;user&quot; refuses to work.
+    Fix: those words already mean something to the database (ORDER BY, GROUP BY,
+    USER). Avoid them as plain names: use &quot;orders&quot;, &quot;groups&quot;, &quot;app_user&quot;, or
+    quote them. This is a PHYSICAL-level gotcha the primer does not mention and
+    the samples PDF flags - a useful addition.
+    Where: samples PDF &quot;How to read&quot; note on reserved words.
+    student-panel: runs on Postgres, where &quot;user&quot;, &quot;order&quot;, and &quot;group&quot; are all
+    reserved, so its real tables use safe names. Worth remembering before you
+    name anything in the practice lesson.
+
+    PICTURE - names that fight the database, and their safe replacements:
+
+      the word you WANT     why it fights          the SAFE name to use
+      ------------------    --------------------   --------------------
+      order                 means ORDER BY ...     orders
+      group                 means GROUP BY ...     groups
+      user                  means CURRENT_USER     app_user
+      select / table / ...  all SQL keywords       pick a non-keyword noun
+
+      CREATE TABLE order  ( ... );   -&gt; may ERROR, or force you to quote &quot;order&quot;
+      CREATE TABLE orders ( ... );   -&gt; safe, boring, works everywhere
+
+    Boring names are a feature. Postgres (student-panel&#x27;s engine) treats all
+    three above as reserved, which is exactly why student-panel never names a
+    table plainly &quot;user&quot; or &quot;group&quot;.
+
+10) SOFT DELETE vs HARD DELETE  (does &quot;delete&quot; really erase?)
+    Confusion: &quot;If I remove a student, is the data gone forever?&quot;
+    Fix: a HARD delete removes the row for good. A SOFT delete keeps the row but
+    marks it (e.g. an archived_at date or an is_active flag) so it stops showing
+    up while the history it is attached to survives. Which to use is a design
+    decision about whether you ever need the past back.
+    Where: primer Part 9 (design judgement, soft vs hard delete); the samples
+    PDF shows HARD deletes with ON DELETE rules (RESTRICT/CASCADE/SET NULL).
+    student-panel: SOFT-deletes / archives rather than erasing, so past scores
+    stay meaningful. In the PRACTICE lesson we will use HARD deletes on a
+    throwaway database - that is simpler and lets you SEE referential integrity
+    refuse an orphan. So the practice deliberately differs from student-panel
+    here: practice erases, student-panel archives. Keep that difference in mind.
+
+    PICTURE - the same &quot;remove Omid,&quot; two ways:
+
+      BEFORE (both rows present; archived_at empty = active):
+      +------------+-------------+-------------+
+      | student_id | full_name   | archived_at |
+      +------------+-------------+-------------+
+      |     1      | Sara Ahmadi |   (NULL)    |
+      |     2      | Omid Karimi |   (NULL)    |
+      +------------+-------------+-------------+
+
+      HARD DELETE (practice, throwaway DB) - the row is simply GONE:
+      +------------+-------------+-------------+
+      | student_id | full_name   | archived_at |
+      +------------+-------------+-------------+
+      |     1      | Sara Ahmadi |   (NULL)    |
+      +------------+-------------+-------------+
+      Omid no longer exists; any history that pointed at him is now orphaned
+      (which is why the database may refuse the delete - referential integrity).
+
+      SOFT DELETE (student-panel) - the row STAYS, just marked and hidden:
+      +------------+-------------+-------------+
+      | student_id | full_name   | archived_at |
+      +------------+-------------+-------------+
+      |     1      | Sara Ahmadi |   (NULL)    |
+      |     2      | Omid Karimi | 2026-10-02  |  &lt;- hidden from lists; past kept
+      +------------+-------------+-------------+
+      Omid drops out of normal views, but his old scores still make sense
+      because the row he points from is still there. That is why student-panel
+      archives instead of erasing.
+
+ THOSE ARE THE TEN YOU WILL MEET FIRST. A FEW MORE, ALMOST AS COMMON:
+
+ The ten above are the classics. These next few trip up newcomers nearly as
+ often, and each is a pattern the primer teaches - same shape as before:
+ confusion, fix, WHERE, student-panel, and a picture.
+
+11) ONE-TO-ONE: MERGE IT, OR SPLIT IT ON PURPOSE
+    Confusion: &quot;Two things line up exactly one-to-one - must I use two tables?&quot;
+    Fix: usually NO. A true 1:1 is a hint the two are really ONE thing, so keep
+    the extra columns on the main table (they sit NULL when absent). You SPLIT
+    on purpose only for a reason you can name: the extra data is rare, or
+    sensitive, or bulky. When you split, the foreign key goes on the NEVER-EMPTY
+    side and wears UNIQUE + NOT NULL - those two constraints are what hold it at
+    1:1 and stop it sliding into 1:many.
+    Where: primer Part 5 (one-to-one) and Part 2 (optional vs mandatory sides).
+    student-panel: keeps rarely-present or sensitive facts in their own place by
+    the same judgement - not a rule, a reason.
+
+    PICTURE - the same person-and-passport, merged vs split:
+
+      MERGED (the usual answer; passport columns are NULL when there is none):
+      +-----------+-------------+-------------+-----------------+
+      | person_id | name        | passport_no | passport_expiry |
+      +-----------+-------------+-------------+-----------------+
+      |     1     | Sara Ahmadi | 981222345   | 2030-05-01      |
+      |     2     | Omid Karimi |   (NULL)    |     (NULL)      |  &lt;- none
+      +-----------+-------------+-------------+-----------------+
+
+      SPLIT ON PURPOSE - two tables, the link carried on ONE side:
+      person (the never-empty side):
+      +-----------+-------------+
+      | person_id | name        |
+      +-----------+-------------+
+      |     1     | Sara Ahmadi |
+      |     2     | Omid Karimi |
+      +-----------+-------------+
+      passport (FK person_id is UNIQUE so one person cannot own two rows,
+      and NOT NULL so a passport row cannot float free):
+      +-----------+-----------+
+      | person_id | number    |
+      +-----------+-----------+
+      |     1     | 981222345 |
+      +-----------+-----------+
+      Person 2 simply has no row here - that is the &quot;zero&quot; in &quot;zero or one.&quot;
+
+12) WEAK ENTITIES - AND WHAT &quot;DELETE THE PARENT&quot; DOES TO THE CHILDREN
+    Confusion: &quot;An order-line, a reply, a room - does it get its own table?&quot;
+    Fix: yes, but it is a WEAK entity - it cannot exist without its parent. An
+    order-line is meaningless without its order; &quot;line 2&quot; only means &quot;line 2 OF
+    order 88.&quot; So its foreign key to the parent is MANDATORY (NOT NULL) and part
+    of its very identity: its key is the parent&#x27;s id PLUS a local number - a
+    COMPOSITE key (order_id, line_no). A weak entity never floats free.
+    Where: primer Part 5 (weak entities) and Part 3 (the ON DELETE rules).
+    student-panel: a score is weak - it belongs to a student and a period and
+    cannot stand alone; because student-panel SOFT-deletes, parents stay, so
+    children are never orphaned (confusion 10).
+
+    PICTURE - an order and its lines (table is &quot;orders&quot;, not &quot;order&quot; - see #9):
+
+      orders (strong):             order_line (weak; PK = (order_id, line_no)):
+      +----------+------------+    +----------+---------+----------+-----+
+      | order_id | placed_on  |    | order_id | line_no | product  | qty |
+      +----------+------------+    +----------+---------+----------+-----+
+      |    88    | 2026-09-30 |    |    88    |    1    | Pencils  |  3  |
+      |    89    | 2026-10-01 |    |    88    |    2    | Eraser   |  1  |
+      +----------+------------+    |    89    |    1    | Notebook |  2  |
+                                   +----------+---------+----------+-----+
+      line_no alone means nothing; order_id is mandatory; a line with no order
+      cannot exist.
+
+    When the PARENT is deleted the database needs ONE plain answer. Say each one
+    aloud and keep the one that is TRUE of your world:
+      - CASCADE : &quot;delete the order and its lines go with it&quot; - they cannot
+                  outlive it; the usual choice for a weak child.
+      - RESTRICT: &quot;you may NOT delete the order while any line still points at
+                  it&quot; - the safe default for strong parents.
+      - SET NULL: &quot;keep the child, just empty its pointer&quot; - only possible when
+                  the link is OPTIONAL, so it is wrong for a weak child (whose
+                  FK is NOT NULL).
+
+13) WHY SPLIT INTO SO MANY TABLES? THE THREE ANOMALIES (and 2NF, 3NF)
+    Confusion: &quot;One wide table is simpler - why break it into pieces?&quot;
+    Fix: because repetition rots. Cram facts about two different things into one
+    table and the SAME fact gets written many times - then the copies drift
+    apart. One value per cell was confusion 7 (that was 1NF); this is the rest of
+    the story. The cure is to split so each fact lives in exactly ONE place.
+    Where: primer Part 1 and Part 6 (normalisation and the three anomalies).
+    student-panel: facts about a student live on the student, facts about a score
+    on the score - never copied side by side, so they cannot disagree.
+
+    PICTURE - one wide loan sheet, and the three ways it goes wrong:
+
+      +---------+-------------+--------------+------------+
+      | loan_id | member_name | member_phone | book_title |
+      +---------+-------------+--------------+------------+
+      |    1    | Sara Ahmadi | 555-1020     | Dune       |
+      |    2    | Sara Ahmadi | 555-1020     | Emma       |  &lt;- phone written
+      |    3    | Omid Karimi | 555-7788     | Dune       |     twice already
+      +---------+-------------+--------------+------------+
+      - UPDATE anomaly: Sara changes phone; you fix row 1, miss row 2 -&gt; the
+        table now claims two phones and cannot say which is right.
+      - INSERT anomaly: a new member who has borrowed nothing has NO row to sit
+        in (the sheet is about loans) -&gt; you cannot record her at all.
+      - DELETE anomaly: delete Omid&#x27;s only loan (row 3) and Omid himself vanishes
+        -&gt; you meant to drop a loan and dropped a person.
+      CURE: split into member / book / loan; loan points at the other two by id.
+      Sara&#x27;s phone now sits in ONE place; a loan-less member is fine; deleting a
+      loan loses only the loan.
+
+    Two deeper splits, each a one-line rule, each fixed by &quot;move the fact home&quot;:
+      - 2NF: on a table keyed by a PAIR (student_id, course_id), the student&#x27;s
+        NAME depends on student_id ALONE - only PART of the key - so it does not
+        belong here; it belongs on the student table.
+      - 3NF: a book row holding publisher_city is wrong - the city depends on the
+        publisher (another NON-key column), not on the book; move it onto a
+        publisher table.
+    The whole craft fits one sentence: every non-key fact must depend on &quot;the
+    key, the whole key, and nothing but the key.&quot; (You MAY, knowingly and for
+    measured speed, keep a little redundancy - DENORMALISE - but correct first,
+    fast later, and never by accident.)
+
+14) A FLEXIBLE (JSON) COLUMN vs PROPER COLUMNS
+    Confusion: &quot;Can I just dump the extra, varies-per-row fields into one column?&quot;
+    Fix: most engines let a single column hold a free-form bag of data (often
+    JSON). It is tempting, but the database cannot easily check, key, sort, or
+    search INSIDE that bag. Rule of thumb: any fact you will FILTER, SORT, or
+    ENFORCE deserves a real column of its own; only genuinely open-ended extras
+    belong in a flexible column. Reach for it rarely, and on purpose.
+    Where: primer Part 9 (a flexible column vs proper columns).
+    student-panel: the facts it reports on and filters by are real columns; it
+    does not hide a queryable fact inside a blob.
+
+    PICTURE - which facts earn a real column:
+
+      the fact                      real column?   why
+      ----------------------------  -------------  ------------------------------
+      a student&#x27;s birth_date        REAL column    you sort and filter by it
+      a score&#x27;s value               REAL column    you total it and chart it
+      which group a student is in   REAL column    you filter by it; it is a link
+      a free-form per-import note   JSON is fine   open-ended, never queried
+
+-------------------------------------------------------------------------------
+ PART 5 - DO THE OTHER AI PIECES AGREE WITH THE PRIMER?
+-------------------------------------------------------------------------------
+
+ Short answer: yes, almost entirely - they were written to sit alongside the
+ primer and even tell you to compare notes. They use the same examples and the
+ same crow&#x27;s-foot notation, and on every big idea (keys, foreign keys, the five
+ patterns, the three normal forms) they say the same thing in a different
+ voice. In a few places they ADD something useful the primer underplays (the
+ frozen-fact exception, reserved words, the explicit mirroring of crow&#x27;s-foot
+ symbols, a surrogate-id option for bridge tables). The one thing to ADD is
+ that the samples PDF uses only INTEGER ids and never mentions UUID - which is
+ exactly what student-panel uses - so a learner following only the PDF would be
+ surprised by student-panel&#x27;s long random ids (see Part 4, number 3).
+
+ THE WHOLE VERDICT AT A GLANCE:
+
+   what the pieces do                       verdict
+   --------------------------------------   -------------------------------------
+   1NF / 2NF / 3NF and the three anomalies  AGREE (identical to the primer)
+   &quot;the key, the whole key, nothing but...&quot; AGREE (same mnemonic)
+   foreign key on the MANY side             AGREE
+   1:1 placement (on the never-empty side)  AGREE
+   self-reference tree, NULL at the root    AGREE
+   the &quot;one move&quot; (M:N / facts / ternary)   AGREE (same as primer Part 5)
+   ON DELETE RESTRICT / CASCADE / SET NULL  AGREE
+   frozen-fact exception (unit_price)       ADD - useful; primer only hinted
+   reserved words (order/group/user)        ADD - useful physical gotcha
+   crow&#x27;s-foot mirroring spelled out        ADD - folded into Part 3 here
+   a surrogate-id option for a bridge       ADD - a valid alternative to show
+   INTEGER ids only; UUID never mentioned   THE ONE GAP (student-panel uses UUID)
+
+ So: a strong team, with four nice additions and exactly one thing to add.
+ There are no outright contradictions in the readable material - only choices
+ of emphasis. (One item is still pending: the lessons .docx has ten practice
+ questions whose written answers have not yet been checked line by line; that
+ is flagged in the review file below and is the one thing left to certify.)
+
+ The full, point-by-point comparison - what agrees, what differs, what needs
+ adding, and which side is right and why - is written out separately in:
+
+     database-design-AI-pieces-review.txt
+
+ Read that when you want the detailed verdict. This companion only needed to
+ reassure you that your materials are a team, not a tug-of-war.
+
+-------------------------------------------------------------------------------
+ PART 6 - WHAT TO DO WITH THIS COMPANION
+-------------------------------------------------------------------------------
+
+ 1. Read it once, slowly, with the primer nearby. When Part 4 points at a
+    primer part, flip there and reread that bit in light of the confusion we
+    just named.
+ 2. Keep the Part 3 cheat-sheet handy whenever you look at a diagram.
+ 3. THEN open the practice lesson (database-design-practice-lesson.txt) and do
+    it with the in-browser sandbox open. Reading made these ideas concrete;
+    doing will make them yours.
+ 4. Write down any question that does not resolve. Bring the list to me. We do
+    NOT move on to re-deriving student-panel until your questions are answered -
+    there is no rush, and confusion now is cheaper than confusion later.
+
+ A READINESS CHECK before the practice lesson. You do not need full marks - this
+ just shows you where to reread. Can you, from memory:
+
+   [ ] say the paper word for a table, a row, and a column (Part 2)?
+   [ ] turn a one-line paper design into a CREATE TABLE in your head (Part 2)?
+   [ ] read  Member ||--o&lt;  Loan  aloud as two true sentences (Part 3)?
+   [ ] say which side of a one-to-many carries the foreign key (Part 4 #4)?
+   [ ] name the &quot;one move&quot; that fixes M:N, a link-with-facts, and a ternary
+       (Part 4 #8)?
+   [ ] explain why &#x27;math, science, art&#x27; in one cell is a problem (Part 4 #7)?
+   [ ] state one honest meaning for a NULL (Part 4 #5)?
+   [ ] say how student-panel&#x27;s ids and deletes differ from the practice
+       lesson&#x27;s (Part 4 #3 and #10)?
+
+ Any box you cannot tick is just a signpost back to that Part - no penalty. Tick
+ most of them and the practice lesson will feel like recognition, not surprise.
+
+ KEY IDEA for the whole file: design lives on paper; a database is just that
+ paper design, made real and filled with rows. Everything you are learning is
+ how to make the paper good BEFORE it becomes real.
+
+ A reminder of our standing rule: we never change the student-panel project.
+ You will build your own version in student-panel-I, and whenever your way
+ differs from student-panel&#x27;s way, I will point it out - as I already did in
+ Part 4 for ids (INT vs UUID) and deletes (hard vs soft).
+
+                              - end of companion -
+</pre></body></html>

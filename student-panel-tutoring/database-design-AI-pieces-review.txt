@@ -1,0 +1,265 @@
+===============================================================================
+ REVIEW OF THE OTHER-AI PIECES
+ Are they enough? Do they contradict my lesson or each other?
+ Both sides shown; the correct one named, with the reason.
+===============================================================================
+
+ You gave me two files written by other AIs and asked, for each: is it enough or
+ does it need something added? does it say anything different from my lesson or
+ from the other piece? If so, show both sides and say which is right and why -
+ and hide nothing. This file is that answer. Nothing is hidden; where I could
+ not fully check something, I say so plainly.
+
+ THE TWO PIECES, AND WHAT THEY ARE
+   PIECE 1  database-design-lessons-1....docx  - a prose "lessons notebook"
+            (its Lessons 1-19), plus ten practice questions with answers at the
+            end (its Lesson 19).
+   PIECE 2  Database Design - Samples ... .PDF  - the picture-book companion to
+            Piece 1: every example from the notebook drawn as real tables (with
+            sample rows) and as crow's-foot diagrams.
+ MY LESSON  database-design-primer.txt  - the general ER-design course I wrote.
+
+ ONE HONEST LIMITATION UP FRONT
+   I was able to read Piece 2 (the PDF) completely, page by page. I could NOT
+   open Piece 1 (the .docx) to read its full prose or its ten practice
+   questions, because reading a Word file needs a tool in my sandbox that is
+   currently unavailable. BUT: Piece 2 is generated FROM Piece 1 and reproduces
+   every one of its examples, tables, and diagrams, so I can see Piece 1's
+   STRUCTURE and SAMPLES clearly - I just cannot quote its exact sentences or
+   check the wording of its ten answers yet. Everywhere below, I mark whether a
+   judgement covers the readable samples or the not-yet-readable prose. When the
+   Word file can be opened, I will check its prose and its ten answers directly.
+
+ THE HEADLINE VERDICT (then the details)
+   The other-AI pieces are NOT a rival to my lesson. They were clearly written
+   to sit ALONGSIDE it - same examples, same crow's-foot notation, and Piece 2
+   even says in so many words that you have "your primer" with its own Part 7
+   and tells you to compare the two. On every major idea they AGREE with my
+   lesson. In several places they ADD something genuinely useful that my primer
+   underplays. There is exactly ONE thing that needs adding (they only ever use
+   INTEGER ids and never mention the UUID style that student-panel actually
+   uses), plus two small "worth a note" items. I found NO outright errors in
+   the readable material.
+
+-------------------------------------------------------------------------------
+ SECTION 1 - PIECE 2 (THE SAMPLES PDF): IS IT ENOUGH?
+-------------------------------------------------------------------------------
+
+ Enough for its job: YES. Its job is to SHOW, as real tables and diagrams, every
+ idea the notebook teaches in prose. It does that well across 19 lessons mapped
+ to Parts 1-7 of the shared material: entity-vs-attribute, key attributes,
+ ternary relationships, enrolment/course-offering, the noun/property/verb to
+ entity/attribute/relationship translation, referential integrity, foreign-key
+ placement, the order/order_line bridge, the five hard patterns, 1NF/2NF/3NF
+ with anomalies, a full worked gym design, eight self-check tests, and a
+ glossary. Each sample has concrete rows, which is exactly what a beginner needs
+ to turn a rule into a picture.
+
+ Where it goes BEYOND my primer (useful additions - keep these):
+   + THE FROZEN-FACT EXCEPTION. My primer says "derive, don't store." Piece 2
+     (Lesson 16) adds the important exception: a value captured on purpose at a
+     moment in time - unit_price_at_sale on an order line - is NOT a derived
+     value you should drop; it is a frozen historical fact you must keep. My
+     primer only hints at this; Piece 2 states it clearly. GOOD addition.
+   + RESERVED WORDS. Piece 2 warns that "order" and "group" are reserved words
+     in SQL and must be named safely (orders, groups). My primer never mentions
+     this. It is a real physical-level gotcha and matters for student-panel
+     (Postgres), so it is a worthwhile addition.
+   + THE EXPLICIT CROW'S-FOOT MIRRORING. Piece 2 spells out that the symbols are
+     mirrored on the two ends of a line (o< on one side, >o on the other, same
+     meaning). My primer USES this convention but never explains it, which can
+     confuse a beginner. Piece 2's note is a helpful addition (I folded it into
+     the companion lesson, Part 3).
+   + A SURROGATE-ID OPTION FOR BRIDGES. For the order_line bridge, Piece 2 notes
+     you may either use the pair as the key OR give the bridge its own single id
+     AND keep a UNIQUE on the pair. My primer mostly shows only the pair-as-key
+     style. Piece 2's extra option is valid and worth knowing.
+   + TWO SMALL HEURISTICS. The "disguise test" for a ternary ("drop one noun -
+     is the sentence still a real fact?") and a beginner-friendly definition of
+     dependency ("A depends on B when knowing B tells you A"). Both are nice
+     teaching aids my primer does not phrase as crisply.
+
+ What it is MISSING / needs added (one real item):
+   - UUID / student-panel's key style. Piece 2 uses INTEGER auto-numbers (1, 2,
+     3) for every primary key and never mentions UUIDs. student-panel uses UUID
+     primary keys plus a unique human code. A learner who only read Piece 2
+     would be surprised by student-panel's long random ids. This is the one
+     addition I would insist on (details in Section 3, difference #1).
+
+-------------------------------------------------------------------------------
+ SECTION 2 - PIECE 1 (THE DOCX NOTEBOOK): IS IT ENOUGH?
+-------------------------------------------------------------------------------
+
+ What I can judge (its structure and all its samples, via Piece 2): the notebook
+ covers the same ground as my primer in a different voice, with the same worked
+ examples, and it reaches the same conclusions. On that evidence it is a solid,
+ aligned companion - enough to teach the ideas, and consistent with my lesson.
+
+ What I CANNOT yet judge (and will, once the Word file can be opened):
+   - the exact PROSE wording of its lessons (tone, any claim phrased loosely);
+   - its TEN PRACTICE QUESTIONS AND ANSWERS (its Lesson 19) - I have not seen
+     the answers, so I cannot confirm they are all correct. These are the most
+     important thing to re-check in the docx, because a wrong worked answer is
+     the kind of error that quietly teaches a beginner the wrong thing.
+ So my verdict on Piece 1 is: "aligned and enough on the evidence I can see;
+ final sign-off on its prose and its ten answers is pending the Word file."
+
+ The additions and the one gap from Section 1 apply to Piece 1 too (it is the
+ same body of material): keep the frozen-fact exception, reserved-words note,
+ mirroring note; ADD the UUID / student-panel key style.
+
+-------------------------------------------------------------------------------
+ SECTION 3 - DIFFERENCES: BOTH SIDES, AND WHICH IS CORRECT
+-------------------------------------------------------------------------------
+
+ Here is every place the pieces differ from my lesson or from each other. For
+ each: both sides, the verdict, and the reason. None of these is a flat-out
+ contradiction where one side is simply wrong; they are differences of CHOICE or
+ EMPHASIS - but you asked me to hide nothing, so each is laid out in full.
+
+ DIFFERENCE #1  -  INTEGER ids (pieces) vs UUID + natural code (my primer and
+                   student-panel).
+   Piece side:  every primary key is an INTEGER auto-number: member_id 1, 2, 3.
+   My side:     recommend a surrogate key too, but student-panel (and my primer)
+                use a UUID (a long random id) PLUS a unique human-readable code.
+   Which is correct: BOTH are correct - they are two kinds of the SAME idea (a
+   surrogate key invented by the system). Neither contradicts the other.
+   Why / when each wins: INTEGER ids are smaller, easier to read, and perfect
+   for learning. UUIDs win when ids must be unique across many machines, or must
+   not reveal how many rows exist or in what order they were made. student-panel
+   chose UUID; the pieces chose INT for teaching clarity.
+   What to DO: just know the two styles are interchangeable in concept. When you
+   see "1, 2, 3" in the pieces and long random ids in student-panel, that is the
+   same decision in two costumes - NOT a conflict. (This is the one item the
+   pieces should ADD a sentence about; see Section 1.)
+
+ DIFFERENCE #2  -  the two TEN-STEP design methods (my primer's Part 7 vs
+                   Piece 2's Lesson 15).
+   Piece 2 even flags this itself: "This routine is my own. Your primer has its
+   own Part 7. Read it later and compare the two lists." So the difference is
+   invited, not accidental. Side by side:
+
+     MY PRIMER (Part 7)                 THE PIECES (Lesson 15)
+     1 State the purpose (+ questions)  1 Purpose
+     2 Find the entities                2 Questions and actions
+     3 Find the attributes              3 Entities
+     4 Find the relationships           4 Attributes and keys
+     5 Choose keys                      5 Say the pairs aloud (cardinality)
+     6 Draw it                          6 Find the rich links (M:N/ternary/facts)
+     7 Resolve the hard patterns        7 Place the foreign keys
+     8 Normalise (3NF)                  8 Choose the delete rules
+     9 Map to tables (+ delete rules)   9 Check normal forms
+     10 Review against the purpose      10 Test with rows
+
+   Which is correct: BOTH - they are the SAME method sliced differently, and
+   they reach the same destination. Mapping them:
+     - My step 1 bundles purpose+questions; the pieces split them (their 1-2).
+     - My step 5 "keys" is separate; the pieces fold keys into "attributes and
+       keys" (their 4).
+     - My step 6 is an explicit "Draw it"; the pieces' list has no draw step
+       (though the whole PDF is drawings).
+     - My step 7 "resolve hard patterns" = their 6 "rich links" + 7 "place FKs".
+     - My step 9 bundles delete rules; the pieces make "delete rules" their own
+       step 8.
+     - Both end by testing against reality (my 10 "review"; their 10 "rows").
+   Verdict / what to DO: use whichever ordering you find easier - they are
+   equivalent. The BEST routine borrows the strengths of each: keep my explicit
+   "Draw it" step, and adopt the pieces' idea of making "questions/actions" and
+   "delete rules" their OWN steps so a beginner cannot skip them. (I will build
+   exactly this merged, numbered routine into the corrected final files.)
+
+ DIFFERENCE #3  -  a surrogate-keyed ternary WITHOUT an explicit UNIQUE on the
+                   natural combination (an inconsistency INSIDE the pieces).
+   The pieces are careful about this in one place and silent in another:
+     - For the order_line bridge they explicitly say: if you give the bridge its
+       own id, keep a UNIQUE on the pair so you cannot store the same pairing
+       twice. GOOD.
+     - For the prescription ternary (doctor + drug + patient, with its own
+       prescription_id) they do NOT mention putting a UNIQUE on the natural
+       triple.
+   Is this a contradiction? Mild, and internal to the pieces, not against my
+   primer. Which is correct: the order_line advice is the fully-correct pattern.
+   Why: if a surrogate id is the only key, nothing stops two identical pairings/
+   triples unless you ALSO constrain the natural combination - UNLESS the real
+   world genuinely allows repeats (e.g. the same doctor may prescribe the same
+   drug to the same patient again on a later date, in which case the triple is
+   deliberately NOT unique and a date belongs in the key instead). What to DO:
+   whenever you give a bridge or ternary its own id, make a conscious decision -
+   "should the natural combination be UNIQUE?" - and write it down. The pieces
+   model this well for order_line; they should say the same for prescription.
+   This is a small "needs a note," not an error.
+
+ DIFFERENCE #4  -  two models shown for the same relationship, without a strong
+                   "pick this one when..." (an emphasis gap, not a conflict).
+   The pieces show BOTH a course_offering with its own surrogate id AND a
+   "teaching" bridge with a composite (course, semester) key for essentially the
+   same situation, and both the pair-key and surrogate-id bridge styles for
+   order_line. All of these are correct. The small gap: a beginner may not know
+   WHICH to choose. Verdict: not wrong, but my corrected files will add a short
+   "choose the pair-key when the pairing is naturally unique and you never point
+   at it from elsewhere; choose a surrogate id when something else must
+   reference the row, and keep a UNIQUE on the pair."
+
+ NON-DIFFERENCES (places they fully AGREE with my primer - so you can relax):
+   = 1NF/2NF/3NF, the three anomalies, and the mnemonic "the key, the whole key,
+     and nothing but the key" - identical.
+   = Foreign key goes on the MANY side; 1:1 FK on the never-empty side with
+     UNIQUE+NOT NULL - identical (same passport example).
+   = Self-reference tree with a parent pointer and NULL at the root; and the
+     reason not to use parent/grandparent columns - identical.
+   = ON DELETE RESTRICT / CASCADE / SET NULL meanings - identical (the pieces
+     add a nice "say the rule as a sentence" habit, which is pure upside).
+   = The "one move" - M:N, a link with its own facts, and a three-way fact all
+     become a table in the middle - identical to my Part 5.
+
+-------------------------------------------------------------------------------
+ SECTION 4 - ERRORS?
+-------------------------------------------------------------------------------
+
+ In everything I could read (all of Piece 2, and Piece 1's structure and samples
+ through it), I found NO outright errors - no table, key, diagram, or normal-form
+ claim that is simply wrong. The pieces even hedge honestly (they note their
+ column types are "illustrative"). The only items are the ADDITION (UUID) and
+ the small NOTES in Section 3.
+
+ The one thing still unchecked is Piece 1's TEN PRACTICE QUESTIONS AND ANSWERS,
+ which live only in the Word file's prose. I have not seen the answers, so I
+ cannot yet certify them. That is the first thing I will verify when the Word
+ file can be opened.
+
+-------------------------------------------------------------------------------
+ SECTION 5 - THE CORRECTIONS TO FOLD INTO THE FINAL FILES
+-------------------------------------------------------------------------------
+
+ So the final corrected versions (your Task 3) are not vague, here is the exact
+ list of edits I will apply:
+   C1  Add a short note, wherever ids first appear, that INTEGER ids and UUIDs
+       are two kinds of surrogate key, and that student-panel uses UUID + a
+       unique human code. (Fixes the one real gap.)
+   C2  Add one sentence to the prescription ternary: decide whether the natural
+       triple should be UNIQUE, exactly as already said for order_line.
+   C3  Add a short "pick the pair-key vs a surrogate-id bridge when..." guide.
+   C4  Keep every good addition the pieces already have (frozen-fact exception,
+       reserved words, crow's-foot mirroring, the disguise test, the "depends
+       on" definition, the per-FK delete-rule sentences).
+   C5  Replace the two separate ten-step lists with ONE merged, numbered routine
+       that keeps my explicit "Draw it" step AND the pieces' separate
+       "questions/actions" and "delete rules" steps, and point out it unifies
+       both lists.
+   C6  (Pending the Word file) verify the ten practice questions' answers and
+       correct any that are wrong.
+
+-------------------------------------------------------------------------------
+ BOTTOM LINE
+-------------------------------------------------------------------------------
+
+ Your materials are a team, not a tug-of-war. The other-AI pieces agree with my
+ lesson on everything that matters, add a few genuinely useful things, and need
+ only one real addition (UUID / student-panel's key style) plus two small notes.
+ I found no outright errors in what I could read; the one thing I still must
+ check is the Word file's ten practice answers, which I will do the moment that
+ file can be opened. Nothing above is hidden - every difference is laid out with
+ both sides and a reason.
+
+                              - end of review -
+

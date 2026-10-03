@@ -1,0 +1,11 @@
+Part 1: contemplate: How many cards before a person is given a free item? what is this person's information? add a new member when they make their first purchase. what is the minimum buy to get a card? for each acceptable buy add a card to that person. should I give the person who bought now a notice for free item?
+
+Part 2.1: try it: ET: entity type, A: attrubute  =>  booking[ET] { films[ET] { title[A], id[A] }, seats[ET] {type[A], number[A] }, customer_id[A] }
+
+Part 2: try it: department >o------ employment ------o< staff / department >o------ employment ------|< staff / department >|------ employment ------|< staff
+
+Qs: in using PK, when said everything that points to this row; does it mean (for example) the student table attributes, which as whole cover the entity instance? / what does keeping unique mean? / how is uuid unique across every machine; no collision merging two DBs from two machines? / explain composite key: from definition to usage in row, table, diagram, ER, SQL, DB, ... . / why id revealing how many rows raises security issues? / explain DELETE rules (especially SET NULL). / explain FK in 1:1. / teach me oval-diamond way too in some examples. 
+
+page 15 of primer pdf: in a diagram it says "has many loans over time"; do we not check the cardianlity (if I am not mistaken) by saying at a time and not over time?
+
+

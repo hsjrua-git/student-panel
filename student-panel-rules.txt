@@ -1,0 +1,185 @@
+================================================================================
+STUDENT PANEL — THE RULES, IN PLAIN SENTENCES
+Every actor, entity, and rule stated as "who can do what, and under what limit."
+================================================================================
+
+WORDS USED BELOW
+  MANAGEMENT = the administrator tier (the top role).
+  MODIFY = add, remove, edit.        MANAGE = create, organise.
+  PERMISSION = one fixed capability the program allows (e.g. "enter scores").
+  PERIOD = how often scoring happens (the rhythm / time between classes).
+  LOCK = the point where a score can no longer be edited.
+
+--------------------------------------------------------------------------------
+ROLES & PERMISSIONS
+--------------------------------------------------------------------------------
+- Every permission can be granted or removed by management.
+- Management can create, rename, and delete roles, except system-protected ones.
+- Management assigns a role to each user; a user has exactly one role at a time.
+- The four default roles (administrator, handler, teacher, student) can be
+  modified like any other role.
+- A permission can require another permission. You cannot hold "override scores"
+  without "enter scores", and you cannot hold "enter scores" without "view
+  students" and "view parameters". The system adds the required ones for you.
+- The last role able to manage roles and users cannot be removed, so nobody can
+  lock themselves out.
+- The set of permissions is fixed in the program; roles are built from that set,
+  but no new permission can be invented from the screen.
+
+--------------------------------------------------------------------------------
+MANAGEMENT (the administrator role)
+--------------------------------------------------------------------------------
+- Management holds every permission automatically, plus the powers below.
+- Management can modify groups and sub-groups, roles, and user accounts.
+- Management can modify the permissions of each role and assign roles to users.
+- Management can modify scores, student fields, and user fields.
+- Management can view the log.
+- Management can delete a log entry only with a given reason; the entry is
+  hidden, never truly erased, and the deletion is itself logged.
+
+--------------------------------------------------------------------------------
+HANDLER
+--------------------------------------------------------------------------------
+- A handler can view and add students.
+- A handler can manage groups (create and organise them).
+- A handler can assign students to groups.
+- A handler can view and add scores.
+- A handler can view and add parameters.
+- A handler can view and add student fields.
+- A handler can view the dashboard.
+- A handler can export data for each student.
+- A handler can set a student's period the first time, and change it later.
+- By default a handler cannot manage roles or users, cannot override a locked
+  score, and cannot delete log entries.
+
+--------------------------------------------------------------------------------
+TEACHER
+--------------------------------------------------------------------------------
+- A teacher can view only their own students — the ones attached to them, either
+  directly or through a group they are attached to.
+- A teacher can view and enter scores only for their own students.
+- A teacher can see a dashboard of only their own students.
+- A teacher can set a student's period.
+- A teacher cannot see students who are not theirs.
+
+--------------------------------------------------------------------------------
+STUDENT (a login given to a student-person)
+--------------------------------------------------------------------------------
+- A student can view only their own evaluation and their own dashboard.
+- A student's login is created switched off; they can sign in only after
+  management activates it.
+- A student cannot see other students, other people's scores, or any admin page.
+
+--------------------------------------------------------------------------------
+STUDENTS (the people being evaluated)
+--------------------------------------------------------------------------------
+- Every student, if not created directly as a user, also becomes a user — a
+  switched-off login until management activates it.
+- Every student belongs to at least one group. A new student is placed directly
+  under a default group inside "education", so no student is ever ungrouped.
+- A student can belong to several groups at once.
+- A student can have their own period; but if a group they are in has its own
+  period, that group's period governs scoring inside that group.
+- A student's custom-field values are stored per student; a field can be
+  restricted so only permitted people can see it.
+
+--------------------------------------------------------------------------------
+GROUPS & THE TREE
+--------------------------------------------------------------------------------
+- Groups form a tree: "everything" at the top, then education / performance /
+  miscellaneous, then sub-groups, then students at the bottom.
+- A group can contain sub-groups to any depth.
+- A group can be modified; managing groups needs the manage-groups permission,
+  and putting students into groups needs the assign permission.
+- A group cannot become its own ancestor (loops are prevented).
+- A group may OPTIONALLY have its own period, and may OPTIONALLY have its own
+  parameters. These two are independent: a group can have neither, only a
+  period, only parameters, or both — and either can be added later.
+- Default groups: education -> children, teenagers, adults; performance -> by
+  level (levels decided later); miscellaneous -> choir, band, acapella.
+- A teacher can be attached to a single student, or to a whole group; attaching
+  to a group covers every student beneath it.
+
+--------------------------------------------------------------------------------
+PARAMETERS (the things you measure)
+--------------------------------------------------------------------------------
+- Parameters can be modified; the defaults are unspecified for now.
+- A parameter may have a unit and a minimum/maximum; a score outside the range
+  is rejected.
+- Seeing parameters needs the view permission; adding or editing them needs the
+  manage permission.
+- A parameter can be assigned to a group or to a student, so not every parameter
+  has to apply to everyone.
+- Every change to a parameter is kept as history.
+
+--------------------------------------------------------------------------------
+SCORES (evaluations)
+--------------------------------------------------------------------------------
+- A score is always recorded under a group; there is no group-less score.
+- A score is one of two things: a named student's score inside a group, or a
+  group's own direct score.
+- The same student is scored separately in each group they belong to; those
+  scores do not clash with each other.
+- There should be at most one score per student + group + parameter + period, so
+  duplicates cannot build up.
+- Entering scores needs the enter permission; seeing them needs the view
+  permission. A "blind entry" role can enter scores without being able to read
+  them back.
+- A score locks automatically based on the period (the time between classes).
+- A locked score can be reopened only by someone with the override permission,
+  and only with a given reason.
+- A group's rolled-up score (built from its students and sub-groups) is
+  calculated when you look at it, not stored; a group's own direct score is
+  always shown separately from that rolled-up number.
+
+--------------------------------------------------------------------------------
+PERIODS (the rhythm)
+--------------------------------------------------------------------------------
+- A period says how often scoring happens (e.g. weekly, every two weeks,
+  monthly, every 3 days).
+- Handlers and teachers can set a student's period; a handler can also change it.
+- A group may have its own period; when it does, it governs the rhythm of its
+  students inside that group.
+- Locking of scores is driven by the period.
+
+--------------------------------------------------------------------------------
+TASKS
+--------------------------------------------------------------------------------
+- A task can be assigned to a group or to a student.
+- A task may or may not relate to a parameter.
+- Tasks are kept deliberately open for now. A completion checkbox may be added
+  later that could affect an evaluation but is not itself a score — to be decided.
+
+--------------------------------------------------------------------------------
+USER FIELDS
+--------------------------------------------------------------------------------
+- Extra fields can be defined for user accounts, the same way they can for
+  students.
+- A user field can be restricted so only permitted people see its value.
+- Each user shows a creation date, which can be restricted.
+- Defining fields needs the manage-fields permission; seeing restricted values
+  needs the restricted-view permission.
+
+--------------------------------------------------------------------------------
+THE LOG (audit)
+--------------------------------------------------------------------------------
+- Every change is logged with who did it, what changed, and when; dates are
+  recorded.
+- Only someone with the view-log permission can read the log.
+- A log entry can be deleted only with a given reason; it is hidden, not erased,
+  and the deletion is itself logged.
+
+--------------------------------------------------------------------------------
+FILTERING (applies everywhere)
+--------------------------------------------------------------------------------
+- Anything that can be filtered has a filter option; where there are several
+  filterable parts, each one has its own separate filter.
+
+--------------------------------------------------------------------------------
+STILL TO BE DECIDED (from the assessment)
+--------------------------------------------------------------------------------
+- How a group's rolled-up number is calculated (average, weighted, or sum).
+- What locking does when neither the student nor the group has a period.
+- The performance "levels", and the default parameters.
+- (See student-panel-explained.txt for the fuller assessment.)
+

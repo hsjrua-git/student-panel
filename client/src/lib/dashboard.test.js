@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  cohortField,
   distribution,
   parameterStats,
+  studentBreakdown,
   summarize,
   trendSeries,
   unmeasuredStudents,
@@ -34,6 +36,34 @@ describe('summarize', () => {
   it('reports null completion when nothing is expected', () => {
     const empty = { parameters: [], students: [{ id: 'a', values: {}, previous: {} }] };
     expect(summarize(empty).completion).toBe(null);
+  });
+});
+
+describe('cohortField', () => {
+  it('classifies each student by measurement completeness, in roster order', () => {
+    const field = cohortField(results);
+    expect(field.map((s) => s.id)).toEqual(['a', 'b', 'c']); // roster order kept
+    expect(field).toEqual([
+      { id: 'a', fullName: 'Ada', studentCode: 'S1', measured: 2, inUse: 2, state: 'full' },
+      { id: 'b', fullName: 'Bea', studentCode: 'S2', measured: 1, inUse: 2, state: 'partial' },
+      { id: 'c', fullName: 'Cid', studentCode: 'S3', measured: 0, inUse: 2, state: 'none' },
+    ]);
+    // The three buckets mirror summarize's complete/partial/none totals.
+    const s = summarize(results);
+    const byState = (state) => field.filter((f) => f.state === state).length;
+    expect(byState('full')).toBe(s.studentsComplete);
+    expect(byState('partial')).toBe(s.studentsPartial);
+    expect(byState('none')).toBe(s.studentsNone);
+  });
+
+  it('marks everyone "none" when no parameters are in use', () => {
+    const noParams = {
+      parameters: [{ id: 'p3', name: 'Retired', inUse: false }],
+      students: [{ id: 'a', fullName: 'Ada', studentCode: 'S1', values: {}, previous: {} }],
+    };
+    expect(cohortField(noParams)).toEqual([
+      { id: 'a', fullName: 'Ada', studentCode: 'S1', measured: 0, inUse: 0, state: 'none' },
+    ]);
   });
 });
 
@@ -93,6 +123,34 @@ describe('trendSeries', () => {
 
   it('is empty when the parameter has no trend rows', () => {
     expect(trendSeries({ trends: [], periods, parameterId: 'p1' })).toEqual([]);
+  });
+});
+
+describe('studentBreakdown', () => {
+  it('lists in-use parameters with the value and paired change for one student', () => {
+    const b = studentBreakdown(results, 'a');
+    expect(b).toMatchObject({
+      id: 'a',
+      fullName: 'Ada',
+      studentCode: 'S1',
+      measured: 2,
+      inUse: 2,
+    });
+    expect(b.rows.map((r) => r.parameter.id)).toEqual(['p1', 'p2']); // p3 excluded
+    expect(b.rows[0]).toMatchObject({ value: 8, change: 2 }); // 8 − previous 6
+    expect(b.rows[1]).toMatchObject({ value: 4, change: null }); // no previous
+  });
+
+  it('marks missing scores null and does not count them as measured', () => {
+    const b = studentBreakdown(results, 'c');
+    expect(b.measured).toBe(0);
+    expect(b.rows.every((r) => r.value === null && r.change === null)).toBe(true);
+  });
+
+  it('returns an empty-but-shaped record for an unknown student', () => {
+    const b = studentBreakdown(results, 'zzz');
+    expect(b).toMatchObject({ id: 'zzz', fullName: '', measured: 0, inUse: 2 });
+    expect(b.rows).toHaveLength(2);
   });
 });
 

@@ -2,7 +2,7 @@ import connectPgSimple from 'connect-pg-simple';
 import express from 'express';
 import session from 'express-session';
 import pool from './db/pool.js';
-import { attachUser, authorize, requireLogin } from './middleware/auth.js';
+import { attachUser, authorize, requireLogin, requirePermission } from './middleware/auth.js';
 import { auditRequests } from './middleware/audit.js';
 import { createCsrf } from './middleware/csrf.js';
 import auditRouter from './routes/audit.js';
@@ -16,6 +16,7 @@ import preferencesRouter from './routes/preferences.js';
 import resultsRouter from './routes/results.js';
 import savedViewsRouter from './routes/savedViews.js';
 import dashboardRouter from './routes/dashboard.js';
+import exportRouter from './routes/export.js';
 import rolesRouter from './routes/roles.js';
 import groupsRouter from './routes/groups.js';
 import fieldDefinitionsRouter from './routes/fieldDefinitions.js';
@@ -239,6 +240,16 @@ app.use(
 );
 app.use('/api/results', authorize({ GET: 'scores.view' }), resultsRouter);
 app.use('/api/dashboard', authorize({ GET: 'dashboard.view' }), dashboardRouter);
+// The Export Center reads the scores cube. `data.export` gates the feature, but
+// its only prerequisite is `students.view`, so on its own it would let a role
+// read scores that `scores.view` is meant to protect. Require BOTH here so the
+// cube can never become a way around the scores.view gate on /api/results.
+app.use(
+  '/api/export',
+  authorize({ GET: 'data.export', POST: 'data.export' }),
+  requirePermission('scores.view'),
+  exportRouter
+);
 app.use(
   '/api/saved-views',
   authorize({ GET: true, POST: true, PUT: true, DELETE: true }),

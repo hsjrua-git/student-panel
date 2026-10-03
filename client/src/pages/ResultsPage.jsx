@@ -28,6 +28,7 @@ import {
 } from '../lib/resultsView.js';
 import { usePeriods } from '../lib/usePeriods.js';
 import ExportButton from '../components/ExportButton.jsx';
+import ExportLink from '../components/ExportLink.jsx';
 import { resultsCsvRows } from '../lib/exports.js';
 
 const EMPTY = [];
@@ -301,6 +302,17 @@ function ResultsPage() {
             }
           />
         )}
+        <ExportLink
+          prefill={{
+            periods: { mode: 'selection', numbers: [periodNumber] },
+            students: groupId ? { mode: 'group', groupId } : undefined,
+            parameters:
+              config.parameterIds.length > 0
+                ? { mode: 'selection', ids: config.parameterIds }
+                : undefined,
+            filters: config.filters,
+          }}
+        />
       </div>
 
       {parameters.length > 0 && (

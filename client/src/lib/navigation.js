@@ -22,11 +22,13 @@ import {
   UsersIcon,
   RolesIcon,
   AuditIcon,
+  DownloadIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
   '/dashboard': 'dashboard.view',
   '/results': 'scores.view',
+  '/export': 'data.export',
   '/students': 'students.view',
   '/students/import': 'data.import',
   '/evaluate': 'scores.enter',
@@ -51,6 +53,7 @@ export const NAV_SECTIONS = [
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
       { to: '/results', label: 'Results', icon: ResultsIcon },
+      { to: '/export', label: 'Export', icon: DownloadIcon },
     ],
   },
   {
