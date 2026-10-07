@@ -1,4 +1,16 @@
-import { request } from './http.js';
+// Students api — on-device adapter over the students service (was fetch to
+// /api/students). Each function keeps the exact return shape it had before so
+// the pages and hooks that consume them are unchanged.
+
+import { callService } from './local.js';
+import {
+  listStudents as listStudentsService,
+  createStudent as createStudentService,
+  updateStudent as updateStudentService,
+  deleteStudent as deleteStudentService,
+  getStudent as getStudentService,
+  importStudents as importStudentsService,
+} from '@server/core/services/students.js';
 
 export function listStudents({
   search = '',
@@ -7,46 +19,39 @@ export function listStudents({
   sort = 'newest',
   groupId = null,
 } = {}) {
-  const params = new URLSearchParams({
-    page: String(page),
-    pageSize: String(pageSize),
-    sort,
-  });
-  if (search) params.set('search', search);
-  if (groupId) params.set('groupId', groupId);
-  return request(`/api/students?${params}`);
+  return callService(() =>
+    listStudentsService({
+      search,
+      page,
+      pageSize,
+      sort,
+      groupId: groupId ?? undefined,
+    }),
+  );
 }
 
 export function createStudent(fullName, extra) {
-  const body = extra ? { fullName, extra } : { fullName };
-  return request('/api/students', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  const input = extra ? { fullName, extra } : { fullName };
+  return callService(() => createStudentService(input));
 }
 
 export function renameStudent(id, fullName) {
-  return request(`/api/students/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ fullName }),
-  });
+  return callService(() => updateStudentService(id, { fullName }));
 }
 
 // Update arbitrary student fields (full name and/or custom fields in `extra`).
 export function updateStudent(id, fields) {
-  return request(`/api/students/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(fields),
-  });
+  return callService(() => updateStudentService(id, fields));
 }
 
 export function deleteStudent(id) {
-  return request(`/api/students/${id}`, { method: 'DELETE' });
+  return callService(() => deleteStudentService(id));
 }
 
 export function getStudent(id) {
-  return request(`/api/students/${id}`);
+  return callService(() => getStudentService(id));
 }
+
 export async function fetchAllStudents() {
   const all = [];
   for (let page = 1; page <= 50; page++) {
@@ -58,8 +63,7 @@ export async function fetchAllStudents() {
 }
 
 export function importStudents({ rows, allowDuplicateNames, dryRun }) {
-  return request('/api/students/import', {
-    method: 'POST',
-    body: JSON.stringify({ rows, allowDuplicateNames, dryRun }),
-  });
+  return callService(() =>
+    importStudentsService({ rows, allowDuplicateNames, dryRun }),
+  );
 }

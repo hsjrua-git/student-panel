@@ -9,6 +9,14 @@ import {
   updateRole,
 } from '../api/roles.js';
 
+// The built-in Administrator is the one system role that can manage roles.
+// It is locked everywhere (no edit, rename, or delete) so an installation can
+// never strip its own last set of admin powers. Other system roles (Staff,
+// Viewer) stay fully editable.
+function isAdminRole(role) {
+  return role.isSystem && role.permissions.includes('roles.manage');
+}
+
 // Expand a chosen set to include every prerequisite (transitively).
 function addWithPrerequisites(keys, key, prerequisites) {
   const next = new Set(keys);
@@ -133,8 +141,9 @@ function RoleEditor({ catalog, role, onDone }) {
 
       {role?.isSystem && (
         <p className="hint">
-          This is a built-in role. You can adjust it, but it cannot be deleted
-          and must keep the abilities that let someone manage users and roles.
+          {isAdminRole(role)
+            ? 'This is the built-in Administrator role and cannot be changed.'
+            : 'This is a built-in role. You can rename it and adjust its permissions, but it cannot be deleted.'}
         </p>
       )}
 
@@ -255,22 +264,28 @@ function RolesPage() {
                     <td>{role.permissions.length}</td>
                     <td>{role.userCount}</td>
                     <td className="actions">
-                      <button type="button" onClick={() => setEditing(role)}>
-                        Edit
-                      </button>
-                      {!role.isSystem && (
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(role)}
-                          disabled={role.userCount > 0 || remove.isPending}
-                          title={
-                            role.userCount > 0
-                              ? 'Move its people to another role first'
-                              : undefined
-                          }
-                        >
-                          Delete
-                        </button>
+                      {isAdminRole(role) ? (
+                        <span className="hint">Locked</span>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => setEditing(role)}>
+                            Edit
+                          </button>
+                          {!role.isSystem && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(role)}
+                              disabled={role.userCount > 0 || remove.isPending}
+                              title={
+                                role.userCount > 0
+                                  ? 'Move its people to another role first'
+                                  : undefined
+                              }
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </>
                       )}
                     </td>
                   </tr>

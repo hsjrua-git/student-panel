@@ -1,31 +1,30 @@
-import { request } from './http.js';
+// Auth api — on-device adapter over the single-user service (was fetch to
+// /api/auth/*). There is no login, session, or password on device: the one
+// person owns the phone and is the administrator. So fetchMe() returns the
+// seeded local admin, and login/logout/changePassword are kept only so the
+// existing AuthProvider mutations still resolve — they are effectively no-ops.
+
+import { callService } from './local.js';
+import { getMe } from '@server/core/services/auth.js';
 
 export async function fetchMe() {
-  try {
-    const data = await request('/api/auth/me');
-    return data.user;
-  } catch (error) {
-    if (error.status === 401) return null;
-    throw error;
-  }
+  const { user } = await callService(() => getMe());
+  return user;
 }
 
-export async function login({ username, password }) {
-  const data = await request('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ username, password }),
-  });
-  return data.user;
+// The login form isn't reachable on device (RequireAuth always has a user), but
+// resolving to the current user keeps the mutation contract intact.
+export async function login() {
+  const { user } = await callService(() => getMe());
+  return user;
 }
 
-export function logout() {
-  return request('/api/auth/logout', { method: 'POST' });
+// Nothing to tear down — there is no session.
+export async function logout() {
+  return;
 }
 
-export async function changePassword({ currentPassword, newPassword }) {
-  const data = await request('/api/auth/change-password', {
-    method: 'POST',
-    body: JSON.stringify({ currentPassword, newPassword }),
-  });
-  return data.user;
+export async function changePassword() {
+  const { user } = await callService(() => getMe());
+  return user;
 }

@@ -1,0 +1,37 @@
+Now that we have the executables and its files, let's put it aside and start checking the app itself.
+
+
+If I add "y" after problem: I tell you the matter, you give me suggestion, I tell you either to fix it or instruct me to fix it.
+If I add "x" after it, you do as I say and fix them.
+
+
+Let's start:
+
+
+problem x:
+every login must land on dashboard, nowhere else.
+browser back button must lead to pages inside that page if exit and then to dashboard.
+students should be able to be evaluated inside their own pages too; evaluation options being there.
+the menu should be folded at login, but each that is unfolded stays as changed until log out.
+
+  admin:
+I tried to change viewer permissions and I got server error (number 1 at the end), I tried, it was the same foe staff too, even for administrator, but be catious: the main administrator shouldn't be able to change its own permissions, can only change the other users'.
+also after I make a role and choose its permissions, I can't change it again, I can only delete, and I can't even change the name of the roles. maybe not even description?
+{ for main administrator no editing must be available, for the others everything must be editable }
+
+  staff: (obviously what staff doesn't have, viewer doesn't too, right?)
+why setting panel when nothing is there for them?
+doesn't need to see parameter history.
+they can assign students to groups in student page in actions.
+they cannot import anything.
+
+  viewers:
+can't see parameter panel.
+why "No students yet. Add the first one above." in students when they won't do anything?
+viewers don't have permission for import and export.
+let's say it like this: they can only see results and students page, and their sub-pages. so wen can say if a role doesn't have permission for something, why should they see the link to the page or any writing related to what isn't their bussiness?
+
+enough for first part.
+
+do it patiently, concisely, carefully, in chunks if more productive rather than thinking as it of one task. whatever was best, set the tasks in progress tab anyway, and subtasks if were any.
+

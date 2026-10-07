@@ -72,17 +72,19 @@ function StudentsPage() {
             aria-label="Search students"
           />
           <GroupFilter value={groupId} onChange={handleGroupChange} />
-          <ExportButton
-            label="Export students (CSV)"
-            filename={`students-${toIsoDate(new Date())}.csv`}
-            buildRows={async () => {
-              const [students, fields] = await Promise.all([
-                fetchFilteredStudents(groupId),
-                listFieldDefinitions(),
-              ]);
-              return studentsCsvRows(students, fields);
-            }}
-          />
+          {can('data.export') && (
+            <ExportButton
+              label="Export students (CSV)"
+              filename={`students-${toIsoDate(new Date())}.csv`}
+              buildRows={async () => {
+                const [students, fields] = await Promise.all([
+                  fetchFilteredStudents(groupId),
+                  listFieldDefinitions(),
+                ]);
+                return studentsCsvRows(students, fields);
+              }}
+            />
+          )}
         </div>
         <StudentsTable
           search={search}

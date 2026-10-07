@@ -22,9 +22,6 @@ function RequireAuth() {
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
-  if (user.mustChangePassword && location.pathname !== '/change-password') {
-    return <Navigate to="/change-password" replace />;
-  }
   return <Outlet />;
 }
 

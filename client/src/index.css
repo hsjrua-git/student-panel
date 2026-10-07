@@ -77,6 +77,14 @@
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+
+  /* Mobile/webview hardening: keep the browser from rescaling our text after an
+     orientation change, kill the grey tap flash on touch, and stop the whole
+     app from rubber-band scrolling behind fixed chrome (topbar/drawer). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
 /* Dark theme: applied when the user picks Dark, or picks System and the OS is
@@ -205,6 +213,7 @@ main {
   max-width: var(--content-max);
   margin: 0 auto;
   padding: 1.75rem 1.5rem 4rem;
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
 }
 
 main.wide {
@@ -502,6 +511,7 @@ tr.inactive,
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* ---- sidebar ---- */
@@ -510,11 +520,17 @@ tr.inactive,
   top: 0;
   align-self: start;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   padding: 1rem 0.75rem 1.5rem;
+  /* Keep the brand + nav clear of the notch/home-indicator when the sidebar is
+     a full-height drawer or the fixed rail runs edge to edge. */
+  padding-top: calc(1rem + env(safe-area-inset-top));
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  padding-left: calc(0.75rem + env(safe-area-inset-left));
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-edge);
   color: var(--sidebar-ink);
@@ -667,6 +683,12 @@ tr.inactive,
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 1rem;
+  /* Clear the status bar / notch when running full-bleed (Capacitor, installed
+     PWA). env() is 0 on desktop and non-notched devices, so this is a no-op
+     there. */
+  padding-top: calc(0.6rem + env(safe-area-inset-top));
+  padding-left: calc(1rem + env(safe-area-inset-left));
+  padding-right: calc(1rem + env(safe-area-inset-right));
   min-height: 3.5rem;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: saturate(1.1) blur(8px);
@@ -886,6 +908,125 @@ tr.inactive,
 
   main {
     padding: 1.25rem 1rem 3rem;
+    /* full-bleed column now, so pull content in from the rounded corners */
+    padding-left: calc(1rem + env(safe-area-inset-left));
+    padding-right: calc(1rem + env(safe-area-inset-right));
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---- phone: single-column, stacked toolbars, roomy controls ---- */
+@media (max-width: 560px) {
+  h1 {
+    font-size: 1.35rem;
+  }
+
+  h2 {
+    font-size: 1.08rem;
+  }
+
+  /* Toolbars and filter rows go vertical so each control gets the full width
+     instead of squeezing onto a wrapped line. */
+  .toolbar,
+  .filters,
+  .period-picker,
+  .views-bar,
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar .search {
+    min-width: 0;
+  }
+
+  .filters input {
+    min-width: 0;
+  }
+
+  /* The group dropdown label sits above a full-width select. */
+  .group-filter {
+    justify-content: space-between;
+  }
+
+  .group-filter select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* One card/field per row on a narrow screen. */
+  .stat-grid,
+  .param-grid,
+  .permission-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Pager: center the count on its own line, spread Prev/Next below it. */
+  .pager {
+    flex-wrap: wrap;
+  }
+
+  .pager span {
+    order: -1;
+    flex-basis: 100%;
+    text-align: center;
+    margin-bottom: 0.35rem;
+  }
+
+  /* Read-only custom-field list stacks label over value. */
+  .field-list-row {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .field-list-row dt {
+    min-width: 0;
+  }
+}
+
+/* ---- touch targets ---- */
+/* On touch devices, grow the standard controls to a ~44px hit area (Apple/WCAG
+   guidance) without touching the desktop mouse layout. Inline/utility buttons
+   that are deliberately text-sized (links, sortable headers, the tiny note
+   toggle) are exempted so they don't blow out their surrounding text. */
+@media (pointer: coarse) {
+  button,
+  input,
+  select,
+  textarea,
+  .account-trigger {
+    min-height: 44px;
+  }
+
+  .nav-link,
+  .account-dropdown-item {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+
+  .tab {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+
+  .note-toggle {
+    min-width: 2rem;
+    min-height: 2rem;
+    /* touch has no hover, so keep the toggle legible at rest */
+    opacity: 0.7;
+  }
+
+  /* Inline, text-shaped buttons must NOT get the 44px box — it would break the
+     line they sit on or the table header they align to. */
+  button.link,
+  .results-table th button.sort {
+    min-height: 0;
+  }
+
+  textarea {
+    /* a comfortable multi-line tap area */
+    min-height: 3rem;
   }
 }
 

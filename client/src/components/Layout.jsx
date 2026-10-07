@@ -1,51 +1,13 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { NAV_SECTIONS, ROUTE_PERMISSIONS } from '../lib/navigation.js';
 import AccountMenu from './AccountMenu.jsx';
 import PageLoader from './PageLoader.jsx';
-
-// The whole navigation, grouped into sections. Each item names the permission
-// that reveals it; items with `always` show for any signed-in user. Building
-// the nav from data (rather than hand-writing links) keeps the sidebar, the
-// mobile drawer, and the page-title lookup in the header all in sync.
-const NAV_SECTIONS = [
-  {
-    title: 'Overview',
-    items: [
-      { to: '/dashboard', label: 'Dashboard', permission: 'dashboard.view' },
-      { to: '/results', label: 'Results', permission: 'scores.view' },
-    ],
-  },
-  {
-    title: 'Teaching',
-    items: [
-      { to: '/students', label: 'Students', permission: 'students.view' },
-      { to: '/evaluate', label: 'Evaluate', permission: 'scores.enter' },
-    ],
-  },
-  {
-    title: 'Setup',
-    items: [
-      { to: '/parameters', label: 'Parameters', permission: 'parameters.view' },
-      { to: '/groups', label: 'Groups', permission: 'groups.manage' },
-      { to: '/fields', label: 'Fields', permission: 'fields.manage' },
-      { to: '/settings', label: 'Settings', always: true },
-    ],
-  },
-  {
-    title: 'Administration',
-    items: [
-      { to: '/users', label: 'Users', permission: 'users.manage' },
-      { to: '/roles', label: 'Roles', permission: 'roles.manage' },
-      { to: '/audit', label: 'Audit log', permission: 'audit.view' },
-    ],
-  },
-];
 
 // Titles shown in the header for routes that aren't in the sidebar.
 const EXTRA_TITLES = {
   '/preferences': 'Preferences',
-  '/change-password': 'Change password',
 };
 
 function Layout() {
@@ -53,6 +15,12 @@ function Layout() {
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  // Which nav groups are expanded. Starts empty (all folded) at every login.
+  // Layout stays mounted while navigating between pages, so an expanded group
+  // stays expanded across the session; logging out unmounts Layout, which
+  // resets this back to folded. Kept in React state (not browser storage) so it
+  // never leaks between users on a shared machine.
+  const [openGroups, setOpenGroups] = useState({});
   const sidebarRef = useRef(null);
   const toggleRef = useRef(null);
 
@@ -121,12 +89,16 @@ function Layout() {
   const showNav = !user.mustChangePassword;
 
   // Only render a section (and its items) the user is actually allowed to see.
+  // The permission for each item comes from ROUTE_PERMISSIONS (null = any
+  // signed-in user), the same map the route guard uses — so a hidden link is
+  // always also a blocked page.
   const sections = showNav
     ? NAV_SECTIONS.map((section) => ({
         ...section,
-        items: section.items.filter(
-          (item) => item.always || can(item.permission),
-        ),
+        items: section.items.filter((item) => {
+          const permission = ROUTE_PERMISSIONS[item.to];
+          return !permission || can(permission);
+        }),
       })).filter((section) => section.items.length > 0)
     : [];
 
@@ -152,7 +124,24 @@ function Layout() {
         {showNav && (
           <nav className="sidebar-nav">
             {sections.map((section) => (
-              <details className="nav-group" open key={section.title}>
+              <details
+                className="nav-group"
+                open={Boolean(openGroups[section.title])}
+                onToggle={(event) => {
+                  // Read the element's open state NOW, while the event is still
+                  // live. React releases the synthetic event once this handler
+                  // returns and nulls out currentTarget, so reading it inside
+                  // the setState updater below (which runs later, during render)
+                  // would throw "Cannot read properties of null (reading
+                  // 'open')". Capture the boolean first, then use that.
+                  const isOpen = event.currentTarget.open;
+                  setOpenGroups((current) => {
+                    if (Boolean(current[section.title]) === isOpen) return current;
+                    return { ...current, [section.title]: isOpen };
+                  });
+                }}
+                key={section.title}
+              >
                 <summary className="nav-group-head">
                   <span>{section.title}</span>
                   <svg className="chevron" viewBox="0 0 12 12" aria-hidden="true">

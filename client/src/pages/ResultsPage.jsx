@@ -269,19 +269,21 @@ function ResultsPage() {
           />
           Show change vs previous period
         </label>
-        <ExportButton
-          label="Export this table (CSV)"
-          filename={`results-period-${periodNumber}.csv`}
-          disabled={!data || parameters.length === 0 || view.rows.length === 0}
-          buildRows={() =>
-            resultsCsvRows({
-              periodNumber,
-              columns,
-              rows: view.rows,
-              showChange: config.showChange,
-            })
-          }
-        />
+        {can('data.export') && (
+          <ExportButton
+            label="Export this table (CSV)"
+            filename={`results-period-${periodNumber}.csv`}
+            disabled={!data || parameters.length === 0 || view.rows.length === 0}
+            buildRows={() =>
+              resultsCsvRows({
+                periodNumber,
+                columns,
+                rows: view.rows,
+                showChange: config.showChange,
+              })
+            }
+          />
+        )}
       </div>
 
       {parameters.length > 0 && (

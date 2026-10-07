@@ -10,6 +10,7 @@ import {
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import { applyRememberedTheme } from './lib/theme.js';
 import { PreferencesProvider } from './preferences/PreferencesProvider.jsx';
+import { initLocalDb } from './db/bootstrap.js';
 import './index.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -43,18 +44,56 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <BrowserRouter>
-          <AuthProvider>
-            <PreferencesProvider>
-              <App />
-            </PreferencesProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </ErrorBoundary>
-    </QueryClientProvider>
-  </StrictMode>
-);
+const root = createRoot(document.getElementById('root'));
+
+// The full application tree. Kept as a factory (not a named component) so this
+// entry module has no component exports — Fast Refresh only tracks modules that
+// export their components, and the entry point intentionally exports nothing.
+function renderApp() {
+  root.render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <AuthProvider>
+              <PreferencesProvider>
+                <App />
+              </PreferencesProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </ErrorBoundary>
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+}
+
+// A tiny inline splash shown while the on-device database starts up (creating
+// PGlite, applying migrations, seeding the local user). This runs before any
+// React/API code, so nothing queries the DB until it is ready.
+function renderSplash(message) {
+  root.render(
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: '2rem',
+        font: '500 15px/1.5 system-ui, sans-serif',
+        color: 'var(--fg, #333)',
+        textAlign: 'center',
+      }}
+    >
+      <p>{message}</p>
+    </div>,
+  );
+}
+
+// Gate the app on the local database. Unlike the desktop build (which talks to a
+// running Postgres server), here the database has to be created in the browser
+// first — so we wait for it, then mount. On failure we show the error rather
+// than a blank screen.
+renderSplash('Starting…');
+initLocalDb().then(renderApp, (error) => {
+  console.error('Failed to start the local database:', error);
+  renderSplash(`Could not start the local database: ${error.message}`);
+});

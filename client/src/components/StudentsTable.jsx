@@ -32,30 +32,34 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
       <p>
         {search
           ? `No students match "${search}".`
-          : 'No students yet. Add the first one above.'}
+          : can('students.create')
+            ? 'No students yet. Add the first one above.'
+            : 'No students yet.'}
       </p>
     );
   }
 
   return (
     <>
-      <table className={isPlaceholderData ? 'stale' : undefined}>
-        <thead>
-          <tr>
-            {preferences.studentsShowCode && <th>Code</th>}
-            <th>Full name</th>
-            {preferences.studentsShowAdded && <th>Added</th>}
-            {(can('students.edit') || can('students.delete')) && (
-              <th>Actions</th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {data.students.map((student) => (
-            <StudentRow key={student.id} student={student} />
-          ))}
-        </tbody>
-      </table>
+      <div className="table-wrap">
+        <table className={isPlaceholderData ? 'stale' : undefined}>
+          <thead>
+            <tr>
+              {preferences.studentsShowCode && <th>Code</th>}
+              <th>Full name</th>
+              {preferences.studentsShowAdded && <th>Added</th>}
+              {(can('students.edit') || can('students.delete')) && (
+                <th>Actions</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {data.students.map((student) => (
+              <StudentRow key={student.id} student={student} />
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="pager">
         <button

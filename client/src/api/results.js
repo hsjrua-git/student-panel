@@ -1,7 +1,11 @@
-import { request } from './http.js';
+// Results api — on-device adapter over the results service (was fetch to
+// /api/results). Same return shape as before (the full results object).
+
+import { callService } from './local.js';
+import { getResults as getResultsService } from '@server/core/services/results.js';
 
 export function getResults(periodNumber, groupId = null) {
-  const params = new URLSearchParams({ periodNumber: String(periodNumber) });
-  if (groupId) params.set('groupId', groupId);
-  return request(`/api/results?${params}`);
+  return callService(() =>
+    getResultsService({ periodNumber, groupId: groupId ?? undefined }),
+  );
 }

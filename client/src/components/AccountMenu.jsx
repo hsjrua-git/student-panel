@@ -24,7 +24,6 @@ function AccountMenu({ user, onSignOut, signingOut = false }) {
   // uniformly regardless of whether each renders as a link or a button.
   const items = [
     { key: 'preferences', label: 'Preferences', to: '/preferences' },
-    { key: 'change-password', label: 'Change password', to: '/change-password' },
     {
       key: 'sign-out',
       label: signingOut ? 'Signing out…' : 'Sign out',

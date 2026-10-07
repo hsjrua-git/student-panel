@@ -57,7 +57,49 @@ so you can never lock yourself out.
 - Node.js 20 or newer (uses `--env-file`).
 - PostgreSQL 14 or newer.
 
+## Quick start (automated installer)
+
+If you just want it running, use the installer instead of the manual steps
+below. It checks for Node.js and PostgreSQL, installs them if missing, creates
+the database and configuration, installs dependencies, runs the migrations,
+creates your first administrator, builds the front end, starts the server, and
+opens your browser. It is interactive and safe to re-run — it only does the
+steps that are still outstanding.
+
+**Windows** — double-click `setup.bat` (or run `powershell -ExecutionPolicy
+Bypass -File setup.ps1`). It requests Administrator rights and uses `winget` to
+install Node.js and PostgreSQL if they are missing.
+
+**Linux / macOS** — from the project root:
+
+```bash
+bash setup.sh
+```
+
+It uses your package manager (`apt`/`dnf`/`pacman`/`zypper`, or Homebrew on
+macOS) with `sudo` to install Node.js and PostgreSQL if they are missing, then
+takes you through the rest.
+
+What it will and won't do automatically:
+
+- **Installs prerequisites** (Node.js 20+, PostgreSQL) through the OS package
+  manager when they are absent. If no supported package manager is found, it
+  stops and tells you what to install, then you re-run it.
+- **Generates secrets** — the `SESSION_SECRET` and the application database
+  password are generated and written to `server/.env` (never printed, never
+  committed).
+- **Creates the database** by connecting as a PostgreSQL superuser (the local
+  `postgres` account via `sudo` on Linux, otherwise prompting for the
+  `postgres` role's password). It only creates the role/database if they are
+  missing.
+- **Prints a one-time temporary password** for the administrator it creates;
+  you change it at first login.
+
+You can also run the orchestrator directly if Node and PostgreSQL are already
+installed: `node scripts/setup.mjs`.
+
 ## First-time setup
+
 
 ```bash
 # 1. Install dependencies.
@@ -186,6 +228,23 @@ Restore a dump (this overwrites the current database, so it asks first):
 ```bash
 ./deploy/restore.sh backups/student-panel-YYYYMMDD-HHMMSS.sql.gz
 ```
+
+## Resetting the data
+
+To return the database to a fresh "institution just started" state — the seeded
+roles and your Administrator account only — run from `server/`:
+
+```bash
+npm run reset-data              # dry run: shows current rows and what would be wiped
+npm run reset-data -- confirm   # actually wipes
+```
+
+It clears students, scores, parameters and their change log, groups, custom
+field definitions, the period anchor, the audit log, saved views, preferences,
+and all sessions, and removes every non-admin account. Roles, permissions, and
+your Administrator account are kept, and the schema itself is left in place. It
+refuses to run if no active Administrator would remain. This is irreversible, so
+take a backup first (see above); everyone is signed out when it finishes.
 
 ## Security
 
