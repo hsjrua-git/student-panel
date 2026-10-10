@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
-import { recordAudit } from '../lib/audit.js';
 import { FIELD_TYPES } from '../lib/fields.js';
 import { isUuid } from '../lib/ids.js';
-import { userCan } from '../middleware/auth.js';
+
+// Custom student-field definitions. Single-operator build: no per-user
+// ownership (`created_by` dropped) and no permission gating — the middleware
+// auto-audits create/update/delete, so this router does not record its own.
 
 const router = Router();
 const UNIQUE_VIOLATION = '23505';
@@ -54,15 +56,12 @@ router.param('id', (req, res, next, value) => {
 
 router.get('/', async (req, res) => {
   const includeArchived = req.query.includeArchived === '1';
-  const seeAll = userCan(req, 'fields.view_restricted') || userCan(req, 'fields.manage');
-
   const result = await pool.query(
     `SELECT ${DEFINITION_COLUMNS}
      FROM student_field_definitions
      WHERE ($1 OR archived_at IS NULL)
-       AND ($2 OR is_restricted = false)
      ORDER BY sort_order, lower(label)`,
-    [includeArchived, seeAll]
+    [includeArchived]
   );
   res.json({ fields: result.rows });
 });
@@ -82,45 +81,26 @@ router.post('/', async (req, res) => {
   }
   const isRestricted = req.body?.isRestricted === true;
 
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    const orderResult = await client.query(
-      `SELECT COALESCE(max(sort_order), 0) + 1 AS next FROM student_field_definitions`
-    );
-    const inserted = await client.query(
+    const inserted = await pool.query(
       `INSERT INTO student_field_definitions
-         (label, field_type, choices, is_restricted, sort_order, created_by)
-       VALUES ($1, $2, $3::jsonb, $4, $5, $6)
+         (label, field_type, choices, is_restricted, sort_order)
+       VALUES ($1, $2, $3::jsonb, $4,
+               (SELECT COALESCE(max(sort_order), 0) + 1 FROM student_field_definitions))
        RETURNING ${DEFINITION_COLUMNS}`,
       [
         label.value,
         fieldType,
         JSON.stringify(fieldType === 'choice' ? choices.value : []),
         isRestricted,
-        orderResult.rows[0].next,
-        req.user.id,
       ]
     );
-    const field = inserted.rows[0];
-    await recordAudit(client, {
-      userId: req.user.id,
-      actor: req.user.username,
-      action: 'field.create',
-      entityType: 'field',
-      entityId: field.id,
-      details: { label: field.label, fieldType, isRestricted },
-    });
-    await client.query('COMMIT');
-    res.status(201).json({ field });
+    res.status(201).json(inserted.rows[0]);
   } catch (err) {
-    await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
       return res.status(409).json({ error: 'A field with that label already exists.' });
     }
     throw err;
-  } finally {
-    client.release();
   }
 });
 
@@ -226,16 +206,8 @@ router.patch('/:id', async (req, res) => {
        RETURNING ${DEFINITION_COLUMNS}`,
       values
     );
-    await recordAudit(client, {
-      userId: req.user.id,
-      actor: req.user.username,
-      action: 'field.update',
-      entityType: 'field',
-      entityId: field.id,
-      details: { label: updated.rows[0].label },
-    });
     await client.query('COMMIT');
-    res.json({ field: updated.rows[0] });
+    res.json(updated.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
@@ -249,42 +221,23 @@ router.patch('/:id', async (req, res) => {
 
 // DELETE archives the field (values stay in students.extra, just hidden).
 router.delete('/:id', async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const updated = await client.query(
-      `UPDATE student_field_definitions SET archived_at = now()
-       WHERE id = $1 AND archived_at IS NULL
-       RETURNING id, label`,
+  const updated = await pool.query(
+    `UPDATE student_field_definitions SET archived_at = now()
+     WHERE id = $1 AND archived_at IS NULL
+     RETURNING id`,
+    [req.params.id]
+  );
+  if (updated.rowCount === 0) {
+    // Either it doesn't exist or it's already archived; treat as done.
+    const exists = await pool.query(
+      'SELECT 1 FROM student_field_definitions WHERE id = $1',
       [req.params.id]
     );
-    if (updated.rowCount === 0) {
-      await client.query('ROLLBACK');
-      // Either it doesn't exist or it's already archived; treat as done.
-      const exists = await client.query(
-        'SELECT 1 FROM student_field_definitions WHERE id = $1',
-        [req.params.id]
-      );
-      return exists.rowCount === 0
-        ? res.status(404).json({ error: 'Field not found.' })
-        : res.status(204).end();
-    }
-    await recordAudit(client, {
-      userId: req.user.id,
-      actor: req.user.username,
-      action: 'field.archive',
-      entityType: 'field',
-      entityId: updated.rows[0].id,
-      details: { label: updated.rows[0].label },
-    });
-    await client.query('COMMIT');
-    res.status(204).end();
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
+    return exists.rowCount === 0
+      ? res.status(404).json({ error: 'Field not found.' })
+      : res.status(204).end();
   }
+  res.status(204).end();
 });
 
 export default router;

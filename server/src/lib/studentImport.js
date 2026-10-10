@@ -1,4 +1,8 @@
-import { normalizeFullName } from '../validation/student.js';
+import {
+  normalizeBirthdate,
+  normalizeFullName,
+  normalizeGender,
+} from '../validation/student.js';
 
 export const MAX_IMPORT_ROWS = 500;
 
@@ -41,7 +45,14 @@ export function validateImportBody(body) {
       return { error: 'Row numbers must be unique.' };
     }
     seenRows.add(item.row);
-    cleaned.push({ row: item.row, fullName: item.fullName });
+    cleaned.push({
+      row: item.row,
+      fullName: item.fullName,
+      // birthdate/gender are optional in the payload but must resolve to valid
+      // values for a row to import (both are NOT NULL in the DB).
+      birthdate: typeof item.birthdate === 'string' ? item.birthdate : '',
+      gender: typeof item.gender === 'string' ? item.gender : '',
+    });
   }
   return { rows: cleaned, allowDuplicateNames, dryRun };
 }
@@ -49,20 +60,25 @@ export function validateImportBody(body) {
 export function classifyImportRows({ rows, existing, allowDuplicateNames }) {
   const firstSeen = new Map();
 
-  return rows.map(({ row, fullName }) => {
-    const parsed = normalizeFullName(fullName);
-    if (parsed.error) {
+  return rows.map(({ row, fullName, birthdate, gender }) => {
+    const parsedName = normalizeFullName(fullName);
+    const parsedBirthdate = normalizeBirthdate(birthdate);
+    const parsedGender = normalizeGender(gender);
+    const problem = parsedName.error || parsedBirthdate.error || parsedGender.error;
+    if (problem) {
       return {
         row,
-        fullName: fullName.trim(),
+        fullName: typeof fullName === 'string' ? fullName.trim() : '',
+        birthdate: typeof birthdate === 'string' ? birthdate.trim() : '',
+        gender: typeof gender === 'string' ? gender.trim() : '',
         status: 'invalid',
-        message: parsed.error,
+        message: problem,
         existingCode: null,
         willImport: false,
       };
     }
 
-    const name = parsed.value;
+    const name = parsedName.value;
     const key = nameKey(name);
     let status = 'ok';
     let message = '';
@@ -81,6 +97,8 @@ export function classifyImportRows({ rows, existing, allowDuplicateNames }) {
     return {
       row,
       fullName: name,
+      birthdate: parsedBirthdate.value,
+      gender: parsedGender.value,
       status,
       message,
       existingCode,

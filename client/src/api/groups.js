@@ -31,7 +31,7 @@ export function archiveGroup(id) {
 
 export async function listGroupMembers(id) {
   const data = await request(`/api/groups/${id}/members`);
-  return data.students;
+  return data.members;
 }
 
 export function updateGroupMembers(id, { add = [], remove = [] }) {

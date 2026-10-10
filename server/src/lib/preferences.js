@@ -1,6 +1,10 @@
 import { isUuid } from './ids.js';
 
-export const THEMES = ['system', 'light', 'dark'];
+// Only light and dark themes (locked decision — no 'system'). The accent
+// palette recolors the shell on top of the chosen light/dark theme; the client
+// ships the picker (see client lib/theme.js), so the server validates and
+// persists it alongside the theme.
+export const THEMES = ['light', 'dark'];
 export const PALETTES = [
   'aurora',
   'gradebook',

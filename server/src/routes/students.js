@@ -1,12 +1,16 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { generateStudentCode } from '../lib/studentCode.js';
-import { normalizeFullName } from '../validation/student.js';
+import {
+  normalizeBirthdate,
+  normalizeFullName,
+  normalizeGender,
+} from '../validation/student.js';
 import { recordAudit } from '../lib/audit.js';
-import { descendantGroupIds } from '../lib/groups.js';
+import { fetchGroupRows, groupSubtreeIds } from '../lib/groups.js';
 import { stripRestricted, validateExtra } from '../lib/fields.js';
 import { isUuid } from '../lib/ids.js';
-import { userCan } from '../middleware/auth.js';
+import { getOperatorName } from '../lib/settings.js';
 import {
   classifyImportRows,
   importCounts,
@@ -15,6 +19,14 @@ import {
 } from '../lib/studentImport.js';
 
 const router = Router();
+
+// A viewer may reveal restricted custom-field values by opting in per request
+// with ?revealRestricted=1 (this is a single-operator app: the flag is a soft
+// privacy nudge, not an access control).
+function wantsRestricted(req) {
+  const raw = req.query.revealRestricted;
+  return raw === '1' || raw === 'true';
+}
 
 // The live custom-field definitions, used to validate incoming values and to
 // strip restricted values from responses.
@@ -36,8 +48,6 @@ function presentStudent(student, definitions, canSeeRestricted) {
 }
 
 const UNIQUE_VIOLATION = '23505';
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 const SORTS = {
@@ -51,6 +61,8 @@ const STUDENT_COLUMNS = `
   id,
   student_code AS "studentCode",
   full_name    AS "fullName",
+  birthdate,
+  gender,
   extra,
   created_at   AS "createdAt"
 `;
@@ -64,43 +76,72 @@ function escapeLike(text) {
   return text.replace(/[\\%_]/g, '\\$&');
 }
 
+// Validate the mandatory create fields (name, birthdate, gender) together.
+function parseCoreFields(body, { partial = false } = {}) {
+  const values = {};
+  if (!partial || 'fullName' in body) {
+    const parsed = normalizeFullName(body.fullName);
+    if (parsed.error) return { error: parsed.error };
+    values.fullName = parsed.value;
+  }
+  if (!partial || 'birthdate' in body) {
+    const parsed = normalizeBirthdate(body.birthdate);
+    if (parsed.error) return { error: parsed.error };
+    values.birthdate = parsed.value;
+  }
+  if (!partial || 'gender' in body) {
+    const parsed = normalizeGender(body.gender);
+    if (parsed.error) return { error: parsed.error };
+    values.gender = parsed.value;
+  }
+  return { values };
+}
+
 router.param('id', (req, res, next, value) => {
-  if (!UUID_PATTERN.test(value)) {
+  if (!isUuid(value)) {
     return res.status(404).json({ error: 'Student not found.' });
   }
   next();
 });
 
 router.post('/', async (req, res) => {
-  const parsed = normalizeFullName(req.body?.fullName);
-  if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+  const body = req.body ?? {};
+  const core = parseCoreFields(body);
+  if (core.error) {
+    return res.status(400).json({ error: core.error });
   }
 
   const definitions = await loadDefinitions(pool);
-  const extra = validateExtra(definitions, req.body?.extra ?? {});
+  const extra = validateExtra(definitions, body.extra ?? {});
   if (extra.error) {
     return res.status(400).json({ error: extra.error });
   }
 
-  const canSeeRestricted = userCan(req, 'fields.view_restricted');
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       const result = await pool.query(
-        `INSERT INTO students (student_code, full_name, extra)
-         VALUES ($1, $2, $3::jsonb)
+        `INSERT INTO students (student_code, full_name, birthdate, gender, extra)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
          RETURNING ${STUDENT_COLUMNS}`,
-        [generateStudentCode(), parsed.value, JSON.stringify(extra.value)]
+        [
+          generateStudentCode(),
+          core.values.fullName,
+          core.values.birthdate,
+          core.values.gender,
+          JSON.stringify(extra.value),
+        ]
       );
       return res
         .status(201)
-        .json(presentStudent(result.rows[0], definitions, canSeeRestricted));
+        .json(presentStudent(result.rows[0], definitions, wantsRestricted(req)));
     } catch (err) {
       if (err.code !== UNIQUE_VIOLATION) throw err;
     }
   }
 
-  res.status(500).json({ error: 'Could not create a unique student code. Please try again.' });
+  res
+    .status(500)
+    .json({ error: 'Could not create a unique student code. Please try again.' });
 });
 
 router.get('/', async (req, res) => {
@@ -121,6 +162,7 @@ router.get('/', async (req, res) => {
   }
 
   const { groupId } = req.query;
+  const ungrouped = req.query.ungrouped === '1' || req.query.ungrouped === 'true';
   if (groupId !== undefined && !isUuid(groupId)) {
     return res.status(400).json({ error: 'groupId must be a valid ID.' });
   }
@@ -130,11 +172,17 @@ router.get('/', async (req, res) => {
 
   if (groupId !== undefined) {
     // Filtering by a group includes every student in it or its subgroups.
-    const groupIds = await descendantGroupIds(pool, groupId);
+    const groupRows = await fetchGroupRows(pool, { includeArchived: true });
+    const groupIds = groupSubtreeIds(groupRows, groupId);
     values.push(groupIds);
     conditions.push(
       `id IN (SELECT student_id FROM student_group_members
               WHERE group_id = ANY($${values.length}::uuid[]))`
+    );
+  } else if (ungrouped) {
+    // Students not placed in any group (they have no evaluations yet).
+    conditions.push(
+      `id NOT IN (SELECT student_id FROM student_group_members)`
     );
   }
 
@@ -167,7 +215,7 @@ router.get('/', async (req, res) => {
   );
 
   const definitions = await loadDefinitions(pool);
-  const canSeeRestricted = userCan(req, 'fields.view_restricted');
+  const canSeeRestricted = wantsRestricted(req);
 
   res.json({
     students: listResult.rows.map((student) =>
@@ -185,22 +233,24 @@ router.patch('/:id', async (req, res) => {
     return res.status(400).json({ error: 'Student codes cannot be changed.' });
   }
 
-  const hasName = 'fullName' in body;
+  const core = parseCoreFields(body, { partial: true });
+  if (core.error) {
+    return res.status(400).json({ error: core.error });
+  }
   const hasExtra = 'extra' in body;
-  if (!hasName && !hasExtra) {
+  if (Object.keys(core.values).length === 0 && !hasExtra) {
     return res.status(400).json({ error: 'Nothing to change.' });
   }
 
   const sets = [];
   const values = [];
 
-  if (hasName) {
-    const parsed = normalizeFullName(body.fullName);
-    if (parsed.error) {
-      return res.status(400).json({ error: parsed.error });
+  const columnFor = { fullName: 'full_name', birthdate: 'birthdate', gender: 'gender' };
+  for (const [key, column] of Object.entries(columnFor)) {
+    if (key in core.values) {
+      values.push(core.values[key]);
+      sets.push(`${column} = $${values.length}`);
     }
-    values.push(parsed.value);
-    sets.push(`full_name = $${values.length}`);
   }
 
   const definitions = await loadDefinitions(pool);
@@ -234,8 +284,7 @@ router.patch('/:id', async (req, res) => {
   if (result.rowCount === 0) {
     return res.status(404).json({ error: 'Student not found.' });
   }
-  const canSeeRestricted = userCan(req, 'fields.view_restricted');
-  res.json(presentStudent(result.rows[0], definitions, canSeeRestricted));
+  res.json(presentStudent(result.rows[0], definitions, wantsRestricted(req)));
 });
 
 router.delete('/:id', async (req, res) => {
@@ -263,9 +312,9 @@ router.get('/:id', async (req, res) => {
     return res.status(404).json({ error: 'Student not found.' });
   }
   const definitions = await loadDefinitions(pool);
-  const canSeeRestricted = userCan(req, 'fields.view_restricted');
-  res.json(presentStudent(result.rows[0], definitions, canSeeRestricted));
+  res.json(presentStudent(result.rows[0], definitions, wantsRestricted(req)));
 });
+
 router.post('/import', async (req, res) => {
   const parsed = validateImportBody(req.body);
   if (parsed.error) {
@@ -310,11 +359,11 @@ router.post('/import', async (req, res) => {
       let student = null;
       for (let attempt = 1; attempt <= 5 && student === null; attempt++) {
         const inserted = await client.query(
-          `INSERT INTO students (student_code, full_name)
-           VALUES ($1, $2)
+          `INSERT INTO students (student_code, full_name, birthdate, gender)
+           VALUES ($1, $2, $3, $4)
            ON CONFLICT (student_code) DO NOTHING
            RETURNING ${STUDENT_COLUMNS}`,
-          [generateStudentCode(), item.fullName]
+          [generateStudentCode(), item.fullName, item.birthdate, item.gender]
         );
         student = inserted.rows[0] ?? null;
       }
@@ -325,8 +374,7 @@ router.post('/import', async (req, res) => {
     }
 
     await recordAudit(client, {
-      userId: req.user.id,
-      actor: req.user.username,
+      actor: await getOperatorName(),
       action: 'student.import',
       entityType: 'student',
       details: {

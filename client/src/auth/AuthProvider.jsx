@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { changePassword, fetchMe, login, logout } from '../api/auth.js';
+import { changePassword, fetchMe, login, logout, setup } from '../api/auth.js';
 import { AuthContext } from './AuthContext.jsx';
 
-// Holds the signed-in user (from the `me` query) and the login/logout/
-// change-password mutations, and exposes a `can(permission)` helper. The
-// context object and the useAuth() hook live in AuthContext.jsx; keeping the
-// provider component in its own file is what lets Fast Refresh work cleanly.
+// Holds the single-operator auth state (from the `me` query) and the
+// setup/login/logout/change-password mutations. There are no users, roles or
+// permissions in this build: the session is either signed in (`authed`) or not,
+// and `initialized` tells us whether a password has been chosen yet. The context
+// object and the useAuth() hook live in AuthContext.jsx; keeping the provider in
+// its own file is what lets Fast Refresh work cleanly.
 export function AuthProvider({ children }) {
   const queryClient = useQueryClient();
 
@@ -13,15 +15,11 @@ export function AuthProvider({ children }) {
     queryKey: ['me'],
     queryFn: fetchMe,
     retry: false,
-    // Re-check who we are (and what we're allowed to do) whenever the user
-    // returns to the tab. The global default turns this off, but the identity
-    // query is the exception: if an admin changes this user's role or
-    // permissions, refetching on focus makes the sidebar, page access, and
-    // landing reflect it on the next glance instead of only after a full
-    // re-login. The route guard then bounces them off any page they just lost.
+    // Re-check the session whenever the user returns to the tab, so an expiry
+    // elsewhere bounces them to the login screen on the next glance.
     refetchOnWindowFocus: true,
   });
-  const user = meQuery.data ?? null;
+  const me = meQuery.data ?? null;
 
   function forgetEverythingExceptMe() {
     queryClient.removeQueries({
@@ -29,11 +27,25 @@ export function AuthProvider({ children }) {
     });
   }
 
+  const setupMutation = useMutation({
+    mutationFn: setup,
+    onSuccess: (data) => {
+      forgetEverythingExceptMe();
+      queryClient.setQueryData(['me'], (prev) => ({ ...(prev ?? {}), ...data }));
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+
   const loginMutation = useMutation({
     mutationFn: login,
-    onSuccess: (signedInUser) => {
+    onSuccess: () => {
       forgetEverythingExceptMe();
-      queryClient.setQueryData(['me'], signedInUser);
+      queryClient.setQueryData(['me'], (prev) => ({
+        ...(prev ?? {}),
+        authed: true,
+        initialized: true,
+      }));
+      queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 
@@ -41,25 +53,24 @@ export function AuthProvider({ children }) {
     mutationFn: logout,
     onSettled: () => {
       forgetEverythingExceptMe();
-      queryClient.setQueryData(['me'], null);
+      queryClient.setQueryData(['me'], (prev) => ({
+        ...(prev ?? {}),
+        authed: false,
+      }));
+      queryClient.invalidateQueries({ queryKey: ['me'] });
     },
   });
 
-  const changePasswordMutation = useMutation({
-    mutationFn: changePassword,
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData(['me'], updatedUser);
-    },
-  });
+  const changePasswordMutation = useMutation({ mutationFn: changePassword });
 
   const value = {
-    user,
+    authed: Boolean(me?.authed),
+    initialized: Boolean(me?.initialized),
+    operatorName: me?.operatorName ?? 'operator',
+    appTitle: me?.appTitle ?? null,
     isLoading: meQuery.isPending,
     loadError: meQuery.isError ? meQuery.error : null,
-    can: (permission) =>
-      user !== null &&
-      Array.isArray(user.permissions) &&
-      user.permissions.includes(permission),
+    setup: setupMutation,
     login: loginMutation,
     logout: logoutMutation,
     changePassword: changePasswordMutation,

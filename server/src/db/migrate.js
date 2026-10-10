@@ -1,10 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import pool from './pool.js';
+import pool, { ready } from './pool.js';
 
 const migrationsDir = path.join(import.meta.dirname, 'migrations');
 
 async function migrate() {
+  await ready();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename   text PRIMARY KEY,

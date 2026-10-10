@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../auth/AuthContext.jsx';
-import EmptyState from '../components/EmptyState.jsx';
 import {
   archiveGroup,
   createGroup,
@@ -301,7 +299,6 @@ function GroupRow({ group, groups, onManage }) {
 }
 
 function GroupsPage() {
-  const { can } = useAuth();
   const [managing, setManaging] = useState(null);
 
   const groupsQuery = useQuery({ queryKey: ['groups'], queryFn: () => listGroups() });
@@ -309,17 +306,6 @@ function GroupsPage() {
     () => (groupsQuery.data ? buildTree(groupsQuery.data) : []),
     [groupsQuery.data]
   );
-
-  if (!can('groups.manage')) {
-    return (
-      <main>
-        <EmptyState
-          title="Read-only access"
-          description="You do not have permission to manage groups."
-        />
-      </main>
-    );
-  }
 
   return (
     <main className="wide">
@@ -368,7 +354,7 @@ function GroupsPage() {
         )}
       </section>
 
-      {managing && can('groups.assign') && (
+      {managing && (
         <MemberPanel group={managing} onClose={() => setManaging(null)} />
       )}
     </main>

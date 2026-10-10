@@ -13,12 +13,17 @@ import { PreferencesProvider } from './preferences/PreferencesProvider.jsx';
 import './index.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import CustomCursor from './components/CustomCursor.jsx';
 
 applyRememberedTheme();
 
 function signOutOn401(error) {
   if (error?.status === 401) {
-    queryClient.setQueryData(['me'], null);
+    // Flip the cached auth state to signed-out (keeping `initialized` etc.) so
+    // RequireAuth redirects to /login; the `me` query refetches the real state.
+    queryClient.setQueryData(['me'], (prev) =>
+      prev ? { ...prev, authed: false } : prev
+    );
   }
 }
 
@@ -51,6 +56,7 @@ createRoot(document.getElementById('root')).render(
           <AuthProvider>
             <PreferencesProvider>
               <App />
+              <CustomCursor />
             </PreferencesProvider>
           </AuthProvider>
         </BrowserRouter>

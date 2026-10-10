@@ -1,5 +1,12 @@
 const FORMULA_START = /^[=+\-@\t\r]/;
 
+// Neutralise spreadsheet formula-injection: a text cell that starts with one of
+// these characters is prefixed with an apostrophe so Excel/Sheets treat it as
+// literal text, not a formula. Shared by the CSV and XLSX writers.
+export function guardFormula(text) {
+  return FORMULA_START.test(text) ? `'${text}` : text;
+}
+
 export function csvField(value, delimiter = ',') {
   if (value === null || value === undefined) return '';
 
@@ -8,8 +15,7 @@ export function csvField(value, delimiter = ',') {
     if (!Number.isFinite(value)) return '';
     text = String(value);
   } else {
-    text = String(value);
-    if (FORMULA_START.test(text)) text = `'${text}`;
+    text = guardFormula(String(value));
   }
 
   if (text.includes(delimiter) || /["\r\n]/.test(text)) {

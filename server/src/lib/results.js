@@ -1,51 +1,54 @@
-export const MAX_RESULT_STUDENTS = 5000;
+import { rollupValues } from './parameters.js';
+import { flattenForest, mean } from './tree.js';
 
-export function buildResults({
-  periodNumber,
-  parameters,
-  usedIds,
-  students,
-  evaluations,
-}) {
-  const activeIds = new Set(students.map((student) => student.id));
-  const current = new Map();
-  const previous = new Map();
-  const scoredHere = new Set();
+// Pure builders for the results surface. Scores live per group (a group's own
+// scores use student_id NULL; a member's use their id). Only LEAF parameters are
+// scored; every parent value is rolled up from its children at read time via
+// rollupValues, so reshaping the parameter tree never rewrites score history.
 
-  for (const item of evaluations) {
-    if (!activeIds.has(item.studentId)) continue;
-    const key = `${item.studentId}:${item.parameterId}`;
-    if (item.periodNumber === periodNumber) {
-      current.set(key, item.value);
-      scoredHere.add(item.parameterId);
-    } else if (item.periodNumber === periodNumber - 1) {
-      previous.set(key, item.value);
-    }
-  }
+// One row per parameter node (parents included, rolled up) for a group in a
+// period: the group's OWN value plus an aggregate across its members.
+//   ownValueByLeaf : Map<leafId, number>            the group's own scores
+//   memberMaps     : [{ studentId, valueByLeaf }]   each member's leaf scores
+export function buildGroupResults(roots, { ownValueByLeaf = new Map(), memberMaps = [] } = {}) {
+  const ownRolled = rollupValues(roots, ownValueByLeaf);
+  const memberRolled = memberMaps.map((m) => rollupValues(roots, m.valueByLeaf));
 
-  const shown = parameters
-    .filter(
-      (parameter) =>
-        usedIds.has(parameter.id) || scoredHere.has(parameter.id)
-    )
-    .map((parameter) => ({ ...parameter, inUse: usedIds.has(parameter.id) }));
-
-  const rows = students.map((student) => {
-    const values = {};
-    const before = {};
-    for (const parameter of shown) {
-      const key = `${student.id}:${parameter.id}`;
-      if (current.has(key)) values[parameter.id] = current.get(key);
-      if (previous.has(key)) before[parameter.id] = previous.get(key);
-    }
+  return flattenForest(roots).map((node) => {
+    const memberValues = memberRolled
+      .map((rolled) => rolled.get(node.id))
+      .filter((v) => typeof v === 'number' && Number.isFinite(v));
     return {
-      id: student.id,
-      fullName: student.fullName,
-      studentCode: student.studentCode,
-      values,
-      previous: before,
+      id: node.id,
+      parentId: node.parentId ?? null,
+      name: node.name,
+      unit: node.unit,
+      depth: node.depth,
+      isLeaf: node.isLeaf,
+      effective: node.effective,
+      own: ownRolled.get(node.id) ?? null,
+      members: {
+        avg: mean(memberValues),
+        min: memberValues.length ? Math.min(...memberValues) : null,
+        max: memberValues.length ? Math.max(...memberValues) : null,
+        count: memberValues.length,
+      },
     };
   });
+}
 
-  return { parameters: shown, students: rows };
+// One row per parameter node for a single student within a group: that student's
+// rolled-up value per parameter (StudentDetail / a single column).
+export function buildStudentResults(roots, valueByLeaf = new Map()) {
+  const rolled = rollupValues(roots, valueByLeaf);
+  return flattenForest(roots).map((node) => ({
+    id: node.id,
+    parentId: node.parentId ?? null,
+    name: node.name,
+    unit: node.unit,
+    depth: node.depth,
+    isLeaf: node.isLeaf,
+    effective: node.effective,
+    value: rolled.get(node.id) ?? null,
+  }));
 }

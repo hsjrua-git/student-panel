@@ -2,8 +2,10 @@ import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from './EmptyState.jsx';
 
+// Auth gate for every routed page. Single-operator: the session is either signed
+// in or not. If not, bounce to /login (which also handles first-run setup).
 function RequireAuth() {
-  const { user, isLoading, loadError } = useAuth();
+  const { authed, isLoading, loadError } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -27,11 +29,8 @@ function RequireAuth() {
       </main>
     );
   }
-  if (!user) {
+  if (!authed) {
     return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-  if (user.mustChangePassword && location.pathname !== '/change-password') {
-    return <Navigate to="/change-password" replace />;
   }
   return <Outlet />;
 }

@@ -9,6 +9,9 @@ node_modules/
 # Build output
 dist/
 
+# Embedded database (PGlite) runtime data — created at first launch, never committed
+/data/
+
 # Logs
 *.log
 npm-debug.log*

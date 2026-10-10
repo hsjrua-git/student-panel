@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listFieldDefinitions } from '../api/fields.js';
 import { updateStudent } from '../api/students.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import StudentFieldInputs from './StudentFieldInputs.jsx';
 import { buildExtraPatch, extraToValues } from '../lib/studentFields.js';
 
@@ -14,7 +13,6 @@ function displayValue(definition, raw) {
 
 function StudentFieldsSection({ student }) {
   const queryClient = useQueryClient();
-  const { can } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [values, setValues] = useState({});
 
@@ -85,11 +83,9 @@ function StudentFieldsSection({ student }) {
               </div>
             ))}
           </dl>
-          {can('students.edit') && (
-            <button type="button" onClick={startEditing}>
-              Edit details
-            </button>
-          )}
+          <button type="button" onClick={startEditing}>
+            Edit details
+          </button>
         </>
       )}
     </section>

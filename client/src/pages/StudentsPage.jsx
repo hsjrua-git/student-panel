@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { listStudents } from '../api/students.js';
 import { listFieldDefinitions } from '../api/fields.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import ExportButton from '../components/ExportButton.jsx';
+import ExportLink from '../components/ExportLink.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
 import StudentForm from '../components/StudentForm.jsx';
 import StudentsTable from '../components/StudentsTable.jsx';
@@ -28,7 +28,6 @@ async function fetchFilteredStudents(groupId) {
 }
 
 function StudentsPage() {
-  const { can } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [page, setPage] = useState(1);
   const [groupId, setGroupId] = useState('');
@@ -48,20 +47,16 @@ function StudentsPage() {
     <main>
       <div className="page-head">
         <h1>Students</h1>
-        {can('data.import') && (
-          <div className="page-head-actions">
-            <Link className="btn" to="/students/import">
-              Import from CSV
-            </Link>
-          </div>
-        )}
+        <div className="page-head-actions">
+          <Link className="btn" to="/students/import">
+            Import from CSV
+          </Link>
+        </div>
       </div>
-      {can('students.create') && (
-        <section className="section-card">
-          <h2>Add a student</h2>
-          <StudentForm />
-        </section>
-      )}
+      <section className="section-card">
+        <h2>Add a student</h2>
+        <StudentForm />
+      </section>
       <section className="section-card">
         <h2>All students</h2>
         <div className="toolbar">
@@ -74,19 +69,22 @@ function StudentsPage() {
             aria-label="Search students"
           />
           <GroupFilter value={groupId} onChange={handleGroupChange} />
-          {can('data.export') && (
-            <ExportButton
-              label="Export students (CSV)"
-              filename={`students-${toIsoDate(new Date())}.csv`}
-              buildRows={async () => {
-                const [students, fields] = await Promise.all([
-                  fetchFilteredStudents(groupId),
-                  listFieldDefinitions(),
-                ]);
-                return studentsCsvRows(students, fields);
-              }}
-            />
-          )}
+          <ExportButton
+            label="Export students (CSV)"
+            filename={`students-${toIsoDate(new Date())}.csv`}
+            buildRows={async () => {
+              const [students, fields] = await Promise.all([
+                fetchFilteredStudents(groupId),
+                listFieldDefinitions(),
+              ]);
+              return studentsCsvRows(students, fields);
+            }}
+          />
+          <ExportLink
+            prefill={{
+              students: groupId ? { mode: 'group', groupId } : undefined,
+            }}
+          />
         </div>
         <StudentsTable
           search={search}

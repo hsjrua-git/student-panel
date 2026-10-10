@@ -18,8 +18,9 @@ const KEY = ['preferences'];
 // component in its own file is what lets Fast Refresh work cleanly.
 export function PreferencesProvider({ children }) {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const enabled = user !== null && !user.mustChangePassword;
+  // Only fetch preferences once signed in; the app is gated on `authed`.
+  const { authed } = useAuth();
+  const enabled = authed;
 
   const query = useQuery({
     queryKey: KEY,

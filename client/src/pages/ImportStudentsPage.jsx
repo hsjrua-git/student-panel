@@ -3,8 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Papa from 'papaparse';
 import { Link } from 'react-router';
 import { importStudents } from '../api/students.js';
-import { useAuth } from '../auth/AuthContext.jsx';
-import EmptyState from '../components/EmptyState.jsx';
 import ExportButton from '../components/ExportButton.jsx';
 import ImportSteps from '../components/ImportSteps.jsx';
 import { UploadIcon } from '../components/icons.jsx';
@@ -55,7 +53,6 @@ function ColumnSelect({ label, value, onChange, columnCount, headerCells }) {
 
 function ImportStudentsPage() {
   const queryClient = useQueryClient();
-  const { can } = useAuth();
 
   const [fileName, setFileName] = useState('');
   const [rows, setRows] = useState([]);
@@ -158,17 +155,6 @@ function ImportStudentsPage() {
           queryClient.invalidateQueries({ queryKey: ['students'] });
         },
       }
-    );
-  }
-
-  if (!can('data.import')) {
-    return (
-      <main>
-        <EmptyState
-          title="Read-only access"
-          description="You do not have permission to import students."
-        />
-      </main>
     );
   }
 

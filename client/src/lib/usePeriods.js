@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { getPeriods } from '../api/periods.js';
+import { listPeriods } from '../api/periods.js';
 
-export function usePeriods() {
-  // The period calendar is derived from a single anchor date and effectively
-  // never changes during a session, so keep it fresh for much longer than the
-  // global default to avoid refetching it on every page that needs it
-  // (Dashboard, Results, Evaluate). Editing the anchor invalidates ['periods'].
+// The list of named, dated periods. Periods change rarely during a session, so
+// keep it fresh far longer than the global default to avoid refetching on every
+// page that needs it (Dashboard, Results, Evaluate). Mutations on the Periods
+// page invalidate ['periods'].
+export function usePeriods({ includeArchived = false } = {}) {
   return useQuery({
-    queryKey: ['periods'],
-    queryFn: getPeriods,
+    queryKey: ['periods', { includeArchived }],
+    queryFn: () => listPeriods({ includeArchived }),
     staleTime: 30 * 60_000,
   });
 }

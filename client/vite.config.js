@@ -69,6 +69,23 @@ export default defineConfig(async () => {
                   if (id.includes('@tanstack')) {
                      return 'react-query'
                   }
+                  if (id.includes('/three/')) {
+                     // three.js is only reached through the lazy CohortConstellation
+                     // on the dashboard; its own chunk keeps the WebGL bytes out of
+                     // the initial load and cached across deploys.
+                     return 'three'
+                  }
+                  if (id.includes('/write-excel-file/') || id.includes('/xlsx/')) {
+                     // The .xlsx writer is only pulled in when the Export Center
+                     // actually builds a workbook (lazy import in lib/xlsx.js), so
+                     // its own chunk stays out of every other page's load.
+                     return 'xlsx'
+                  }
+                  if (id.includes('/fflate/')) {
+                     // The ZIP bundler is lazy-imported by lib/bundle.js only when
+                     // an export produces more than one artifact.
+                     return 'fflate'
+                  }
                   if (
                      id.includes('/react/') ||
                      id.includes('/react-dom/') ||

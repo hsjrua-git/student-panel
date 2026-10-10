@@ -7,14 +7,31 @@ import {
   lockedDraftKeys,
   parseCell,
   savedText,
+  splitCellKey,
 } from './cells.js';
 
 const scored = { minValue: 0, maxValue: 10 };
 const open = { minValue: null, maxValue: null };
 
-describe('cellKey / savedText', () => {
+describe('cellKey / splitCellKey / savedText', () => {
   it('joins ids with a colon', () => {
     expect(cellKey('s1', 'p1')).toBe('s1:p1');
+  });
+
+  it('folds the group-own column onto the "group" sentinel', () => {
+    expect(cellKey(null, 'p1')).toBe('group:p1');
+    expect(cellKey(undefined, 'p1')).toBe('group:p1');
+  });
+
+  it('splits a key back into a student id and parameter id', () => {
+    expect(splitCellKey('s1:p1')).toEqual({ studentId: 's1', parameterId: 'p1' });
+  });
+
+  it('maps the sentinel back to a null student id', () => {
+    expect(splitCellKey('group:p1')).toEqual({
+      studentId: null,
+      parameterId: 'p1',
+    });
   });
 
   it('renders null/undefined as an empty string, numbers as text', () => {
@@ -48,17 +65,27 @@ describe('parseCell', () => {
 describe('buildEntries', () => {
   const params = new Map([['p1', scored]]);
 
-  it('collects valid entries and reports errors by key', () => {
+  it('collects valid entries carrying the group id and reports errors by key', () => {
     const { entries, errors } = buildEntries(
       { 's1:p1': '8', 's2:p1': '99' },
       params,
+      'g1',
     );
-    expect(entries).toEqual([{ studentId: 's1', parameterId: 'p1', value: 8 }]);
+    expect(entries).toEqual([
+      { groupId: 'g1', studentId: 's1', parameterId: 'p1', value: 8 },
+    ]);
     expect(errors['s2:p1']).toMatch(/at most/i);
   });
 
+  it('maps the group-own column to a null student id', () => {
+    const { entries } = buildEntries({ 'group:p1': '5' }, params, 'g1');
+    expect(entries).toEqual([
+      { groupId: 'g1', studentId: null, parameterId: 'p1', value: 5 },
+    ]);
+  });
+
   it('skips drafts whose parameter is unknown', () => {
-    const { entries, errors } = buildEntries({ 's1:ghost': '5' }, params);
+    const { entries, errors } = buildEntries({ 's1:ghost': '5' }, params, 'g1');
     expect(entries).toEqual([]);
     expect(errors).toEqual({});
   });
@@ -93,9 +120,25 @@ describe('buildSavePayload', () => {
       noteDrafts: {},
       savedValues: {},
       parametersById: params,
+      groupId: 'g1',
     });
-    expect(entries).toEqual([{ studentId: 's1', parameterId: 'p1', value: 8 }]);
+    expect(entries).toEqual([
+      { groupId: 'g1', studentId: 's1', parameterId: 'p1', value: 8 },
+    ]);
     expect('comment' in entries[0]).toBe(false);
+  });
+
+  it('maps the group-own column to a null student id', () => {
+    const { entries } = buildSavePayload({
+      drafts: { 'group:p1': '7' },
+      noteDrafts: {},
+      savedValues: {},
+      parametersById: params,
+      groupId: 'g1',
+    });
+    expect(entries).toEqual([
+      { groupId: 'g1', studentId: null, parameterId: 'p1', value: 7 },
+    ]);
   });
 
   it('re-sends the saved value for a note-only edit so the row is not cleared', () => {
@@ -104,9 +147,16 @@ describe('buildSavePayload', () => {
       noteDrafts: { 's1:p1': 'absent' },
       savedValues: { 's1:p1': 6 },
       parametersById: params,
+      groupId: 'g1',
     });
     expect(entries).toEqual([
-      { studentId: 's1', parameterId: 'p1', value: 6, comment: 'absent' },
+      {
+        groupId: 'g1',
+        studentId: 's1',
+        parameterId: 'p1',
+        value: 6,
+        comment: 'absent',
+      },
     ]);
   });
 
@@ -116,6 +166,7 @@ describe('buildSavePayload', () => {
       noteDrafts: { 's1:p1': '   ' },
       savedValues: {},
       parametersById: params,
+      groupId: 'g1',
     });
     expect(entries[0].comment).toBe(null);
   });
@@ -126,6 +177,7 @@ describe('buildSavePayload', () => {
       noteDrafts: {},
       savedValues: {},
       parametersById: params,
+      groupId: 'g1',
     });
     expect(entries).toEqual([]);
     expect(errors['s1:p1']).toBeTruthy();

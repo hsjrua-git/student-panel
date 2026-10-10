@@ -5,12 +5,9 @@ import {
   listStudentGroups,
   updateGroupMembers,
 } from '../api/groups.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 
 function StudentGroupsSection({ student }) {
   const queryClient = useQueryClient();
-  const { can } = useAuth();
-  const canAssign = can('groups.assign');
   const [choice, setChoice] = useState('');
 
   const memberOfQuery = useQuery({
@@ -20,7 +17,6 @@ function StudentGroupsSection({ student }) {
   const allGroupsQuery = useQuery({
     queryKey: ['groups'],
     queryFn: () => listGroups(),
-    enabled: canAssign,
   });
 
   const memberOf = memberOfQuery.data ?? [];
@@ -67,23 +63,21 @@ function StudentGroupsSection({ student }) {
           {memberOf.map((group) => (
             <span key={group.id} className="chip brand">
               {group.name}
-              {canAssign && (
-                <button
-                  type="button"
-                  className="chip-remove"
-                  onClick={() => remove.mutate(group.id)}
-                  disabled={busy}
-                  aria-label={`Remove from ${group.name}`}
-                >
-                  ×
-                </button>
-              )}
+              <button
+                type="button"
+                className="chip-remove"
+                onClick={() => remove.mutate(group.id)}
+                disabled={busy}
+                aria-label={`Remove from ${group.name}`}
+              >
+                ×
+              </button>
             </span>
           ))}
         </span>
       )}
 
-      {canAssign && available.length > 0 && (
+      {available.length > 0 && (
         <div className="row">
           <label htmlFor={`add-group-${student.id}`} className="sr-only">
             Add to group

@@ -1,31 +1,35 @@
 import { request } from './http.js';
 
-export async function fetchMe() {
-  try {
-    const data = await request('/api/auth/me');
-    return data.user;
-  } catch (error) {
-    if (error.status === 401) return null;
-    throw error;
-  }
+// Single-operator auth. There are no users or roles: `GET /api/auth/me` returns
+// the app's auth state, not a user object.
+//   { authed, initialized, operatorName, appTitle }
+export function fetchMe() {
+  return request('/api/auth/me');
 }
 
-export async function login({ username, password }) {
-  const data = await request('/api/auth/login', {
+// First-run setup: choose the single password (and an optional operator name).
+// Signs the session in on success. Returns { authed, initialized, operatorName }.
+export function setup({ password, operatorName }) {
+  return request('/api/auth/setup', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ password, operatorName }),
   });
-  return data.user;
+}
+
+export function login({ password }) {
+  return request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
 }
 
 export function logout() {
   return request('/api/auth/logout', { method: 'POST' });
 }
 
-export async function changePassword({ currentPassword, newPassword }) {
-  const data = await request('/api/auth/change-password', {
+export function changePassword({ currentPassword, newPassword }) {
+  return request('/api/auth/change-password', {
     method: 'POST',
     body: JSON.stringify({ currentPassword, newPassword }),
   });
-  return data.user;
 }

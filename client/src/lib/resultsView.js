@@ -31,13 +31,10 @@ export function newFilterKey() {
 
 export function defaultConfig() {
   return {
-    periodMode: 'current',
-    periodNumber: null,
     parameterIds: [],
     filters: [],
     sort: { key: 'name', direction: 'asc' },
     search: '',
-    showChange: false,
   };
 }
 
@@ -54,10 +51,6 @@ export function normalizeConfig(raw) {
   const base = defaultConfig();
   if (raw === null || typeof raw !== 'object') return base;
 
-  const isFixed =
-    raw.periodMode === 'fixed' &&
-    Number.isInteger(raw.periodNumber) &&
-    raw.periodNumber >= 1;
   const sort = raw.sort;
   const sortOk =
     sort !== null &&
@@ -66,8 +59,6 @@ export function normalizeConfig(raw) {
     (sort.direction === 'asc' || sort.direction === 'desc');
 
   return {
-    periodMode: isFixed ? 'fixed' : 'current',
-    periodNumber: isFixed ? raw.periodNumber : null,
     parameterIds: Array.isArray(raw.parameterIds)
       ? raw.parameterIds.filter((id) => typeof id === 'string')
       : [],
@@ -76,7 +67,6 @@ export function normalizeConfig(raw) {
       : [],
     sort: sortOk ? { key: sort.key, direction: sort.direction } : base.sort,
     search: typeof raw.search === 'string' ? raw.search.trim() : '',
-    showChange: raw.showChange === true,
   };
 }
 
@@ -109,13 +99,6 @@ export function toggleColumn(selectedIds, allIds, parameterId, shouldShow) {
 
   if (!shouldShow && next.length === 0) return selectedIds;
   return next.length === allIds.length ? [] : next;
-}
-
-export function changeOf(row, parameterId) {
-  const now = row.values[parameterId];
-  const before = row.previous[parameterId];
-  if (now === undefined || before === undefined) return null;
-  return round(now - before);
 }
 
 export function describeFilter(filter, parametersById) {

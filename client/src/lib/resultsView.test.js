@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyView,
-  changeOf,
   defaultConfig,
   describeFilter,
   normalizeConfig,
@@ -28,17 +27,6 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig(42)).toEqual(defaultConfig());
   });
 
-  it('keeps a valid fixed period but rejects a bad one', () => {
-    expect(normalizeConfig({ periodMode: 'fixed', periodNumber: 3 })).toMatchObject({
-      periodMode: 'fixed',
-      periodNumber: 3,
-    });
-    expect(normalizeConfig({ periodMode: 'fixed', periodNumber: 0 })).toMatchObject({
-      periodMode: 'current',
-      periodNumber: null,
-    });
-  });
-
   it('drops filters that are malformed or missing a required value', () => {
     const config = normalizeConfig({
       filters: [
@@ -59,7 +47,7 @@ describe('normalizeConfig', () => {
 describe('sameConfig', () => {
   it('compares by normalized value, not reference', () => {
     expect(sameConfig({ search: ' hi ' }, { search: 'hi' })).toBe(true);
-    expect(sameConfig({ showChange: true }, { showChange: false })).toBe(false);
+    expect(sameConfig({ parameterIds: ['p1'] }, { parameterIds: ['p2'] })).toBe(false);
   });
 });
 
@@ -89,16 +77,6 @@ describe('toggleColumn', () => {
 
   it('refuses to hide the last visible column', () => {
     expect(toggleColumn(['p2'], allIds, 'p2', false)).toEqual(['p2']);
-  });
-});
-
-describe('changeOf', () => {
-  it('rounds the delta when both periods have a value', () => {
-    expect(changeOf({ values: { p1: 5 }, previous: { p1: 3 } }, 'p1')).toBe(2);
-  });
-
-  it('is null when either side is missing', () => {
-    expect(changeOf({ values: {}, previous: { p1: 3 } }, 'p1')).toBe(null);
   });
 });
 

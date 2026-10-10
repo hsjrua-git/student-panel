@@ -146,11 +146,16 @@ export function buildImport({
   };
 }
 
+// Fold the server's dry-run preview back onto the built entries to decide what
+// to actually send. The preview carries one cell per entry index
+// ({ index, status: 'unchanged' | 'changed' | 'cleared', wasLocked }) plus a
+// list of per-index problems. Unchanged cells are skipped; a cell that is both
+// changed and locked needs an override (and is dropped when the caller cannot
+// override). `canOverride` is always true for the single operator, but the flag
+// is kept so the logic stays pure and testable.
 export function planImport({ built, server, canOverride }) {
   const problemIndexes = new Set(server.problems.map((problem) => problem.index));
-  const statusByIndex = new Map(
-    server.cells.map((cell) => [cell.index, cell.status])
-  );
+  const cellByIndex = new Map(server.cells.map((cell) => [cell.index, cell]));
 
   const send = [];
   let unchanged = 0;
@@ -159,14 +164,14 @@ export function planImport({ built, server, canOverride }) {
 
   built.entries.forEach((entry, index) => {
     if (problemIndexes.has(index)) return;
-    const status = statusByIndex.get(index);
-    if (status === undefined) return;
+    const cell = cellByIndex.get(index);
+    if (cell === undefined) return;
 
-    if (status === 'unchanged') {
+    if (cell.status === 'unchanged') {
       unchanged++;
       return;
     }
-    if (status === 'locked') {
+    if (cell.wasLocked) {
       if (!canOverride) {
         lockedBlocked++;
         return;

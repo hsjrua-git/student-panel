@@ -1,47 +1,59 @@
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const DAYS_PER_PERIOD = 7;
+import pool from '../db/pool.js';
 
-function dayNumber(isoDate) {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  return Date.UTC(year, month - 1, day) / MS_PER_DAY;
+// Read + shape periods and their assignments. A period applies to a student
+// inside a group when it is assigned to that group (or an ancestor) or directly
+// to the student. Assignments are group XOR student (see 006_periods.sql).
+
+const COLUMNS = `
+  id,
+  name,
+  start_date  AS "startDate",
+  end_date    AS "endDate",
+  sort_order  AS "sortOrder",
+  archived_at AS "archivedAt",
+  created_at  AS "createdAt"
+`;
+
+export async function fetchPeriodRows(db = pool, { includeArchived = false } = {}) {
+  const where = includeArchived ? '' : 'WHERE archived_at IS NULL';
+  const result = await db.query(
+    `SELECT ${COLUMNS} FROM periods ${where}
+     ORDER BY start_date, sort_order, lower(name)`
+  );
+  return result.rows;
 }
 
-function isoDateFromDayNumber(days) {
-  return new Date(days * MS_PER_DAY).toISOString().slice(0, 10);
+export async function fetchPeriod(db, id) {
+  const result = await db.query(`SELECT ${COLUMNS} FROM periods WHERE id = $1`, [id]);
+  return result.rows[0] ?? null;
 }
 
-export function isValidIsoDate(text) {
-  if (typeof text !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    return false;
+// All assignments as { periodId, groupId, studentId }.
+export async function fetchPeriodAssignments(db = pool) {
+  const result = await db.query(
+    `SELECT period_id AS "periodId", group_id AS "groupId", student_id AS "studentId"
+       FROM period_assignments`
+  );
+  return result.rows;
+}
+
+// Period ids that apply to the given set of group ids (typically a group plus
+// its ancestors) and, optionally, a student. Returns a Set of period ids.
+export async function applicablePeriodIds(db, { groupIds = [], studentId = null } = {}) {
+  const ids = new Set();
+  if (groupIds.length) {
+    const byGroup = await db.query(
+      `SELECT DISTINCT period_id FROM period_assignments WHERE group_id = ANY($1)`,
+      [groupIds]
+    );
+    for (const row of byGroup.rows) ids.add(row.period_id);
   }
-  return isoDateFromDayNumber(dayNumber(text)) === text;
-}
-
-export function isSaturday(isoDate) {
-  return new Date(dayNumber(isoDate) * MS_PER_DAY).getUTCDay() === 6;
-}
-
-export function todayIso(now = new Date()) {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-export function periodForDate(anchorDate, date) {
-  const daysSinceAnchor = dayNumber(date) - dayNumber(anchorDate);
-  if (daysSinceAnchor < 0) return null;
-  return Math.floor(daysSinceAnchor / DAYS_PER_PERIOD) + 1;
-}
-
-export function periodDates(anchorDate, number) {
-  if (!Number.isInteger(number) || number < 1) {
-    throw new Error('Period number must be a whole number from 1.');
+  if (studentId) {
+    const byStudent = await db.query(
+      `SELECT DISTINCT period_id FROM period_assignments WHERE student_id = $1`,
+      [studentId]
+    );
+    for (const row of byStudent.rows) ids.add(row.period_id);
   }
-  const start = dayNumber(anchorDate) + (number - 1) * DAYS_PER_PERIOD;
-  return {
-    number,
-    startDate: isoDateFromDayNumber(start),
-    endDate: isoDateFromDayNumber(start + DAYS_PER_PERIOD - 1),
-  };
+  return ids;
 }

@@ -1,106 +1,105 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import {
-  listEvaluations,
-  listPeriodParameters,
-  saveEvaluations,
-} from '../api/evaluations.js';
-import { useAuth } from '../auth/AuthContext.jsx';
+import { getMatrix, saveEvaluations } from '../api/evaluations.js';
+import { listGroups } from '../api/groups.js';
 import EmptyState from '../components/EmptyState.jsx';
-import EvaluationGrid from '../components/EvaluationGrid.jsx';
-import GroupFilter from '../components/GroupFilter.jsx';
-import PeriodParametersPanel from '../components/PeriodParametersPanel.jsx';
-import PeriodPicker from '../components/PeriodPicker.jsx';
+import EvaluationMatrix from '../components/EvaluationMatrix.jsx';
 import {
   buildEntries,
   buildSavePayload,
   cellKey,
   lockedDraftKeys,
 } from '../lib/cells.js';
-import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { usePeriods } from '../lib/usePeriods.js';
 
-function EvaluatePage() {
-  const queryClient = useQueryClient();
-  const { can } = useAuth();
-  const periodsQuery = usePeriods();
-  const periods = periodsQuery.data;
+// The same indented, tree-ordered list the Groups page and GroupFilter use.
+function orderGroups(groups) {
+  const byParent = new Map();
+  for (const group of groups) {
+    const key = group.parentId ?? 'root';
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(group);
+  }
+  const walk = (parentKey, depth) =>
+    (byParent.get(parentKey) ?? []).flatMap((group) => [
+      { ...group, depth },
+      ...walk(group.id, depth + 1),
+    ]);
+  return walk('root', 0);
+}
 
-  const [chosenPeriod, setChosenPeriod] = useState(null);
+// Scoring is per group + per period: pick one of each, then fill the matrix of
+// leaf parameters (rows) against the group's own score and each member (cols).
+export default function EvaluatePage() {
+  const queryClient = useQueryClient();
+  const periodsQuery = usePeriods();
+  const groupsQuery = useQuery({ queryKey: ['groups'], queryFn: () => listGroups() });
+
+  const [groupId, setGroupId] = useState('');
+  const [periodId, setPeriodId] = useState('');
   const [drafts, setDrafts] = useState({});
   const [noteDrafts, setNoteDrafts] = useState({});
-  const [searchText, setSearchText] = useState('');
-  const [page, setPage] = useState(1);
-  const [groupId, setGroupId] = useState('');
-  const search = useDebouncedValue(searchText.trim(), 300);
+  const periods = periodsQuery.data ?? [];
+  const groups = useMemo(
+    () => orderGroups(groupsQuery.data ?? []),
+    [groupsQuery.data],
+  );
 
-  const periodNumber = chosenPeriod ?? periods?.current ?? null;
+  const ready = groupId !== '' && periodId !== '';
 
-  const parametersQuery = useQuery({
-    queryKey: ['period-parameters', periodNumber],
-    queryFn: () => listPeriodParameters(periodNumber),
-    enabled: periodNumber !== null,
+  const matrixQuery = useQuery({
+    queryKey: ['matrix', { groupId, periodId }],
+    queryFn: () => getMatrix({ groupId, periodId }),
+    enabled: ready,
   });
-  const savedQuery = useQuery({
-    queryKey: ['evaluations', { periodNumber }],
-    queryFn: () => listEvaluations({ periodNumber }),
-    enabled: periodNumber !== null,
-  });
+  const matrix = matrixQuery.data;
 
-  const saved = useMemo(
-    () =>
-      Object.fromEntries(
-        (savedQuery.data ?? []).map((item) => [
-          cellKey(item.studentId, item.parameterId),
-          item.value,
-        ])
-      ),
-    [savedQuery.data]
-  );
-  const savedNotes = useMemo(
-    () =>
-      Object.fromEntries(
-        (savedQuery.data ?? [])
-          .filter((item) => item.comment != null)
-          .map((item) => [
-            cellKey(item.studentId, item.parameterId),
-            item.comment,
-          ])
-      ),
-    [savedQuery.data]
-  );
-  const locks = useMemo(
-    () =>
-      Object.fromEntries(
-        (savedQuery.data ?? []).map((item) => [
-          cellKey(item.studentId, item.parameterId),
-          { isLocked: item.isLocked, lockedAt: item.lockedAt },
-        ])
-      ),
-    [savedQuery.data]
-  );
+  const saved = useMemo(() => {
+    const out = {};
+    for (const [key, cell] of Object.entries(matrix?.cells ?? {})) {
+      out[key] = cell.value;
+    }
+    return out;
+  }, [matrix]);
+  const savedNotes = useMemo(() => {
+    const out = {};
+    for (const [key, cell] of Object.entries(matrix?.cells ?? {})) {
+      if (cell.comment != null) out[key] = cell.comment;
+    }
+    return out;
+  }, [matrix]);
+  const locks = useMemo(() => {
+    const out = {};
+    for (const [key, cell] of Object.entries(matrix?.cells ?? {})) {
+      out[key] = { isLocked: cell.isLocked, lockedAt: cell.lockedAt };
+    }
+    return out;
+  }, [matrix]);
   const parametersById = useMemo(
-    () => new Map((parametersQuery.data ?? []).map((p) => [p.id, p])),
-    [parametersQuery.data]
+    () => new Map((matrix?.parameters ?? []).map((p) => [p.id, p])),
+    [matrix],
   );
   const liveErrors = useMemo(
-    () => buildEntries(drafts, parametersById).errors,
-    [drafts, parametersById]
+    () => buildEntries(drafts, parametersById, groupId).errors,
+    [drafts, parametersById, groupId],
   );
 
   const mutation = useMutation({
     mutationFn: saveEvaluations,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+      await queryClient.invalidateQueries({ queryKey: ['matrix'] });
+      queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+      queryClient.invalidateQueries({ queryKey: ['results'] });
+      queryClient.invalidateQueries({ queryKey: ['trends'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       setDrafts({});
       setNoteDrafts({});
     },
   });
   // Read the mutation through a ref so the cell/note change handlers can stay
-  // referentially stable (see useCallback below); the memoized EvaluationRow
-  // relies on those callbacks not changing identity between keystrokes. The ref
-  // is synced in an effect (not during render) to satisfy the rules of refs.
+  // referentially stable (see useCallback below); the memoized MatrixRow relies
+  // on those callbacks not changing identity between keystrokes.
   const mutationRef = useRef(mutation);
   useEffect(() => {
     mutationRef.current = mutation;
@@ -117,7 +116,7 @@ function EvaluatePage() {
     (mutation.error?.data?.problems ?? []).map((problem) => [
       cellKey(problem.studentId, problem.parameterId),
       problem.message,
-    ])
+    ]),
   );
   const cellErrors = { ...serverErrors, ...liveErrors };
 
@@ -155,15 +154,14 @@ function EvaluatePage() {
       return next;
     });
   }, []);
-
-  function handlePeriodChange(next) {
+  function switchWith(apply) {
     if (
       draftCount > 0 &&
-      !window.confirm('You have unsaved changes. Discard them and switch period?')
+      !window.confirm('You have unsaved changes. Discard them and switch?')
     ) {
       return;
     }
-    setChosenPeriod(next);
+    apply();
     setDrafts({});
     setNoteDrafts({});
     mutation.reset();
@@ -175,6 +173,7 @@ function EvaluatePage() {
       noteDrafts,
       savedValues: saved,
       parametersById,
+      groupId,
     });
     if (Object.keys(errors).length > 0 || entries.length === 0) return;
 
@@ -183,12 +182,12 @@ function EvaluatePage() {
       const answer = window.prompt(
         `${lockedCount} of your changes are to locked scores. ` +
           'Enter the reason for changing them (5 to 300 characters). ' +
-          'It is recorded in the audit log.'
+          'It is recorded in the audit log.',
       );
       if (answer === null) return;
       overrideReason = answer;
     }
-    mutation.mutate({ periodNumber, entries, overrideReason });
+    mutation.mutate({ periodId, entries, overrideReason });
   }
 
   function handleDiscard() {
@@ -197,28 +196,7 @@ function EvaluatePage() {
     mutation.reset();
   }
 
-  function handleSearchChange(event) {
-    setSearchText(event.target.value);
-    setPage(1);
-  }
-
-  function handleGroupChange(value) {
-    setGroupId(value);
-    setPage(1);
-  }
-
-  if (!can('scores.enter')) {
-    return (
-      <main>
-        <h1>Evaluate</h1>
-        <EmptyState
-          title="Read-only access"
-          description="You do not have permission to enter scores. You can see scores on each student's page."
-        />
-      </main>
-    );
-  }
-  if (periodsQuery.isPending) {
+  if (periodsQuery.isPending || groupsQuery.isPending) {
     return (
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
@@ -228,50 +206,55 @@ function EvaluatePage() {
       </main>
     );
   }
-  if (periodsQuery.isError) {
-    return (
-      <main>
-        <EmptyState
-          tone="danger"
-          title="Couldn't load the evaluation page"
-          description={periodsQuery.error.message}
-        />
-      </main>
-    );
-  }
-  if (!periods.anchorDate) {
+  if (periodsQuery.isError || groupsQuery.isError) {
     return (
       <main>
         <h1>Evaluate</h1>
         <EmptyState
-          title="Set up the calendar"
-          description="Set the period start date first, then you can start entering scores."
+          tone="danger"
+          title="Couldn't load the evaluation page"
+          description={(periodsQuery.error ?? groupsQuery.error).message}
+        />
+      </main>
+    );
+  }
+  if (groups.length === 0) {
+    return (
+      <main>
+        <h1>Evaluate</h1>
+        <EmptyState
+          title="Create a group first"
+          description="Scores are entered per group. Make a group and add students to it, then come back here."
         >
           <p>
-            <Link to="/settings">Go to Settings</Link>
+            <Link className="btn" to="/groups">
+              Go to Groups
+            </Link>
           </p>
         </EmptyState>
       </main>
     );
   }
-  if (periods.current === null) {
+  if (periods.length === 0) {
     return (
       <main>
         <h1>Evaluate</h1>
         <EmptyState
-          title="Period 1 hasn't started"
-          description="Once the first period begins, you can enter scores here."
-        />
+          title="Create a period first"
+          description="Scores are entered for a named period. Define one, then come back here."
+        >
+          <p>
+            <Link className="btn" to="/periods">
+              Go to Periods
+            </Link>
+          </p>
+        </EmptyState>
       </main>
     );
   }
-
-  const isLoading = parametersQuery.isPending || savedQuery.isPending;
-  const loadError = parametersQuery.error ?? savedQuery.error;
-
   let saveLabel = 'Save';
   if (mutation.isPending) {
-    saveLabel = 'Saving...';
+    saveLabel = 'Saving…';
   } else if (draftCount > 0) {
     saveLabel =
       `Save ${draftCount} change${draftCount === 1 ? '' : 's'}` +
@@ -282,38 +265,52 @@ function EvaluatePage() {
     <main className="wide">
       <div className="page-head">
         <h1>Evaluate</h1>
-        {can('data.import') && (
-          <div className="page-head-actions">
-            <Link className="btn" to="/evaluate/import">
-              Import scores
-            </Link>
-          </div>
-        )}
+        <div className="page-head-actions">
+          <Link className="btn" to="/evaluate/import">
+            Import scores
+          </Link>
+        </div>
       </div>
-
-      <PeriodPicker
-        periods={periods}
-        value={periodNumber}
-        onChange={handlePeriodChange}
-      />
-
-      {can('parameters.manage') && (
-        <PeriodParametersPanel
-          periodNumber={periodNumber}
-          disabled={draftCount > 0}
-        />
-      )}
+      <p className="hint">
+        Scores are kept separately for each group a student belongs to. Pick the
+        group and the period, then fill in the leaf parameters. Parent
+        parameters and group roll-ups are worked out for you.
+      </p>
 
       <div className="control-bar">
-        <input
-          type="search"
-          className="search"
-          value={searchText}
-          onChange={handleSearchChange}
-          placeholder="Search students by name or code"
-          aria-label="Search students"
-        />
-        <GroupFilter value={groupId} onChange={handleGroupChange} />
+        <label className="group-filter">
+          Group
+          <select
+            value={groupId}
+            onChange={(event) =>
+              switchWith(() => setGroupId(event.target.value))
+            }
+          >
+            <option value="">Choose a group…</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {'  '.repeat(group.depth)}
+                {group.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="group-filter">
+          Period
+          <select
+            value={periodId}
+            onChange={(event) =>
+              switchWith(() => setPeriodId(event.target.value))
+            }
+          >
+            <option value="">Choose a period…</option>
+            {periods.map((period) => (
+              <option key={period.id} value={period.id}>
+                {period.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <span className="spacer" />
         <button
           type="button"
@@ -334,10 +331,8 @@ function EvaluatePage() {
 
       <p className="hint">
         A score can be changed for 7 days after it is first saved (1 day if it
-        was entered late). After that it is locked
-        {can('scores.override')
-          ? '. You can still change it, with a written reason.'
-          : ' and only someone who can override locks can change it.'}
+        was entered late). After that it is locked. You can still change it, with
+        a written reason, which is recorded in the audit log.
       </p>
 
       {hasLiveErrors && (
@@ -357,11 +352,20 @@ function EvaluatePage() {
         </p>
       )}
 
-      {loadError && <p className="error">{loadError.message}</p>}
-      {isLoading && !loadError && <p className="hint">Loading…</p>}
-      {!isLoading && !loadError && (
-        <EvaluationGrid
-          parameters={parametersQuery.data}
+      {!ready && (
+        <EmptyState
+          title="Choose a group and a period"
+          description="Pick both above to start entering scores."
+        />
+      )}
+      {ready && matrixQuery.isPending && <p className="hint">Loading…</p>}
+      {ready && matrixQuery.isError && (
+        <p className="error">{matrixQuery.error.message}</p>
+      )}
+      {ready && matrix && (
+        <EvaluationMatrix
+          parameters={matrix.parameters}
+          columns={matrix.columns}
           saved={saved}
           savedNotes={savedNotes}
           locks={locks}
@@ -370,15 +374,10 @@ function EvaluatePage() {
           cellErrors={cellErrors}
           onCellChange={handleCellChange}
           onNoteChange={handleNoteChange}
-          canOverride={can('scores.override')}
-          search={search}
-          page={page}
-          onPageChange={setPage}
-          groupId={groupId || null}
+          canOverride
         />
       )}
     </main>
   );
 }
 
-export default EvaluatePage;

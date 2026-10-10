@@ -1,10 +1,5 @@
 import { Link } from 'react-router';
-import {
-  formatChange,
-  formatParameterHint,
-  formatStudentCode,
-} from '../lib/format.js';
-import { changeOf } from '../lib/resultsView.js';
+import { formatParameterHint, formatStudentCode } from '../lib/format.js';
 
 function SortHeader({ label, sortKey, sort, onSort, className }) {
   const active = sort.key === sortKey;
@@ -23,17 +18,7 @@ function SortHeader({ label, sortKey, sort, onSort, className }) {
   );
 }
 
-function ResultsTable({
-  rows,
-  columns,
-  stats,
-  sort,
-  onSort,
-  showChange,
-  periodNumber,
-}) {
-  const withChange = showChange && periodNumber > 1;
-
+function ResultsTable({ rows, columns, stats, sort, onSort }) {
   return (
     <div className="table-wrap">
       <table className="results-table">
@@ -71,22 +56,12 @@ function ResultsTable({
               <td className="code">{formatStudentCode(row.studentCode)}</td>
               {columns.map((parameter) => {
                 const value = row.values[parameter.id];
-                const change = withChange ? changeOf(row, parameter.id) : null;
                 return (
                   <td key={parameter.id} className="num">
                     {value === undefined ? (
                       <span className="muted">—</span>
                     ) : (
                       value
-                    )}
-                    {change !== null && (
-                      <span
-                        className={`chg${
-                          change > 0 ? ' up' : change < 0 ? ' down' : ''
-                        }`}
-                      >
-                        {formatChange(change)}
-                      </span>
                     )}
                   </td>
                 );

@@ -5,13 +5,14 @@ import {
   parsePreferencesUpdate,
 } from '../lib/preferences.js';
 
+// Global (single-operator) preferences. Migration 001 keeps a single settings
+// row in `preferences` (id = 1, CHECK id = 1), seeded on install, so there is
+// always exactly one row to read and merge over the defaults.
+
 const router = Router();
 
-router.get('/', async (req, res) => {
-  const result = await pool.query(
-    'SELECT settings FROM user_preferences WHERE user_id = $1',
-    [req.user.id]
-  );
+router.get('/', async (_req, res) => {
+  const result = await pool.query('SELECT settings FROM preferences WHERE id = 1');
   res.json({ preferences: mergePreferences(result.rows[0]?.settings) });
 });
 
@@ -22,21 +23,21 @@ router.put('/', async (req, res) => {
   }
 
   const result = await pool.query(
-    `INSERT INTO user_preferences (user_id, settings)
-     VALUES ($1, $2::jsonb)
-     ON CONFLICT (user_id)
-     DO UPDATE SET settings = user_preferences.settings || EXCLUDED.settings,
+    `INSERT INTO preferences (id, settings)
+     VALUES (1, $1::jsonb)
+     ON CONFLICT (id)
+     DO UPDATE SET settings = preferences.settings || EXCLUDED.settings,
                    updated_at = now()
      RETURNING settings`,
-    [req.user.id, JSON.stringify(parsed.values)]
+    [JSON.stringify(parsed.values)]
   );
   res.json({ preferences: mergePreferences(result.rows[0].settings) });
 });
 
-router.delete('/', async (req, res) => {
-  await pool.query('DELETE FROM user_preferences WHERE user_id = $1', [
-    req.user.id,
-  ]);
+router.delete('/', async (_req, res) => {
+  await pool.query(
+    "UPDATE preferences SET settings = '{}'::jsonb, updated_at = now() WHERE id = 1"
+  );
   res.json({ preferences: mergePreferences({}) });
 });
 

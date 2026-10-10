@@ -1,126 +1,96 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
-import {
-  MAX_PERIOD,
-  isValidPeriodNumber,
-  parametersUsedInPeriod,
-} from '../lib/parameterUse.js';
-import { periodDates, periodForDate, todayIso } from '../lib/periods.js';
-import { MAX_RESULT_STUDENTS, buildResults } from '../lib/results.js';
-import { descendantGroupIds } from '../lib/groups.js';
 import { isUuid } from '../lib/ids.js';
+import {
+  fetchParameterRows,
+  buildParameterTree,
+  leafIds,
+} from '../lib/parameters.js';
+import { fetchGroupRows, fetchDirectMembers } from '../lib/groups.js';
+import { fetchPeriod } from '../lib/periods.js';
+import { buildGroupResults, buildStudentResults } from '../lib/results.js';
+
+// Read-only results for one group in one period. Every parameter (leaves plus
+// derived parents) is returned with its effective range/norm and the rolled-up
+// values: the group's own score, and — unless a single studentId is asked for —
+// an aggregate (avg/min/max/count) across the group's direct members. All GETs,
+// so the audit middleware ignores them.
 
 const router = Router();
 
 router.get('/', async (req, res) => {
-  const raw = req.query.periodNumber;
-  const isDigits = typeof raw === 'string' && /^\d+$/.test(raw);
-  if (!isDigits || !isValidPeriodNumber(Number(raw))) {
-    return res.status(400).json({
-      error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
+  const { groupId, periodId, studentId } = req.query;
+  if (!isUuid(groupId)) return res.status(400).json({ error: 'groupId must be a valid ID.' });
+  if (!isUuid(periodId)) return res.status(400).json({ error: 'periodId must be a valid ID.' });
+  if (studentId !== undefined && !isUuid(studentId)) {
+    return res.status(400).json({ error: 'studentId must be a valid ID.' });
+  }
+
+  const groupRows = await fetchGroupRows(pool, { includeArchived: true });
+  const group = groupRows.find((g) => g.id === groupId);
+  if (!group || group.archivedAt) return res.status(404).json({ error: 'Group not found.' });
+
+  const period = await fetchPeriod(pool, periodId);
+  if (!period) return res.status(404).json({ error: 'Period not found.' });
+
+  const [paramRows, members] = await Promise.all([
+    fetchParameterRows(pool, { includeArchived: false }),
+    fetchDirectMembers(pool, groupId),
+  ]);
+  const roots = buildParameterTree(paramRows);
+  const leaves = new Set(leafIds(roots));
+
+  const cellRows = await pool.query(
+    `SELECT student_id   AS "studentId",
+            parameter_id AS "parameterId",
+            value::float8 AS value
+       FROM evaluations
+      WHERE group_id = $1 AND period_id = $2 AND value IS NOT NULL`,
+    [groupId, periodId]
+  );
+
+  // Split the scored cells into the group's own values and per-student maps,
+  // keeping only live leaf parameters (parents are derived, never stored).
+  const ownValueByLeaf = new Map();
+  const byStudent = new Map();
+  for (const row of cellRows.rows) {
+    if (!leaves.has(row.parameterId)) continue;
+    if (row.studentId === null) {
+      ownValueByLeaf.set(row.parameterId, row.value);
+    } else {
+      if (!byStudent.has(row.studentId)) byStudent.set(row.studentId, new Map());
+      byStudent.get(row.studentId).set(row.parameterId, row.value);
+    }
+  }
+
+  if (studentId !== undefined) {
+    const member = members.find((m) => m.id === studentId);
+    if (!member) {
+      return res.status(404).json({ error: 'That student is not a member of the group.' });
+    }
+    return res.json({
+      mode: 'student',
+      group: { id: group.id, name: group.name },
+      period,
+      student: { id: member.id, fullName: member.fullName, studentCode: member.studentCode },
+      rows: buildStudentResults(roots, byStudent.get(studentId) ?? new Map()),
     });
   }
-  const periodNumber = Number(raw);
 
-  const { groupId } = req.query;
-  if (groupId !== undefined && !isUuid(groupId)) {
-    return res.status(400).json({ error: 'groupId must be a valid ID.' });
-  }
-  // Build an optional "student belongs to this group tree" SQL condition.
-  let groupFilter = '';
-  const groupValues = [];
-  if (groupId !== undefined) {
-    const groupIds = await descendantGroupIds(pool, groupId);
-    groupValues.push(groupIds);
-    groupFilter = ` AND id IN (SELECT student_id FROM student_group_members
-                    WHERE group_id = ANY($1::uuid[]))`;
-  }
-
-  const anchorResult = await pool.query(
-    'SELECT value FROM settings WHERE key = $1',
-    ['period_anchor_date']
-  );
-  const anchorDate = anchorResult.rows[0]?.value;
-  if (!anchorDate) {
-    return res.status(409).json({ error: 'Set the period start date first.' });
-  }
-
-  const current = periodForDate(anchorDate, todayIso());
-  if (current === null || periodNumber > current) {
-    return res
-      .status(400)
-      .json({ error: `Period ${periodNumber} has not started yet.` });
-  }
-
-  const [
-    changesResult,
-    parametersResult,
-    studentsResult,
-    countResult,
-    evaluationsResult,
-  ] = await Promise.all([
-    pool.query(
-      `SELECT parameter_id  AS "parameterId",
-              period_number AS "periodNumber",
-              scope,
-              action
-       FROM parameter_changes`
-    ),
-    pool.query(
-      `SELECT id,
-              name,
-              unit,
-              min_value::float8 AS "minValue",
-              max_value::float8 AS "maxValue"
-       FROM parameters
-       ORDER BY sort_order, lower(name)`
-    ),
-    pool.query(
-      `SELECT id,
-              full_name    AS "fullName",
-              student_code AS "studentCode"
-       FROM students
-       WHERE deleted_at IS NULL${groupFilter}
-       ORDER BY lower(full_name), id
-       LIMIT $${groupValues.length + 1}`,
-      [...groupValues, MAX_RESULT_STUDENTS]
-    ),
-    pool.query(
-      `SELECT count(*)::int AS total FROM students
-       WHERE deleted_at IS NULL${groupFilter}`,
-      groupValues
-    ),
-    pool.query(
-      `SELECT student_id    AS "studentId",
-              parameter_id  AS "parameterId",
-              period_number AS "periodNumber",
-              value::float8 AS value
-       FROM evaluations
-       WHERE period_number = ANY($1::int[]) AND value IS NOT NULL`,
-      [[periodNumber, periodNumber - 1]]
-    ),
-  ]);
-
-  const usedIds = new Set(
-    parametersUsedInPeriod(changesResult.rows, periodNumber)
-  );
-  const built = buildResults({
-    periodNumber,
-    parameters: parametersResult.rows,
-    usedIds,
-    students: studentsResult.rows,
-    evaluations: evaluationsResult.rows,
-  });
-  const dates = periodDates(anchorDate, periodNumber);
-  const total = countResult.rows[0].total;
-
+  const memberMaps = members.map((m) => ({
+    studentId: m.id,
+    valueByLeaf: byStudent.get(m.id) ?? new Map(),
+  }));
   res.json({
-    periodNumber,
-    startDate: dates.startDate,
-    endDate: dates.endDate,
-    ...built,
-    total,
-    truncated: total > studentsResult.rows.length,
+    mode: 'group',
+    group: { id: group.id, name: group.name },
+    period,
+    members: members.map((m) => ({
+      id: m.id,
+      fullName: m.fullName,
+      studentCode: m.studentCode,
+    })),
+    rows: buildGroupResults(roots, { ownValueByLeaf, memberMaps }),
   });
 });
 

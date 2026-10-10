@@ -1,21 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-
-// Watches the reduced-motion preference live, so a mid-session change is
-// respected (the count-up below falls back to showing the final value at once).
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
-  );
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReduced(query.matches);
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-  return reduced;
-}
+import { useReducedMotion } from '../lib/useReducedMotion.js';
 
 // The "information reveal" beat from the data-viz reference: a headline number
 // counts up from 0 on first paint (and animates between values when the period

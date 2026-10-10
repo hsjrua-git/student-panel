@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'studentPanelTheme';
 const PALETTE_KEY = 'studentPanelPalette';
-const THEMES = ['system', 'light', 'dark'];
+const THEMES = ['light', 'dark'];
 // 'aurora' is the built-in default: it maps to *no* data-palette attribute, so
 // the signature grey base + top-edge glow tokens at the top of index.css apply
 // untouched. Every other palette sets [data-palette] and lets the stylesheet
@@ -20,7 +20,8 @@ const PALETTES = [
 
 export function normalizeTheme(value) {
   // Dark-first: an unset or invalid theme falls back to dark (the default
-  // look). 'system' and 'light' remain fully selectable.
+  // look). Only 'light' and 'dark' are offered now — a previously-stored
+  // 'system' value therefore resolves safely to dark.
   return THEMES.includes(value) ? value : 'dark';
 }
 

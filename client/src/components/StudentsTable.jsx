@@ -1,12 +1,10 @@
 import { useEffect } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listStudents } from '../api/students.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 import StudentRow from './StudentRow.jsx';
 
 function StudentsTable({ search, page, onPageChange, groupId = null }) {
-  const { can } = useAuth();
   const { preferences } = usePreferences();
   const pageSize = preferences.studentsPageSize;
   const sort = preferences.studentsSort;
@@ -32,9 +30,7 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
       <p>
         {search
           ? `No students match "${search}".`
-          : can('students.create')
-            ? 'No students yet. Add the first one above.'
-            : 'No students yet.'}
+          : 'No students yet. Add the first one above.'}
       </p>
     );
   }
@@ -48,9 +44,7 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
               {preferences.studentsShowCode && <th>Code</th>}
               <th>Full name</th>
               {preferences.studentsShowAdded && <th>Added</th>}
-              {(can('students.edit') || can('students.delete')) && (
-                <th>Actions</th>
-              )}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>

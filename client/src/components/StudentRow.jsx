@@ -2,13 +2,11 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { deleteStudent, renameStudent } from '../api/students.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { formatDateTime, formatStudentCode } from '../lib/format.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
 function StudentRow({ student }) {
   const queryClient = useQueryClient();
-  const { can } = useAuth();
   const { preferences } = usePreferences();
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(student.fullName);
@@ -80,25 +78,19 @@ function StudentRow({ student }) {
       {preferences.studentsShowAdded && (
         <td>{formatDateTime(student.createdAt)}</td>
       )}
-      {(can('students.edit') || can('students.delete')) && (
-        <td className="actions">
-          {can('students.edit') && (
-            <button type="button" onClick={startEditing} disabled={isEditing}>
-              Rename
-            </button>
-          )}
-          {can('students.delete') && (
-            <button
-              type="button"
-              className="danger"
-              onClick={handleDelete}
-              disabled={remove.isPending}
-            >
-              {remove.isPending ? 'Deleting...' : 'Delete'}
-            </button>
-          )}
-        </td>
-      )}
+      <td className="actions">
+        <button type="button" onClick={startEditing} disabled={isEditing}>
+          Rename
+        </button>
+        <button
+          type="button"
+          className="danger"
+          onClick={handleDelete}
+          disabled={remove.isPending}
+        >
+          {remove.isPending ? 'Deleting...' : 'Delete'}
+        </button>
+      </td>
     </tr>
   );
 }

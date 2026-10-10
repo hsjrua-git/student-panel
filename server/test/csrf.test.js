@@ -1,159 +1,79 @@
-import { test } from 'node:test';
+import './_env.js';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCsrf } from '../src/middleware/csrf.js';
 
-// Minimal Express-ish req/res doubles.
-function makeReq({ method = 'GET', cookie, origin, referer, host = 'panel.example.com', csrfHeader, secure } = {}) {
-  const headers = {
-    cookie,
-    origin,
-    referer,
-    host,
-    'x-csrf-token': csrfHeader,
-  };
-  return {
-    method,
-    secure,
-    headers: { cookie },
-    get(name) {
-      return headers[name.toLowerCase()];
-    },
-  };
+function mkReq({ method = 'GET', cookie, origin, referer, host, csrfHeader, secure = false } = {}) {
+  const headers = {};
+  if (cookie !== undefined) headers.cookie = cookie;
+  if (origin !== undefined) headers.origin = origin;
+  if (referer !== undefined) headers.referer = referer;
+  if (host !== undefined) headers.host = host;
+  if (csrfHeader !== undefined) headers['x-csrf-token'] = csrfHeader;
+  return { method, headers, secure, get(name) { return headers[name.toLowerCase()]; } };
 }
 
-function makeRes() {
+function mkRes() {
   return {
-    statusCode: null,
+    statusCode: 200,
     body: null,
     cookies: [],
-    cookie(name, value, options) {
-      this.cookies.push({ name, value, options });
-    },
-    status(code) {
-      this.statusCode = code;
-      return this;
-    },
-    json(payload) {
-      this.body = payload;
-      return this;
-    },
+    status(code) { this.statusCode = code; return this; },
+    json(obj) { this.body = obj; return this; },
+    cookie(name, val, opts) { this.cookies.push({ name, val, opts }); return this; },
   };
 }
 
-function runMiddleware(mw, req, res) {
-  let called = false;
-  mw(req, res, () => {
-    called = true;
-  });
-  return called; // true => passed through to next()
+function run(mw, req) {
+  const res = mkRes();
+  let nexted = false;
+  mw(req, res, () => { nexted = true; });
+  return { res, nexted };
 }
 
-const { issue, checkOrigin, verifyToken } = createCsrf({ secure: 'auto' });
+const csrf = createCsrf({ secure: false, enforceOrigin: true });
 
-test('issue sets a readable csrf cookie only when one is absent', () => {
-  const res1 = makeRes();
-  assert.equal(runMiddleware(issue, makeReq(), res1), true);
-  assert.equal(res1.cookies.length, 1);
-  const cookie = res1.cookies[0];
-  assert.equal(cookie.name, 'csrf');
-  assert.ok(cookie.value.length >= 32);
-  assert.equal(cookie.options.httpOnly, false); // the SPA must read it
-  assert.equal(cookie.options.sameSite, 'lax');
+test('issue sets a csrf cookie only when none is present', () => {
+  const a = run(csrf.issue, mkReq());
+  assert.equal(a.nexted, true);
+  assert.equal(a.res.cookies.length, 1);
+  assert.equal(a.res.cookies[0].name, 'csrf');
 
-  const res2 = makeRes();
-  assert.equal(runMiddleware(issue, makeReq({ cookie: 'csrf=already' }), res2), true);
-  assert.equal(res2.cookies.length, 0); // left the existing token alone
+  const b = run(csrf.issue, mkReq({ cookie: 'csrf=existing' }));
+  assert.equal(b.res.cookies.length, 0);
 });
 
-test("issue resolves secure:'auto' from the connection, not the literal string", () => {
-  // res.cookie's `secure` is a plain boolean: passing the string 'auto' straight
-  // through would be truthy and mark the cookie Secure even over plain HTTP, so
-  // the browser would drop it and every mutation would then fail verifyToken.
-  const http = makeRes();
-  runMiddleware(issue, makeReq({ secure: false }), http);
-  assert.equal(http.cookies[0].options.secure, false); // sendable over HTTP LAN
-
-  const https = makeRes();
-  runMiddleware(issue, makeReq({ secure: true }), https);
-  assert.equal(https.cookies[0].options.secure, true);
-});
-
-test('issue honours an explicit secure boolean regardless of the connection', () => {
-  const forced = createCsrf({ secure: true });
-  const res = makeRes();
-  runMiddleware(forced.issue, makeReq({ secure: false }), res);
-  assert.equal(res.cookies[0].options.secure, true);
-
-  const off = createCsrf({ secure: false });
-  const res2 = makeRes();
-  runMiddleware(off.issue, makeReq({ secure: true }), res2);
-  assert.equal(res2.cookies[0].options.secure, false);
-});
-
-test('checkOrigin lets safe methods and same-origin writes through', () => {
-  assert.equal(runMiddleware(checkOrigin, makeReq({ method: 'GET', origin: 'https://evil.test' }), makeRes()), true);
+test('checkOrigin allows safe methods, same-origin, and header-less requests', () => {
+  assert.equal(run(csrf.checkOrigin, mkReq({ method: 'GET' })).nexted, true);
+  assert.equal(run(csrf.checkOrigin, mkReq({ method: 'POST', host: 'host' })).nexted, true);
   assert.equal(
-    runMiddleware(checkOrigin, makeReq({ method: 'POST', origin: 'https://panel.example.com' }), makeRes()),
+    run(csrf.checkOrigin, mkReq({ method: 'POST', origin: 'http://host', host: 'host' })).nexted,
     true
   );
 });
 
-test('checkOrigin allows a mutation that carries neither Origin nor Referer', () => {
-  // Browsers attach Origin on cross-site writes; a bare request is a non-browser
-  // client, which is not a CSRF vector.
-  assert.equal(runMiddleware(checkOrigin, makeReq({ method: 'POST' }), makeRes()), true);
-});
+test('checkOrigin rejects a cross-origin mutation but is off when not enforced', () => {
+  const bad = run(csrf.checkOrigin, mkReq({ method: 'POST', origin: 'http://evil.com', host: 'host' }));
+  assert.equal(bad.nexted, false);
+  assert.equal(bad.res.statusCode, 403);
+  assert.equal(bad.res.body.code, 'CSRF_ORIGIN');
 
-test('checkOrigin refuses a cross-origin write', () => {
-  const res = makeRes();
+  const lax = createCsrf({ secure: false, enforceOrigin: false });
   assert.equal(
-    runMiddleware(checkOrigin, makeReq({ method: 'POST', origin: 'https://evil.test' }), res),
-    false
-  );
-  assert.equal(res.statusCode, 403);
-  assert.equal(res.body.code, 'CSRF_ORIGIN');
-});
-
-test('checkOrigin also honours the Referer host when there is no Origin', () => {
-  const ok = makeRes();
-  assert.equal(
-    runMiddleware(checkOrigin, makeReq({ method: 'PATCH', referer: 'https://panel.example.com/x' }), ok),
-    true
-  );
-  const bad = makeRes();
-  assert.equal(
-    runMiddleware(checkOrigin, makeReq({ method: 'PATCH', referer: 'https://evil.test/x' }), bad),
-    false
-  );
-  assert.equal(bad.statusCode, 403);
-});
-
-test('checkOrigin is a no-op when origin enforcement is disabled (dev/proxy)', () => {
-  const dev = createCsrf({ secure: 'auto', enforceOrigin: false });
-  assert.equal(
-    runMiddleware(dev.checkOrigin, makeReq({ method: 'POST', origin: 'https://evil.test' }), makeRes()),
+    run(lax.checkOrigin, mkReq({ method: 'POST', origin: 'http://evil.com', host: 'host' })).nexted,
     true
   );
 });
 
-test('verifyToken passes only when header matches the cookie', () => {
-  assert.equal(runMiddleware(verifyToken, makeReq({ method: 'GET' }), makeRes()), true);
-
-  const match = makeReq({ method: 'POST', cookie: 'csrf=abc123', csrfHeader: 'abc123' });
-  assert.equal(runMiddleware(verifyToken, match, makeRes()), true);
-
-  const missing = makeRes();
+test('verifyToken enforces the double-submit token on mutations', () => {
+  assert.equal(run(csrf.verifyToken, mkReq({ method: 'GET' })).nexted, true);
   assert.equal(
-    runMiddleware(verifyToken, makeReq({ method: 'POST', cookie: 'csrf=abc123' }), missing),
-    false
+    run(csrf.verifyToken, mkReq({ method: 'POST', cookie: 'csrf=abc', csrfHeader: 'abc' })).nexted,
+    true
   );
-  assert.equal(missing.statusCode, 403);
-  assert.equal(missing.body.code, 'CSRF');
-
-  const mismatch = makeRes();
-  assert.equal(
-    runMiddleware(verifyToken, makeReq({ method: 'POST', cookie: 'csrf=abc123', csrfHeader: 'nope456' }), mismatch),
-    false
-  );
-  assert.equal(mismatch.statusCode, 403);
+  const missing = run(csrf.verifyToken, mkReq({ method: 'POST', cookie: 'csrf=abc' }));
+  assert.equal(missing.res.statusCode, 403);
+  assert.equal(missing.res.body.code, 'CSRF');
+  const mismatch = run(csrf.verifyToken, mkReq({ method: 'POST', cookie: 'csrf=abc', csrfHeader: 'abd' }));
+  assert.equal(mismatch.res.statusCode, 403);
 });

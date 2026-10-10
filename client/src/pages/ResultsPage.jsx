@@ -1,20 +1,21 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import { getResults } from '../api/results.js';
+import { getMatrix } from '../api/evaluations.js';
+import { listGroups } from '../api/groups.js';
 import {
   createSavedView,
   deleteSavedView,
   listSavedViews,
   updateSavedView,
 } from '../api/savedViews.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import ExportButton from '../components/ExportButton.jsx';
 import FilterEditor from '../components/FilterEditor.jsx';
-import GroupFilter from '../components/GroupFilter.jsx';
-import PeriodPicker from '../components/PeriodPicker.jsx';
 import ResultsTable from '../components/ResultsTable.jsx';
 import SavedViewsBar from '../components/SavedViewsBar.jsx';
+import { matrixToCohort } from '../lib/dashboard.js';
+import { resultsCsvRows } from '../lib/exports.js';
 import { formatIsoDate } from '../lib/format.js';
 import {
   applyView,
@@ -27,36 +28,54 @@ import {
   withFilterKeys,
 } from '../lib/resultsView.js';
 import { usePeriods } from '../lib/usePeriods.js';
-import ExportButton from '../components/ExportButton.jsx';
-import { resultsCsvRows } from '../lib/exports.js';
 
 const EMPTY = [];
 
+// The same indented, tree-ordered group list the Evaluate and Groups pages use.
+function orderGroups(groups) {
+  const byParent = new Map();
+  for (const group of groups) {
+    const key = group.parentId ?? 'root';
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(group);
+  }
+  const walk = (parentKey, depth) =>
+    (byParent.get(parentKey) ?? []).flatMap((group) => [
+      { ...group, depth },
+      ...walk(group.id, depth + 1),
+    ]);
+  return walk('root', 0);
+}
+
+// Compare every student in one group within one period. Scores are per group,
+// so a group and a period must both be chosen before any table appears; the
+// matrix for that pair feeds the same filter/sort/stats view the saved-view
+// bar persists.
 function ResultsPage() {
   const queryClient = useQueryClient();
-  const { can } = useAuth();
   const periodsQuery = usePeriods();
-  const periods = periodsQuery.data;
+  const groupsQuery = useQuery({
+    queryKey: ['groups'],
+    queryFn: () => listGroups(),
+  });
 
   const [config, setConfig] = useState(() => withFilterKeys(defaultConfig()));
   const [activeView, setActiveView] = useState(null);
   const [groupId, setGroupId] = useState('');
+  const [periodId, setPeriodId] = useState('');
 
-  const current = periods?.current ?? null;
-  let periodNumber = current;
-  if (
-    current !== null &&
-    config.periodMode === 'fixed' &&
-    config.periodNumber !== null &&
-    config.periodNumber <= current
-  ) {
-    periodNumber = config.periodNumber;
-  }
+  const periods = periodsQuery.data ?? EMPTY;
+  const groups = useMemo(
+    () => orderGroups(groupsQuery.data ?? []),
+    [groupsQuery.data]
+  );
 
-  const resultsQuery = useQuery({
-    queryKey: ['results', periodNumber, groupId],
-    queryFn: () => getResults(periodNumber, groupId || null),
-    enabled: periodNumber !== null,
+  const ready = groupId !== '' && periodId !== '';
+
+  const matrixQuery = useQuery({
+    queryKey: ['matrix', { groupId, periodId }],
+    queryFn: () => getMatrix({ groupId, periodId }),
+    enabled: ready,
   });
   const viewsQuery = useQuery({
     queryKey: ['saved-views'],
@@ -102,8 +121,12 @@ function ResultsPage() {
     remove.reset();
   }
 
-  const parameters = resultsQuery.data?.parameters ?? EMPTY;
-  const students = resultsQuery.data?.students ?? EMPTY;
+  const cohort = useMemo(
+    () => matrixToCohort(matrixQuery.data),
+    [matrixQuery.data]
+  );
+  const parameters = cohort.parameters;
+  const students = cohort.students;
   const parametersById = useMemo(
     () => new Map(parameters.map((parameter) => [parameter.id, parameter])),
     [parameters]
@@ -116,21 +139,21 @@ function ResultsPage() {
   const chosenColumns =
     config.parameterIds.length === 0
       ? parameters
-      : parameters.filter((parameter) => config.parameterIds.includes(parameter.id));
+      : parameters.filter((parameter) =>
+          config.parameterIds.includes(parameter.id)
+        );
   const columns = chosenColumns.length > 0 ? chosenColumns : parameters;
   const allIds = parameters.map((parameter) => parameter.id);
   const dirty = activeView !== null && !sameConfig(config, activeView.config);
 
+  const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
+  const selectedPeriod =
+    periods.find((period) => period.id === periodId) ?? null;
+  const groupName = selectedGroup?.name ?? null;
+  const periodName = selectedPeriod?.name ?? null;
+
   function patch(changes) {
     setConfig((existing) => ({ ...existing, ...changes }));
-  }
-
-  function handlePeriodChange(number) {
-    patch(
-      number === current
-        ? { periodMode: 'current', periodNumber: null }
-        : { periodMode: 'fixed', periodNumber: number }
-    );
   }
 
   function handleLoad(id) {
@@ -179,7 +202,7 @@ function ResultsPage() {
     setActiveView(null);
   }
 
-  if (periodsQuery.isPending) {
+  if (periodsQuery.isPending || groupsQuery.isPending) {
     return (
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
@@ -189,51 +212,54 @@ function ResultsPage() {
       </main>
     );
   }
-  if (periodsQuery.isError) {
-    return (
-      <main>
-        <EmptyState
-          tone="danger"
-          title="Couldn't load results"
-          description={periodsQuery.error.message}
-        />
-      </main>
-    );
-  }
-  if (!periods.anchorDate) {
+  if (periodsQuery.isError || groupsQuery.isError) {
     return (
       <main>
         <h1>Results</h1>
         <EmptyState
-          title="Set up the calendar"
-          description={
-            can('settings.manage')
-              ? 'Set the period start date first, then results will appear here.'
-              : 'An administrator needs to set the period start date first.'
-          }
+          tone="danger"
+          title="Couldn't load results"
+          description={(periodsQuery.error ?? groupsQuery.error).message}
+        />
+      </main>
+    );
+  }
+  if (groups.length === 0) {
+    return (
+      <main>
+        <h1>Results</h1>
+        <EmptyState
+          title="Create a group first"
+          description="Scores are kept per group. Make a group and add students to it, then results will appear here."
         >
-          {can('settings.manage') && (
-            <p>
-              <Link to="/settings">Go to Settings</Link>
-            </p>
-          )}
+          <p>
+            <Link className="btn" to="/groups">
+              Go to Groups
+            </Link>
+          </p>
         </EmptyState>
       </main>
     );
   }
-  if (periods.current === null) {
+  if (periods.length === 0) {
     return (
       <main>
         <h1>Results</h1>
         <EmptyState
-          title="Period 1 hasn't started"
-          description="Once the first period begins, results will appear here."
-        />
+          title="Create a period first"
+          description="Results are shown for a named period. Define one, then come back here."
+        >
+          <p>
+            <Link className="btn" to="/periods">
+              Go to Periods
+            </Link>
+          </p>
+        </EmptyState>
       </main>
     );
   }
 
-  const data = resultsQuery.data;
+  const matrix = matrixQuery.data;
   const filterTexts = config.filters.map((filter) =>
     describeFilter(filter, parametersById)
   );
@@ -242,170 +268,201 @@ function ResultsPage() {
     <main className="wide results">
       <h1>Results</h1>
       <p className="hint">
-        Compare all students in one period. Filter, sort, and save the setup as
-        a named view.
+        Compare the students in one group for one period. Filter, sort, and save
+        the setup as a named view.
       </p>
 
-      <div className="toolbar">
-        <PeriodPicker
-          periods={periods}
-          value={periodNumber}
-          onChange={handlePeriodChange}
-        />
-        <GroupFilter value={groupId} onChange={setGroupId} />
-      </div>
-
-      <SavedViewsBar
-        views={viewsQuery.data ?? EMPTY}
-        activeId={activeView?.id ?? null}
-        dirty={dirty}
-        busy={busy}
-        error={actionError}
-        onLoad={handleLoad}
-        onSaveAs={handleSaveAs}
-        onUpdate={handleUpdate}
-        onRename={handleRename}
-        onDelete={handleDelete}
-        onReset={handleReset}
-      />
-
-      <div className="toolbar">
-        <input
-          type="search"
-          className="search"
-          value={config.search}
-          onChange={(event) => patch({ search: event.target.value })}
-          placeholder="Search by name or code"
-          aria-label="Search students"
-        />
-        <label className="inline">
-          <input
-            type="checkbox"
-            checked={config.showChange}
-            onChange={(event) => patch({ showChange: event.target.checked })}
-          />
-          Show change vs previous period
-        </label>
-        {can('data.export') && (
-          <ExportButton
-            label="Export this table (CSV)"
-            filename={`results-period-${periodNumber}.csv`}
-            disabled={!data || parameters.length === 0 || view.rows.length === 0}
-            buildRows={() =>
-              resultsCsvRows({
-                periodNumber,
-                columns,
-                rows: view.rows,
-                showChange: config.showChange,
-              })
-            }
-          />
-        )}
-      </div>
-
-      {parameters.length > 0 && (
-        <details className="panel">
-          <summary>
-            Columns ({columns.length} of {parameters.length})
-          </summary>
-          <div className="columns-list">
-            {parameters.map((parameter) => (
-              <label key={parameter.id} className="inline">
-                <input
-                  type="checkbox"
-                  checked={columns.some((column) => column.id === parameter.id)}
-                  onChange={(event) =>
-                    patch({
-                      parameterIds: toggleColumn(
-                        config.parameterIds,
-                        allIds,
-                        parameter.id,
-                        event.target.checked
-                      ),
-                    })
-                  }
-                />
-                {parameter.name}
-              </label>
+      <div className="control-bar">
+        <label className="group-filter">
+          Group
+          <select
+            value={groupId}
+            onChange={(event) => setGroupId(event.target.value)}
+          >
+            <option value="">Choose a group…</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {'  '.repeat(group.depth)}
+                {group.name}
+              </option>
             ))}
-          </div>
-        </details>
-      )}
+          </select>
+        </label>
+        <label className="group-filter">
+          Period
+          <select
+            value={periodId}
+            onChange={(event) => setPeriodId(event.target.value)}
+          >
+            <option value="">Choose a period…</option>
+            {periods.map((period) => (
+              <option key={period.id} value={period.id}>
+                {period.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
-      <section className="section-card">
-        <h2 className="group-title">Filters</h2>
-        <FilterEditor
-          filters={config.filters}
-          parameters={parameters}
-          onChange={(filters) => patch({ filters })}
+      {!ready && (
+        <EmptyState
+          title="Choose a group and a period"
+          description="Pick both above to compare the students in that group."
         />
-      </section>
-
-      {resultsQuery.isPending && <p className="hint">Loading…</p>}
-      {resultsQuery.isError && (
-        <p className="error">{resultsQuery.error.message}</p>
       )}
 
-      {data && (
-        <section className="section-card">
-          <p className="summary-line">
-            Period {data.periodNumber} ({formatIsoDate(data.startDate)} –{' '}
-            {formatIsoDate(data.endDate)}) · Showing {view.rows.length} of{' '}
-            {students.length} students
-          </p>
-          {filterTexts.length > 0 && (
-            <span className="chip-row">
-              {filterTexts.map((text, index) => (
-                <span
-                  key={config.filters[index]?.key ?? index}
-                  className="chip brand"
-                >
-                  {text}
-                </span>
-              ))}
-            </span>
-          )}
-          {data.truncated && (
-            <p className="hint">
-              Only the first {students.length} of {data.total} students are
-              included.
-            </p>
-          )}
-          {view.ignoredFilters > 0 && (
-            <p className="hint">
-              {view.ignoredFilters} filter{view.ignoredFilters === 1 ? '' : 's'}{' '}
-              refer to parameters this period does not use, and{' '}
-              {view.ignoredFilters === 1 ? 'is' : 'are'} ignored.
-            </p>
-          )}
+      {ready && (
+        <>
+          <SavedViewsBar
+            views={viewsQuery.data ?? EMPTY}
+            activeId={activeView?.id ?? null}
+            dirty={dirty}
+            busy={busy}
+            error={actionError}
+            onLoad={handleLoad}
+            onSaveAs={handleSaveAs}
+            onUpdate={handleUpdate}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onReset={handleReset}
+          />
 
-          {parameters.length === 0 ? (
-            <p>
-              No parameters were used in this period and no scores were entered.
+          <div className="toolbar">
+            <label className="search">
+              <span className="sr-only">Search students</span>
+              <input
+                type="search"
+                placeholder="Search by name or code…"
+                value={config.search}
+                onChange={(event) => patch({ search: event.target.value })}
+              />
+            </label>
+            <ExportButton
+              label="Export this table (CSV)"
+              filename="results.csv"
+              disabled={
+                !matrix || parameters.length === 0 || view.rows.length === 0
+              }
+              buildRows={() =>
+                resultsCsvRows({ groupName, periodName, columns, rows: view.rows })
+              }
+            />
+          </div>
+
+          <details className="columns-picker">
+            <summary>Columns ({columns.length} shown)</summary>
+            <div className="columns-grid">
+              {parameters.length === 0 ? (
+                <p className="hint">No parameters to choose from.</p>
+              ) : (
+                parameters.map((parameter) => {
+                  const shown =
+                    config.parameterIds.length === 0 ||
+                    config.parameterIds.includes(parameter.id);
+                  return (
+                    <label key={parameter.id} className="column-toggle">
+                      <input
+                        type="checkbox"
+                        checked={shown}
+                        onChange={(event) =>
+                          patch({
+                            parameterIds: toggleColumn(
+                              config.parameterIds,
+                              allIds,
+                              parameter.id,
+                              event.target.checked
+                            ),
+                          })
+                        }
+                      />
+                      {parameter.name}
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </details>
+
+          <section className="filters">
+            <FilterEditor
+              filters={config.filters}
+              parameters={parameters}
+              onChange={(filters) => patch({ filters })}
+            />
+          </section>
+
+          {matrixQuery.isPending && (
+            <p className="hint" role="status" aria-live="polite">
+              Loading scores…
             </p>
-          ) : view.rows.length === 0 ? (
-            <p>
-              No students match.{' '}
-              <button
-                type="button"
-                className="quiet"
-                onClick={() => patch({ filters: [], search: '' })}
-              >
-                Clear filters and search
-              </button>
-            </p>
-          ) : (
-            <ResultsTable
-              rows={view.rows}
-              columns={columns}
-              stats={view.stats}
-              sort={config.sort}
-              onSort={(key) => patch({ sort: toggleSort(config.sort, key) })}
-              showChange={config.showChange}
-              periodNumber={data.periodNumber}
+          )}
+          {matrixQuery.isError && (
+            <EmptyState
+              tone="danger"
+              title="Couldn't load scores"
+              description={matrixQuery.error.message}
             />
           )}
-        </section>
+
+          {matrix && (
+            <section className="section-card">
+              <p className="results-summary">
+                <strong>{groupName}</strong> · {periodName}
+                {selectedPeriod && (
+                  <>
+                    {' '}
+                    ({formatIsoDate(selectedPeriod.startDate)} –{' '}
+                    {formatIsoDate(selectedPeriod.endDate)})
+                  </>
+                )}{' '}
+                · Showing {view.rows.length} of {students.length} students
+              </p>
+
+              {filterTexts.length > 0 && (
+                <ul className="filter-chips">
+                  {filterTexts.map((text, index) => (
+                    <li key={index} className="filter-chip">
+                      {text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {view.ignoredFilters > 0 && (
+                <p className="hint">
+                  {view.ignoredFilters} filter
+                  {view.ignoredFilters === 1 ? '' : 's'} ignored (parameter not
+                  shown).
+                </p>
+              )}
+
+              {parameters.length === 0 ? (
+                <EmptyState
+                  title="No parameters yet"
+                  description="Define parameters, then scores for this group will appear here."
+                />
+              ) : view.rows.length === 0 ? (
+                <EmptyState
+                  title="No students match"
+                  description="No students in this group match the current search and filters."
+                >
+                  <p>
+                    <button type="button" className="btn" onClick={handleReset}>
+                      Clear filters
+                    </button>
+                  </p>
+                </EmptyState>
+              ) : (
+                <ResultsTable
+                  rows={view.rows}
+                  columns={columns}
+                  stats={view.stats}
+                  sort={config.sort}
+                  onSort={(key) => patch({ sort: toggleSort(config.sort, key) })}
+                />
+              )}
+            </section>
+          )}
+        </>
       )}
     </main>
   );

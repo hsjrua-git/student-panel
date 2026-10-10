@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 const MIN_LENGTH = 10;
 
 function ChangePasswordPage() {
-  const { user, changePassword } = useAuth();
-  const navigate = useNavigate();
+  const { changePassword } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [repeat, setRepeat] = useState('');
@@ -27,7 +25,6 @@ function ChangePasswordPage() {
     }
 
     setProblem(null);
-    const wasForced = user.mustChangePassword;
     changePassword.mutate(
       { currentPassword, newPassword },
       {
@@ -35,7 +32,6 @@ function ChangePasswordPage() {
           setCurrentPassword('');
           setNewPassword('');
           setRepeat('');
-          if (wasForced) navigate('/students', { replace: true });
         },
       }
     );
@@ -44,9 +40,6 @@ function ChangePasswordPage() {
   return (
     <main className="narrow">
       <h1>Change password</h1>
-      {user.mustChangePassword && (
-        <p>You are using a temporary password. Choose a new one to continue.</p>
-      )}
       <form onSubmit={handleSubmit} className="edit-form">
         <label>
           Current password
@@ -88,7 +81,7 @@ function ChangePasswordPage() {
             {changePassword.error.message}
           </p>
         )}
-        {changePassword.isSuccess && !user.mustChangePassword && (
+        {changePassword.isSuccess && (
           <p className="success" role="status">
             Password changed. Your other sessions were signed out.
           </p>

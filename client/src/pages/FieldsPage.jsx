@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../auth/AuthContext.jsx';
-import EmptyState from '../components/EmptyState.jsx';
 import {
   archiveFieldDefinition,
   createFieldDefinition,
@@ -167,30 +165,18 @@ function FieldRow({ field }) {
 }
 
 function FieldsPage() {
-  const { can } = useAuth();
   const query = useQuery({
     queryKey: ['field-definitions'],
     queryFn: () => listFieldDefinitions(),
   });
-
-  if (!can('fields.manage')) {
-    return (
-      <main>
-        <EmptyState
-          title="Read-only access"
-          description="You do not have permission to manage custom fields."
-        />
-      </main>
-    );
-  }
 
   return (
     <main className="wide">
       <h1>Custom fields</h1>
       <p className="hint">
         Add your own fields to student records — a phone number, a join date, a
-        squad. Restricted fields are hidden from people without permission to
-        see them.
+        squad. Restricted fields are kept out of exports and bulk views unless
+        you choose to include them.
       </p>
 
       <section className="section-card">

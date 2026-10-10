@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { NAV_SECTIONS, ROUTE_PERMISSIONS } from '../lib/navigation.js';
+import { NAV_SECTIONS } from '../lib/navigation.js';
 import {
   ChevronsLeftIcon,
   LockIcon,
@@ -17,21 +17,23 @@ const EXTRA_TITLES = {
 };
 
 function Layout() {
-  const { user, can, logout } = useAuth();
+  // Single-operator: no user object, no permissions. The whole menu is always
+  // visible (RequireAuth has already gated the app on `authed`); the account
+  // chip just shows the operator's name.
+  const { operatorName, appTitle, logout } = useAuth();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   // Desktop-only: collapse the labelled rail down to a slim icon-only strip.
   // Session-local React state (like openGroups): a layout convenience that
-  // resets at logout and never leaks between users on a shared machine.
+  // resets at logout and never leaks between sessions on a shared machine.
   // Starts collapsed at every login — Layout unmounts on logout, so this
-  // default re-applies each time a user signs in (ref 5's slim-rail default).
+  // default re-applies each time the operator signs in.
   const [navCollapsed, setNavCollapsed] = useState(true);
   // Which nav groups are expanded. Starts empty (all folded) at every login.
   // Layout stays mounted while navigating between pages, so an expanded group
   // stays expanded across the session; logging out unmounts Layout, which
-  // resets this back to folded. Kept in React state (not browser storage) so it
-  // never leaks between users on a shared machine.
+  // resets this back to folded. Kept in React state (not browser storage).
   const [openGroups, setOpenGroups] = useState({});
   const sidebarRef = useRef(null);
   const toggleRef = useRef(null);
@@ -98,30 +100,15 @@ function Layout() {
     return () => document.removeEventListener('keydown', handleKey);
   }, [isMobile, drawerOpen]);
 
-  const showNav = !user.mustChangePassword;
-
-  // Only render a section (and its items) the user is actually allowed to see.
-  // The permission for each item comes from ROUTE_PERMISSIONS (null = any
-  // signed-in user), the same map the route guard uses — so a hidden link is
-  // always also a blocked page.
-  const sections = showNav
-    ? NAV_SECTIONS.map((section) => ({
-        ...section,
-        items: section.items.filter((item) => {
-          const permission = ROUTE_PERMISSIONS[item.to];
-          return !permission || can(permission);
-        }),
-      })).filter((section) => section.items.length > 0)
-    : [];
-
+  // The whole menu is always shown; no permission filtering in the single-
+  // operator build.
+  const sections = NAV_SECTIONS;
   const currentTitle = titleForPath(location.pathname, sections);
+  const brandName = appTitle || 'Student Panel';
 
   // The icon-only rail is a desktop affordance; on mobile the sidebar is a
-  // full-width overlay drawer, so collapsing never applies there. It also only
-  // applies once the nav is showing — on the forced change-password screen
-  // (showNav false) the rail stays expanded so the pinned account actions keep
-  // their labels and Change password stays reachable.
-  const railCollapsed = showNav && !isMobile && navCollapsed;
+  // full-width overlay drawer, so collapsing never applies there.
+  const railCollapsed = !isMobile && navCollapsed;
 
   return (
     <div
@@ -141,101 +128,97 @@ function Layout() {
         inert={isMobile && !drawerOpen}
       >
         <div className="sidebar-top">
-          {showNav && (
-            <button
-              type="button"
-              className="rail-toggle"
-              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-pressed={navCollapsed}
-              aria-controls="primary-navigation"
-              onClick={() => setNavCollapsed((collapsed) => !collapsed)}
-            >
-              <ChevronsLeftIcon className="rail-toggle-icon" size={18} />
-            </button>
-          )}
-          <span className="brand-name">Student Panel</span>
+          <button
+            type="button"
+            className="rail-toggle"
+            aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-pressed={navCollapsed}
+            aria-controls="primary-navigation"
+            onClick={() => setNavCollapsed((collapsed) => !collapsed)}
+          >
+            <ChevronsLeftIcon className="rail-toggle-icon" size={18} />
+          </button>
+          <span className="brand-name">{brandName}</span>
         </div>
-        {showNav && (
-          <nav className="sidebar-nav">
-            {sections.map((section) => (
-              <details
-                className="nav-group"
-                open={railCollapsed || Boolean(openGroups[section.title])}
-                onToggle={(event) => {
-                  // While collapsed the rail forces every group open so all
-                  // icons show; don't record that transient state — the user's
-                  // real expand/fold choices are preserved for when they expand
-                  // the rail again.
-                  if (railCollapsed) return;
-                  // Read the element's open state NOW, while the event is still
-                  // live. React releases the synthetic event once this handler
-                  // returns and nulls out currentTarget, so reading it inside
-                  // the setState updater below (which runs later, during render)
-                  // would throw "Cannot read properties of null (reading
-                  // 'open')". Capture the boolean first, then use that.
-                  const isOpen = event.currentTarget.open;
-                  setOpenGroups((current) => {
-                    if (Boolean(current[section.title]) === isOpen) return current;
-                    return { ...current, [section.title]: isOpen };
-                  });
-                }}
-                key={section.title}
-              >
-                <summary className="nav-group-head">
-                  <span>{section.title}</span>
-                  <svg className="chevron" viewBox="0 0 12 12" aria-hidden="true">
-                    <path
-                      d="M2.5 4.5 6 8l3.5-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </summary>
-                <div className="nav-group-items">
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className="nav-link"
-                        title={railCollapsed ? item.label : undefined}
-                      >
-                        {Icon && (
-                          <span className="nav-icon" aria-hidden="true">
-                            <Icon size={18} />
-                          </span>
-                        )}
-                        <span className="nav-label">{item.label}</span>
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              </details>
-            ))}
-          </nav>
-        )}
+        <nav className="sidebar-nav">
+          {sections.map((section) => (
+            <details
+              className="nav-group"
+              open={railCollapsed || Boolean(openGroups[section.title])}
+              onToggle={(event) => {
+                // While collapsed the rail forces every group open so all
+                // icons show; don't record that transient state — the user's
+                // real expand/fold choices are preserved for when they expand
+                // the rail again.
+                if (railCollapsed) return;
+                // Read the element's open state NOW, while the event is still
+                // live. React releases the synthetic event once this handler
+                // returns and nulls out currentTarget, so reading it inside
+                // the setState updater below (which runs later, during render)
+                // would throw "Cannot read properties of null (reading
+                // 'open')". Capture the boolean first, then use that.
+                const isOpen = event.currentTarget.open;
+                setOpenGroups((current) => {
+                  if (Boolean(current[section.title]) === isOpen) return current;
+                  return { ...current, [section.title]: isOpen };
+                });
+              }}
+              key={section.title}
+            >
+              <summary className="nav-group-head">
+                <span>{section.title}</span>
+                <svg className="chevron" viewBox="0 0 12 12" aria-hidden="true">
+                  <path
+                    d="M2.5 4.5 6 8l3.5-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </summary>
+              <div className="nav-group-items">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className="nav-link"
+                      title={railCollapsed ? item.label : undefined}
+                    >
+                      {Icon && (
+                        <span className="nav-icon" aria-hidden="true">
+                          <Icon size={18} />
+                        </span>
+                      )}
+                      <span className="nav-label">{item.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </details>
+          ))}
+        </nav>
 
-        {/* Personal actions pinned at the foot of the rail (ref 5): who's signed
-            in, then Preferences / Change password / Sign out. Preferences and
-            Sign out stay visible in both the expanded and collapsed rail; Change
+        {/* Personal actions pinned at the foot of the rail: who's signed in,
+            then Preferences / Change password / Sign out. Preferences and Sign
+            out stay visible in both the expanded and collapsed rail; Change
             password rides along only when there's room for its label. This is
-            the app's single home for these actions — there is no separate topbar
-            account menu. */}
+            the app's single home for these actions — there is no separate
+            topbar account menu. */}
         <div className="sidebar-account">
           <div
             className="sidebar-account-id"
-            title={railCollapsed ? `${user.fullName} · ${user.role}` : undefined}
+            title={railCollapsed ? operatorName : undefined}
           >
             <span className="avatar" aria-hidden="true">
-              {initialsOf(user.fullName)}
+              {initialsOf(operatorName)}
             </span>
             <span className="sidebar-account-meta">
-              <span className="account-name">{user.fullName}</span>
-              <span className="account-role">{user.role}</span>
+              <span className="account-name">{operatorName}</span>
+              <span className="account-role">Signed in</span>
             </span>
           </div>
           <div className="sidebar-account-actions">
@@ -290,27 +273,25 @@ function Layout() {
 
       <div className="app-main">
         <header className="app-topbar">
-          {showNav && (
-            <button
-              type="button"
-              className="nav-toggle"
-              ref={toggleRef}
-              aria-label="Toggle menu"
-              aria-expanded={drawerOpen}
-              aria-controls="primary-navigation"
-              onClick={() => setDrawerOpen((open) => !open)}
-            >
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M3 5h14M3 10h14M3 15h14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          )}
+          <button
+            type="button"
+            className="nav-toggle"
+            ref={toggleRef}
+            aria-label="Toggle menu"
+            aria-expanded={drawerOpen}
+            aria-controls="primary-navigation"
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M3 5h14M3 10h14M3 15h14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
           <span className="topbar-title" key={currentTitle}>
             {currentTitle}
           </span>
@@ -330,9 +311,9 @@ function Layout() {
 }
 
 // Up to two initials for the account chip's avatar: first + last word of the
-// full name, falling back to the first character (or "?" for an empty name).
-function initialsOf(fullName) {
-  const parts = String(fullName ?? '')
+// operator name, falling back to the first character (or "?" for an empty name).
+function initialsOf(name) {
+  const parts = String(name ?? '')
     .trim()
     .split(/\s+/)
     .filter(Boolean);

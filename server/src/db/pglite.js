@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 
 // A pg-Pool-compatible facade over a single PGlite (Postgres-in-WASM) connection.
@@ -61,6 +62,11 @@ async function run(db, text, params) {
 export function createPglitePool(dataDir) {
   // No dataDir => in-memory (used by the verification script). A path (or
   // file://, idb://) => persisted, which the on-device build will use.
+  // PGlite's Node filesystem creates its own directory but not intermediate
+  // parents, so ensure the parent chain exists first (fresh machine, first run).
+  if (dataDir && !/^[a-z]+:\/\//i.test(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
   const db = new PGlite(dataDir);
   const mutex = new Mutex();
 

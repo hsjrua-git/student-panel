@@ -22,3 +22,15 @@ export const CHART_TOOLTIP = {
   labelStyle: { color: 'var(--ink-soft)', fontWeight: 600 },
   itemStyle: { color: 'var(--ink)' },
 };
+
+// A multi-series chart (trend / comparison) cycles each series onto one of the
+// six --series-* palette slots defined in index.css. Give every recharts
+// <Line>/<Bar>/<Radar> className={seriesClass(i)}; the per-series CSS rules then
+// colour its geometry distinctly, and — because those rules resolve var() — the
+// colours track the theme and palette AND survive the computed-style inlining
+// that `chartImage.js` does when exporting the chart to PNG/SVG.
+export const SERIES_COUNT = 6;
+
+export function seriesClass(index) {
+  return `series-${(index % SERIES_COUNT) + 1}`;
+}

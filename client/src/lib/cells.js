@@ -1,7 +1,22 @@
 const NUMBER_PATTERN = /^[+-]?(\d+([.,]\d*)?|[.,]\d+)$/;
 
+// The evaluation matrix is scoped to one group + one period. A column is either
+// the group's own direct score (studentId null) or a member's score within the
+// group. The cell key folds the group-own column onto the sentinel 'group' so
+// draft maps, lock maps and the server's cells map all share one key space.
 export function cellKey(studentId, parameterId) {
-  return `${studentId}:${parameterId}`;
+  return `${studentId ?? 'group'}:${parameterId}`;
+}
+
+// Inverse of cellKey. parameterId is a UUID (no colon), so we split on the
+// first colon only and map the sentinel back to a null studentId.
+export function splitCellKey(key) {
+  const index = key.indexOf(':');
+  const studentPart = key.slice(0, index);
+  return {
+    studentId: studentPart === 'group' ? null : studentPart,
+    parameterId: key.slice(index + 1),
+  };
 }
 
 export function savedText(value) {
@@ -23,12 +38,14 @@ export function parseCell(text, parameter) {
   return { value };
 }
 
-export function buildEntries(drafts, parametersById) {
+// Collect value-only drafts into bulk entries for one group. Each entry carries
+// the constant groupId and the per-cell studentId (null = the group's own row).
+export function buildEntries(drafts, parametersById, groupId) {
   const entries = [];
   const errors = {};
 
   for (const [key, text] of Object.entries(drafts)) {
-    const [studentId, parameterId] = key.split(':');
+    const { studentId, parameterId } = splitCellKey(key);
     const parameter = parametersById.get(parameterId);
     if (!parameter) continue;
 
@@ -36,11 +53,12 @@ export function buildEntries(drafts, parametersById) {
     if (result.error) {
       errors[key] = result.error;
     } else {
-      entries.push({ studentId, parameterId, value: result.value });
+      entries.push({ groupId, studentId, parameterId, value: result.value });
     }
   }
   return { entries, errors };
 }
+
 export function cellAccess(lock, canOverride) {
   if (!lock || !lock.isLocked) return 'open';
   return canOverride ? 'override' : 'locked';
@@ -54,19 +72,21 @@ export function lockedDraftKeys(drafts, noteDrafts, locks) {
 
 // Build the save payload from both value edits and note edits. A value-only
 // edit sends no `comment` (the server keeps the existing note); a note-only
-// edit re-sends the unchanged saved value so the row is not cleared.
+// edit re-sends the unchanged saved value so the row is not cleared. Every
+// entry carries the constant groupId of the matrix being edited.
 export function buildSavePayload({
   drafts,
   noteDrafts,
   savedValues,
   parametersById,
+  groupId,
 }) {
   const keys = new Set([...Object.keys(drafts), ...Object.keys(noteDrafts)]);
   const entries = [];
   const errors = {};
 
   for (const key of keys) {
-    const [studentId, parameterId] = key.split(':');
+    const { studentId, parameterId } = splitCellKey(key);
     const parameter = parametersById.get(parameterId);
     if (!parameter) continue;
 
@@ -82,7 +102,7 @@ export function buildSavePayload({
       value = savedValues[key] ?? null;
     }
 
-    const entry = { studentId, parameterId, value };
+    const entry = { groupId, studentId, parameterId, value };
     if (key in noteDrafts) {
       const text = noteDrafts[key].trim();
       entry.comment = text === '' ? null : text;

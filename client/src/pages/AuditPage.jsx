@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { listAudit } from '../api/audit.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { CATEGORY_OPTIONS, describeAudit } from '../lib/audit.js';
 import { formatDateTime, formatStudentCode } from '../lib/format.js';
@@ -47,7 +46,6 @@ function Details({ entry }) {
 }
 
 function AuditPage() {
-  const { can } = useAuth();
   const [category, setCategory] = useState('');
   const [actorText, setActorText] = useState('');
   const [page, setPage] = useState(1);
@@ -57,19 +55,7 @@ function AuditPage() {
     queryKey: ['audit', { category, actor, page }],
     queryFn: () => listAudit({ category, actor, page }),
     placeholderData: keepPreviousData,
-    enabled: can('audit.view'),
   });
-
-  if (!can('audit.view')) {
-    return (
-      <main>
-        <EmptyState
-          title="Read-only access"
-          description="You do not have permission to see the audit log."
-        />
-      </main>
-    );
-  }
 
   const { data } = query;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;

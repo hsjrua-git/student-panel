@@ -125,13 +125,13 @@ describe('planImport', () => {
   const server = {
     problems: [],
     cells: [
-      { index: 0, status: 'new' },
-      { index: 1, status: 'unchanged' },
-      { index: 2, status: 'locked' },
+      { index: 0, status: 'changed', wasLocked: false },
+      { index: 1, status: 'unchanged', wasLocked: false },
+      { index: 2, status: 'changed', wasLocked: true },
     ],
   };
 
-  it('sends new/changed rows, skips unchanged, and needs override for locked', () => {
+  it('sends changed rows, skips unchanged, and needs override for locked', () => {
     const plan = planImport({ built, server, canOverride: true });
     expect(plan.send.map((e) => e.studentId).sort()).toEqual(['a', 'c']);
     expect(plan.unchanged).toBe(1);
@@ -139,24 +139,24 @@ describe('planImport', () => {
     expect(plan.lockedBlocked).toBe(0);
   });
 
-  it('blocks locked rows when the user cannot override', () => {
+  it('blocks locked rows when the caller cannot override', () => {
     const plan = planImport({ built, server, canOverride: false });
     expect(plan.send.map((e) => e.studentId)).toEqual(['a']); // c is locked+blocked
     expect(plan.lockedBlocked).toBe(1);
     expect(plan.problemCount).toBe(1);
   });
 
-  it('treats a redacted "save" status (blind entry) as a plain write', () => {
-    const redacted = {
-      problems: [],
+  it('counts per-index problems and keeps them out of the send list', () => {
+    const withProblem = {
+      problems: [{ index: 0, message: 'That student is not a member of the group.' }],
       cells: [
-        { index: 0, status: 'save' },
-        { index: 1, status: 'save' },
-        { index: 2, status: 'locked' },
+        { index: 1, status: 'changed', wasLocked: false },
+        { index: 2, status: 'unchanged', wasLocked: false },
       ],
     };
-    const plan = planImport({ built, server: redacted, canOverride: true });
-    expect(plan.send).toHaveLength(3); // both saves + the overridable locked
-    expect(plan.unchanged).toBe(0);
+    const plan = planImport({ built, server: withProblem, canOverride: true });
+    expect(plan.send.map((e) => e.studentId)).toEqual(['b']);
+    expect(plan.unchanged).toBe(1);
+    expect(plan.problemCount).toBe(1);
   });
 });

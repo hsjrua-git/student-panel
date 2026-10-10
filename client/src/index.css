@@ -98,6 +98,19 @@
   --glow-1: color-mix(in srgb, var(--brand) 15%, transparent);
   --glow-2: color-mix(in srgb, var(--brand-2, var(--brand)) 11%, transparent);
 
+  /* Spacing scale — one 4px-based rhythm so every gap/padding/margin snaps to the
+     same ladder instead of ad-hoc rem values. Structural rules reference these
+     (--space-1 … --space-8 → 4/8/12/16/20/24/32/48px); leaf components may still
+     tune locally, but the app-wide rhythm and hierarchy come from this scale. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 3rem;
+
   --sidebar-w: 250px;
   --content-max: 880px;
 
@@ -560,13 +573,21 @@ h4 {
 h1 {
   font-size: 1.7rem;
   font-weight: 750;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-4);
+}
+
+/* A .hint that sits directly under the page title is the page-intro subtitle:
+   pull it up so it hugs the title (~8px) instead of reading as a detached
+   paragraph. Only matches the bare-h1 intro pages — where the title lives in a
+   .page-head flex row, the hint is a sibling of that wrapper, not of the h1. */
+h1 + .hint {
+  margin-top: calc(var(--space-2) - var(--space-4));
 }
 
 h2 {
   font-size: 1.2rem;
   font-weight: 700;
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--space-3);
 }
 
 h3 {
@@ -582,7 +603,7 @@ a {
 main {
   max-width: var(--content-max);
   margin: 0 auto;
-  padding: 1.75rem 1.5rem 4rem;
+  padding: var(--space-6) var(--space-6) var(--space-8);
 }
 
 main.wide {
@@ -722,7 +743,7 @@ textarea {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  padding: 0.5rem 0.6rem;
+  padding: var(--space-2) var(--space-3);
   transition:
     border-color var(--t-fast) var(--ease),
     box-shadow var(--t-fast) var(--ease),
@@ -965,7 +986,7 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.6rem 0.65rem;
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--line);
 }
 
@@ -1054,7 +1075,7 @@ tr.inactive,
 .search {
   width: 100%;
   box-sizing: border-box;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .actions {
@@ -1062,14 +1083,14 @@ tr.inactive,
 }
 
 .actions button + button {
-  margin-left: 0.5rem;
+  margin-left: var(--space-2);
 }
 
 .pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
 
 /* --------------------------------------------------------- form layouts - */
@@ -1079,14 +1100,14 @@ tr.inactive,
      width, so a narrow card can't be forced wider (the old fixed 160px minimum
      caused horizontal scrolling on the Add-parameter card and on phones). */
   grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
-  gap: 0.85rem;
-  margin-bottom: 0.85rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .form-grid label,
 .edit-form label {
   display: grid;
-  gap: 0.3rem;
+  gap: var(--space-1);
   font-size: 0.9rem;
   font-weight: 560;
   color: var(--ink-soft);
@@ -1106,7 +1127,7 @@ tr.inactive,
 
 .edit-form {
   display: grid;
-  gap: 0.85rem;
+  gap: var(--space-3);
 }
 
 /* Control clusters. A toolbar is a light "tray" that visually holds a set of
@@ -1120,9 +1141,9 @@ tr.inactive,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 0.7rem;
-  padding: 0.7rem 0.8rem;
-  margin-bottom: 1.1rem;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  margin-bottom: var(--space-5);
   background: var(--surface-2);
   border-radius: var(--radius);
 }
@@ -1131,7 +1152,7 @@ tr.inactive,
    header the way a section does — balancing areas that otherwise have a bold
    heading against areas that have none. */
 .group-title {
-  margin: 0 0 0.6rem;
+  margin: 0 0 var(--space-2);
   font-size: 0.95rem;
   font-weight: 640;
   color: var(--ink);
@@ -1146,16 +1167,12 @@ tr.inactive,
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
-}
-
-.period-picker {
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .filter-row,
 .columns-list {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
 }
 
 .toolbar .search {
@@ -1175,7 +1192,7 @@ tr.inactive,
 }
 
 .columns-list {
-  gap: 0.5rem 1rem;
+  gap: var(--space-2) var(--space-4);
 }
 
 /* ============================================================= app shell = */
@@ -1726,7 +1743,7 @@ tr.inactive,
   }
 
   main {
-    padding: 1.25rem 1rem 3rem;
+    padding: var(--space-5) var(--space-4) var(--space-8);
   }
 }
 
@@ -1746,7 +1763,7 @@ tr.inactive,
 
   th,
   td {
-    padding: 0.5rem 0.55rem;
+    padding: var(--space-2) var(--space-2);
   }
 
   /* The page count was colliding with the Previous button under
@@ -1760,7 +1777,7 @@ tr.inactive,
     order: -1;
     flex-basis: 100%;
     text-align: center;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-1);
   }
 }
 
@@ -1768,14 +1785,14 @@ tr.inactive,
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.85rem;
-  margin: 1rem 0;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
 }
 
 .param-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 /* Floating surfaces read as frosted glass: a translucent fill over a blurred
@@ -1802,7 +1819,7 @@ tr.inactive,
    rather than flat boxes. */
 .stat-card {
   position: relative;
-  padding: 0.95rem 1.05rem 1rem 1.15rem;
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
   overflow: hidden;
   transition:
     transform var(--t) var(--ease),
@@ -1860,7 +1877,7 @@ tr.inactive,
 }
 
 .param-card {
-  padding: 1rem 1.1rem;
+  padding: var(--space-4);
   transition:
     box-shadow var(--t) var(--ease),
     border-color var(--t) var(--ease);
@@ -1883,7 +1900,7 @@ tr.inactive,
 }
 
 .stat-value {
-  margin-top: 0.25rem;
+  margin-top: var(--space-1);
   font-family: var(--font-numeric);
   font-size: 2.7rem;
   font-weight: 800;
@@ -1893,11 +1910,651 @@ tr.inactive,
 }
 
 .param-card h3 {
-  margin: 0 0 0.25rem;
+  margin: 0 0 var(--space-1);
 }
 
-.param-card h4 {
-  margin: 0.85rem 0 0.3rem;
+/* ----------------------------------------------------- cohort hero (dash) - */
+/* The dashboard's focal object: a glowing completion core ringed by a progress
+   arc, with the class rendered as a field of dots inside it and quiet KPI
+   readouts beneath that double as the dot legend. Fully token-based, so it
+   re-tints across every palette; the core reuses the page's aurora glow token
+   (--glow-1). Entrance motion is deliberately left to the route-transition
+   system (the section animates as one block) plus CountUp for the figures — the
+   arc-draw / dot-ignite choreography is a later polish step. */
+.cohort-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+  margin: 1.5rem 0 2rem;
+}
+
+/* Host for the 3D cohort constellation (CohortConstellation mounts a WebGL
+   canvas here, sized to fill this box). Centred by .cohort-hero's flex column;
+   the clamp keeps it a comfortable stage without dominating narrow screens. */
+.cohort-canvas {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  height: clamp(320px, 52vw, 460px);
+}
+
+/* Label revealed on hovering a student node (name + measured/total). Positioned
+   in JS at the node's projected screen point; a small box that reads on any
+   palette, non-interactive so it never eats the pointer driving the raycast. */
+.cohort-tooltip {
+  position: absolute;
+  transform: translate(-50%, -145%);
+  padding: 0.28rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-pop);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* The WebGL constellation's keyboard/AT control layer. The canvas itself is
+   aria-hidden decoration; these buttons (class summary, one per in-use parameter,
+   one per student) open the same drawers a click on the 3D marks would, so every
+   target is reachable without WebGL. The layer fills the hero but is inert to the
+   pointer at rest — only a focused jump button (revealed below) takes events, so it
+   never steals the drag/hover that drives the 3D scene. */
+.cohort-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cohort-jump-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Each jump button is visually hidden until focused (the sighted-keyboard "skip
+   link" pattern), then surfaces as a pill at the top of the stage so a keyboard
+   user sees where they are. Screen readers reach them at rest regardless. */
+.cohort-jump {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.cohort-jump:focus-visible {
+  left: 50%;
+  top: 0.5rem;
+  transform: translateX(-50%);
+  width: auto;
+  height: auto;
+  clip: auto;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  pointer-events: auto;
+  z-index: 3;
+}
+
+/* The orbit holds the core and its parameter satellites. Default (many params or
+   a narrow screen) is a plain stack: core, then a wrapped row of satellites. When
+   there are 1–6 in-use parameters and the screen is wide, .ring turns it into a
+   square stage with the core centred and satellites placed on a true circle. */
+.cohort-orbit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.cohort-orbit.ring {
+  position: relative;
+  width: clamp(340px, 56vw, 560px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  --orbit-r: clamp(150px, 23vw, 230px);
+}
+
+/* A faint guide circle traces the orbit path the satellites sit on. */
+.cohort-orbit.ring::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(2 * var(--orbit-r));
+  height: calc(2 * var(--orbit-r));
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px dashed var(--glass-border);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.cohort-core {
+  position: relative;
+  width: clamp(230px, 34vw, 320px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 40%, var(--glow-1), transparent 68%),
+    var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    var(--shadow-md),
+    0 0 60px -14px color-mix(in srgb, var(--brand) 42%, transparent);
+}
+
+/* Progress ring, rotated so the fill grows clockwise from 12 o'clock. */
+.cohort-arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.cohort-arc-track {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  opacity: 0.4;
+}
+
+.cohort-arc-value {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand) 55%, transparent));
+  transition: stroke-dasharray var(--t) var(--ease);
+}
+
+/* One dot per student, laid on a phyllotaxis halo (positions set inline as
+   percentages of this box) in the band between the readout and the arc. */
+.cohort-field {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.field-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--surface) 65%, transparent);
+}
+
+.cohort-field.dense .field-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* Fully-measured students glow; partial are solid amber; not-yet are hollow —
+   the fill/shape difference carries state beyond colour alone. */
+.field-dot.full {
+  background: var(--ok);
+  box-shadow:
+    0 0 6px -1px color-mix(in srgb, var(--ok) 60%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--surface) 65%, transparent);
+}
+
+.field-dot.partial {
+  background: var(--brand-2);
+}
+
+.field-dot.none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+
+/* The headline number sits on a soft surface medallion so it stays legible over
+   the dots behind it. */
+.cohort-readout {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  width: 48%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    var(--surface) 60%,
+    color-mix(in srgb, var(--surface) 65%, transparent) 82%,
+    transparent
+  );
+}
+
+.cohort-pct {
+  font-family: var(--font-numeric);
+  font-size: clamp(2.2rem, 6vw, 3.1rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.cohort-pct-label {
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+/* The 2D hub's centre readout is a real button (opens the class-summary drawer).
+   Strip the native button chrome so it looks identical to the old static medallion,
+   and give it a visible ring only on keyboard focus. */
+.cohort-readout-btn {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cohort-readout-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Parameter satellites. In the stacked fallback they wrap in a centred row
+   beneath the core; in ring mode each is placed on the orbit circle by angle
+   (evenly spaced from 12 o'clock) using CSS trig on its --i / --n indices. */
+.cohort-satellites {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.8rem 1.4rem;
+}
+
+.cohort-orbit.ring .cohort-satellites {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.cohort-orbit.ring .cohort-sat {
+  --a: calc(-90deg + (360deg / var(--n)) * var(--i));
+  position: absolute;
+  left: calc(50% + var(--orbit-r) * cos(var(--a)));
+  top: calc(50% + var(--orbit-r) * sin(var(--a)));
+  transform: translate(-50%, -50%);
+}
+
+/* A satellite is a button that opens the parameter's detail drawer. Reset the
+   native button chrome back to the bare stack of ring + name, then add a quiet
+   interactive affordance — a soft brand wash and a small lift of the ring on
+   hover, a brand outline on keyboard focus — so it reads as clickable without
+   competing with the glowing core. */
+.sat-node {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 5.5rem;
+  padding: 0.35rem 0.2rem;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  transition: background var(--t-fast) var(--ease);
+}
+
+.sat-node:hover {
+  background: color-mix(in srgb, var(--brand) 9%, transparent);
+}
+
+.sat-node:hover .sat-name {
+  color: var(--brand);
+}
+
+.sat-node:hover .sat-ring {
+  transform: scale(1.06);
+}
+
+.sat-node:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.sat-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.sat-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+
+.sat-ring-track {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  opacity: 0.4;
+}
+
+.sat-ring-value {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--t) var(--ease);
+}
+
+.sat-frac {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-numeric);
+  font-size: 0.8rem;
+  font-weight: 750;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sat-frac-total {
+  color: var(--ink-faint);
+  font-weight: 600;
+  font-size: 0.68rem;
+}
+
+.sat-name {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* A parameter with no scores yet reads as quiet — the ring is just its track. */
+.sat-node.empty .sat-frac {
+  color: var(--ink-soft);
+}
+
+/* Too narrow for a ring: drop back to the stacked row regardless of param count. */
+@media (max-width: 760px) {
+  .cohort-orbit.ring {
+    position: static;
+    width: auto;
+    aspect-ratio: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .cohort-orbit.ring::before {
+    display: none;
+  }
+
+  .cohort-orbit.ring .cohort-satellites {
+    position: static;
+    inset: auto;
+    display: flex;
+  }
+
+  .cohort-orbit.ring .cohort-sat {
+    position: static;
+    left: auto;
+    top: auto;
+    transform: none;
+  }
+}
+
+.cohort-kpis {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem 1.6rem;
+}
+
+.cohort-kpi {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.kpi-swatch {
+  align-self: center;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.kpi-swatch.total {
+  background: var(--brand);
+}
+
+.kpi-swatch.full {
+  background: var(--ok);
+}
+
+.kpi-swatch.partial {
+  background: var(--brand-2);
+}
+
+.kpi-swatch.none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+
+.kpi-value {
+  font-family: var(--font-numeric);
+  font-weight: 750;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink);
+}
+
+.kpi-label {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* -------------------------------------------------- needs-scoring rail --- */
+/* The "who to score next" work queue. A horizontal rail keeps the hero the
+   page's vertical focus (a long list would push everything down); it reads
+   left→right as a work order, worst-first. Tickets stay quiet — neutral glass,
+   thin line — so the amber "missing" chips inside carry the only colour. */
+.needs-rail {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0 0 0.4rem;
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.needs-ticket {
+  flex: 0 0 13rem;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.needs-ticket-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.needs-name {
+  font-weight: 640;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.needs-name:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+/* The trailing "+N more" ticket: a dashed placeholder, not a real card, so it
+   reads as "the rail continues" rather than another student to act on. */
+.needs-more {
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 6rem;
+  background: none;
+  border-style: dashed;
+  color: var(--ink-faint);
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.needs-clear {
+  margin: 0.75rem 0 0;
+  color: var(--ok);
+}
+
+/* ------------------------------------------------- parameter detail drawer -
+   A parameter's full picture (summary + trend + distribution) opens in a modal
+   sheet that slides in from the right when its satellite is clicked, so the
+   dashboard itself stays a single glowing object and the depth is disclosed on
+   demand. Modal at every width. Following the mobile-nav precedent, the sliding
+   panel carries NO backdrop-filter and the scrim is a flat dim: a blur on a
+   transformed fixed element re-composites the viewport every frame (the "blur
+   flash"). The panel is always mounted so both the slide-in and slide-out come
+   from CSS; the scroll-lock, focus trap, and focus return live in the component.
+   Reduced motion is handled globally (the block at end of file zeroes the slide,
+   so the panel simply appears). */
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(8, 11, 20, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t) var(--ease);
+}
+
+.drawer-scrim.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.param-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(31rem, 94vw);
+  height: 100dvh;
+  padding: 1.3rem 1.5rem 2rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  transform: translateX(100%);
+  transition: transform var(--t) var(--ease);
+}
+
+.param-drawer.open {
+  transform: translateX(0);
+  box-shadow: var(--shadow-pop);
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.drawer-title {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+/* A quiet round icon button that brightens to the brand on hover/focus, like the
+   app's other dismiss affordances. */
+.drawer-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
+}
+
+.drawer-close:hover,
+.drawer-close:focus-visible {
+  color: var(--brand);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+  background: color-mix(in srgb, var(--brand) 10%, var(--surface-2));
+}
+
+.drawer-chart-title {
+  margin: var(--space-4) 0 var(--space-1);
   font-size: 0.82rem;
   font-weight: 620;
   color: var(--ink-soft);
@@ -1905,8 +2562,8 @@ tr.inactive,
 
 /* --------------------------------------------------------- panels/notice - */
 .panel {
-  padding: 0.6rem 0.9rem;
-  margin-bottom: 1rem;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .panel summary {
@@ -1928,8 +2585,8 @@ tr.inactive,
 .notice {
   border-color: var(--brand);
   border-left-width: 3px;
-  padding: 0.85rem 1rem;
-  margin: 1rem 0;
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
 }
 
 /* Empty state: a calm, centered panel for "nothing here yet" pages so a sparse
@@ -1940,10 +2597,10 @@ tr.inactive,
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   max-width: 30rem;
-  margin: 2.5rem auto;
-  padding: 2.25rem 1.75rem;
+  margin: var(--space-8) auto;
+  padding: var(--space-7) var(--space-6);
   background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
@@ -1957,7 +2614,7 @@ tr.inactive,
   place-items: center;
   width: 3rem;
   height: 3rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-1);
   border-radius: 50%;
   color: var(--brand);
   background: var(--brand-soft);
@@ -2118,26 +2775,9 @@ tr.inactive,
   padding: 0;
 }
 
-.param-choice,
-.unmeasured li {
+.param-choice {
   padding: 0.5rem 0;
   border-top: 1px solid var(--line);
-}
-
-/* Coverage-gap row: the student's name/code sit on their own line with the
-   missing parameters listed below as amber chips, instead of a comma-joined
-   "missing a, b, c" tail that scanned as prose. */
-.unmeasured li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.unmeasured-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.4rem;
 }
 
 .param-line {
@@ -2893,8 +3533,8 @@ html {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  padding: 1.15rem 1.25rem 1.3rem;
-  margin: 1.25rem 0;
+  padding: var(--space-5);
+  margin: var(--space-5) 0;
 }
 
 .section-card > :first-child {
@@ -2916,9 +3556,9 @@ html {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.7rem 0.85rem;
-  margin: 0 0 1.2rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3);
+  margin: 0 0 var(--space-5);
   background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
@@ -2937,7 +3577,7 @@ html {
    glass fill, leading brand rule, and hover lift. */
 .kpi-callout {
   max-width: 22rem;
-  margin: 1rem 0;
+  margin: var(--space-5) 0;
 }
 
 /* Parameter management cards (the Parameters page): the name sits on a row with
@@ -2947,7 +3587,7 @@ html {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: var(--space-2);
 }
 
 .param-card-head h3 {
@@ -2961,14 +3601,14 @@ html {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
-  margin: 0.35rem 0;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--space-1);
   padding: 0.22rem 0.62rem;
   font-size: 0.82rem;
   font-weight: 550;
@@ -3021,6 +3661,122 @@ html {
   background: color-mix(in srgb, currentColor 18%, transparent);
 }
 
+/* Section header row: a section-card's own <h2> on the left with a small inline
+   control (a "Show archived" toggle, a filter) on the right. The section-card
+   equivalent of .page-head, one notch quieter. */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+/* A reset <ul> that lays its children out as chips (the list-semantics sibling
+   of .chip-row — used where the chips are genuinely a list, e.g. the people a
+   period or task is assigned to). */
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A labelled block inside a Drawer, set off from the edit form above it. */
+.drawer-section {
+  margin-top: var(--space-5);
+}
+
+.drawer-section h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.82rem;
+  font-weight: 620;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* A reset <ul> of assignment rows: each row is a checkbox-or-label on the left
+   and a quiet remove button on the right, stacked with hairline separators. */
+.assignment-list {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.assignment-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.assignment-row:last-child {
+  border-bottom: 0;
+}
+
+/* The free-form "extra details" editor on the Parameters form: a vertical stack
+   of label/value rows, each with a quiet remove button, plus a text-style "+ Add
+   detail" button underneath. .extra-label wraps the whole thing under its
+   caption, separated from the field grid above. */
+.extra-label {
+  margin-top: var(--space-3);
+}
+
+.extra-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.extra-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.extra-row input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* A text-only button that reads as an inline link (used for "+ Add detail"):
+   resets the neutral surface button entirely. */
+.link-button {
+  align-self: flex-start;
+  padding: 0;
+  font-weight: 560;
+  color: var(--brand);
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.link-button:hover {
+  background: none;
+  border-color: transparent;
+  color: var(--brand-strong);
+  text-decoration: underline;
+}
+
+/* The em-dash depth prefix on a parameter tree row: present but quiet, so the
+   name still reads first. aria-hidden, so it is purely visual. */
+.tree-indent {
+  color: var(--ink-soft);
+  white-space: pre;
+}
+
 /* Page header row: the page title on the left, its primary action(s) on the
    right, wrapping on narrow screens. Lets a page lead with "<Title> … [Add]"
    instead of a bare heading with the action buried below. */
@@ -3029,8 +3785,8 @@ html {
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  margin-bottom: 0.75rem;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .page-head h1 {
@@ -3041,7 +3797,7 @@ html {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* Loading state: a small brand spinner over a calm centered column, replacing
@@ -3053,7 +3809,7 @@ html {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.8rem;
+  gap: var(--space-3);
   min-height: 38vh;
   color: var(--ink-soft);
 }
@@ -3178,6 +3934,390 @@ html {
 .drop-zone-mark svg {
   width: 1.3rem;
   height: 1.3rem;
+}
+
+/* --------------------------------------------------------- custom cursor --- */
+/* Workstream I: a glowing dot that replaces the desktop pointer (Hybrid mode -
+   the native caret is kept over text fields). Mounted from main.jsx by
+   CustomCursor.jsx, which only renders on a fine, hovering pointer and never
+   under reduced motion; this block is the paint. It is wrapped so it can only
+   take effect on such a device, and `cursor: none` applies only while the JS
+   layer is actually live (html.cursor-active). */
+@media (hover: hover) and (pointer: fine) {
+  html.cursor-active,
+  html.cursor-active * {
+    cursor: none !important;
+  }
+  /* Hybrid: keep the real caret where text is entered or selected. */
+  html.cursor-active
+    :is(
+      input:not([type='button']):not([type='submit']):not([type='reset']):not(
+          [type='checkbox']
+        ):not([type='radio']):not([type='range']):not([type='color']):not(
+          [type='file']
+        ):not([type='image']):not([type='hidden']),
+      textarea,
+      [contenteditable='true'],
+      [contenteditable='']
+    ) {
+    cursor: text !important;
+  }
+
+  .cursor-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1000; /* above the app's 100 ceiling (drawer 90, scrim 80, topbar 70) */
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--t-fast) var(--ease);
+  }
+  .cursor-layer.is-visible {
+    opacity: 1;
+  }
+  .cursor-dot,
+  .cursor-wave {
+    position: absolute;
+    top: 0;
+    left: 0;
+    will-change: transform;
+  }
+  /* The spring: overshoot easing carries the click's shrink back past 1.0, and
+     eases the calm bloom over actionable elements. */
+  .cursor-dot > i,
+  .cursor-wave > i {
+    display: block;
+    border-radius: 50%;
+    transition:
+      transform var(--t-fast) cubic-bezier(0.34, 1.56, 0.64, 1),
+      opacity var(--t-fast) var(--ease),
+      border-color var(--t-fast) var(--ease);
+  }
+  .cursor-dot > i {
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    background: var(--brand);
+    box-shadow:
+      0 0 10px 1px var(--glow-1),
+      0 0 4px 0 var(--brand);
+  }
+  /* the wave: concentric hollow rings around the dot. Each ring carries its own
+     diameter (--r-size) and opacity (--r-o) inline; the outer rings are set
+     larger and fainter, so the brand-hued halo fades outward like a ripple. */
+  .cursor-wave > i {
+    width: var(--r-size, 34px);
+    height: var(--r-size, 34px);
+    margin: calc(var(--r-size, 34px) / -2) 0 0 calc(var(--r-size, 34px) / -2);
+    border: 1.5px solid var(--brand);
+    opacity: var(--r-o, 0.3);
+  }
+  /* over actionable elements: the wave blooms outward, the dot eases down */
+  .cursor-layer.is-interactive .cursor-wave > i {
+    transform: scale(1.35);
+  }
+  .cursor-layer.is-interactive .cursor-dot > i {
+    transform: scale(0.7);
+  }
+
+  /* over text: step aside so the native caret is unobstructed */
+  .cursor-layer.is-text .cursor-dot > i,
+  .cursor-layer.is-text .cursor-wave > i {
+    opacity: 0;
+  }
+
+  /* click: dot shrinks and the wave tightens; the spring easing carries them
+     back (declared last so a press wins over the hover bloom) */
+  .cursor-layer.is-pressed .cursor-dot > i {
+    transform: scale(0.55);
+  }
+  .cursor-layer.is-pressed .cursor-wave > i {
+    transform: scale(0.85);
+  }
+}
+
+/* ================================================== export center ======= */
+/* The /export page: a two-column layout (config on the left, run + live
+   preview on the right). Pickers are plain <fieldset>s; the chart editors and
+   the scores-preview reuse the glass .section-card. Multi-series chart colours
+   are defined at the end of this block. */
+.export-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .export-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.export-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.export-output {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Pickers: a light card that reads clearly against the page and lets the
+   nested glass .section-card chart editors stand out on top of it. */
+.export-fieldset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--space-4);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.export-fieldset > legend {
+  padding: 0 var(--space-2);
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.export-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.include-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Each include line is a checkbox next to a label whose hint wraps beneath it,
+   so pin the box to the top rather than centring on the whole two-line block. */
+.include-item {
+  align-items: flex-start;
+}
+
+.hint.block {
+  display: block;
+  margin-top: 2px;
+}
+
+/* A capped, scrollable checklist. .columns-list is a wrapping row; here we make
+   it a single scrolling column so long rosters/parameter lists stay compact. */
+.columns-list.scroll-list {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: var(--space-1);
+  max-height: 15rem;
+  overflow-y: auto;
+  padding: var(--space-2);
+  margin-bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.columns-list.scroll-list.small {
+  max-height: 10rem;
+}
+
+/* Chart editors sit inside the Charts fieldset's flex column, so drop the
+   section-card's own vertical margin and let the parent gap do the spacing. */
+.section-card.chart-editor {
+  margin: 0;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.chart-editor .toolbar {
+  margin-bottom: 0;
+}
+
+.export-run-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.export-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.export-errors {
+  list-style: disc;
+  margin: 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* The chart's on-screen container is exactly what the Export run serialises to
+   PNG/SVG, so keep it on an opaque surface (transparent areas raster black). */
+.chart-capture {
+  background: var(--surface);
+}
+
+.heatmap-wrap {
+  overflow-x: auto;
+}
+
+.heatmap-svg {
+  display: block;
+  max-width: none;
+}
+
+/* ---- multi-series chart colours ----
+   Six slots for charts that draw several series at once (trend lines, grouped
+   comparison bars, radar polygons). --series-1/2 reuse the palette's own accent
+   pair so they track [data-theme]/[data-palette]; 3–6 are fixed, distinct hues
+   that stay legible on both light and dark surfaces. Each recharts <Line>/<Bar>/
+   <Radar> is tagged .series-N (chartTheme.js#seriesClass); these rules recolour
+   its geometry and override the single-series base rules above. Setting a CSS
+   `fill`/`stroke` PROPERTY (not an attribute) is what lets var() resolve — and
+   what survives chartImage.js inlining computed styles for PNG/SVG export. */
+:root {
+  --series-1: var(--brand);
+  --series-2: var(--brand-2);
+  --series-3: #2563eb;
+  --series-4: #16a34a;
+  --series-5: #9333ea;
+  --series-6: #db2777;
+}
+
+.recharts-line.series-1 .recharts-line-curve,
+.recharts-radar.series-1 .recharts-polygon {
+  stroke: var(--series-1);
+}
+.recharts-line.series-1 .recharts-line-dot,
+.recharts-bar.series-1 .recharts-bar-rectangle path,
+.recharts-radar.series-1 .recharts-polygon,
+.recharts-radar.series-1 .recharts-radar-dot {
+  fill: var(--series-1);
+}
+
+.recharts-line.series-2 .recharts-line-curve,
+.recharts-radar.series-2 .recharts-polygon {
+  stroke: var(--series-2);
+}
+.recharts-line.series-2 .recharts-line-dot,
+.recharts-bar.series-2 .recharts-bar-rectangle path,
+.recharts-radar.series-2 .recharts-polygon,
+.recharts-radar.series-2 .recharts-radar-dot {
+  fill: var(--series-2);
+}
+
+.recharts-line.series-3 .recharts-line-curve,
+.recharts-radar.series-3 .recharts-polygon {
+  stroke: var(--series-3);
+}
+.recharts-line.series-3 .recharts-line-dot,
+.recharts-bar.series-3 .recharts-bar-rectangle path,
+.recharts-radar.series-3 .recharts-polygon,
+.recharts-radar.series-3 .recharts-radar-dot {
+  fill: var(--series-3);
+}
+
+.recharts-line.series-4 .recharts-line-curve,
+.recharts-radar.series-4 .recharts-polygon {
+  stroke: var(--series-4);
+}
+.recharts-line.series-4 .recharts-line-dot,
+.recharts-bar.series-4 .recharts-bar-rectangle path,
+.recharts-radar.series-4 .recharts-polygon,
+.recharts-radar.series-4 .recharts-radar-dot {
+  fill: var(--series-4);
+}
+
+.recharts-line.series-5 .recharts-line-curve,
+.recharts-radar.series-5 .recharts-polygon {
+  stroke: var(--series-5);
+}
+.recharts-line.series-5 .recharts-line-dot,
+.recharts-bar.series-5 .recharts-bar-rectangle path,
+.recharts-radar.series-5 .recharts-polygon,
+.recharts-radar.series-5 .recharts-radar-dot {
+  fill: var(--series-5);
+}
+
+.recharts-line.series-6 .recharts-line-curve,
+.recharts-radar.series-6 .recharts-polygon {
+  stroke: var(--series-6);
+}
+.recharts-line.series-6 .recharts-line-dot,
+.recharts-bar.series-6 .recharts-bar-rectangle path,
+.recharts-radar.series-6 .recharts-polygon,
+.recharts-radar.series-6 .recharts-radar-dot {
+  fill: var(--series-6);
+}
+
+/* Radar (comparison chart) grid + axes, matching the cartesian grid tint. */
+.recharts-polar-grid-angle line,
+.recharts-polar-grid-concentric-polygon,
+.recharts-polar-grid-concentric-circle {
+  stroke: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* Recharts draws the legend as an HTML layer outside the <svg>, so it is not
+   part of the exported image — this only aligns the on-screen preview legend
+   with the series colours. Icons are coloured by their render order (which
+   matches the series index); scoped to the export preview so no other chart's
+   legend is affected. */
+.export-preview .recharts-legend-item.legend-item-0 .recharts-legend-icon {
+  stroke: var(--series-1);
+  fill: var(--series-1);
+}
+.export-preview .recharts-legend-item.legend-item-1 .recharts-legend-icon {
+  stroke: var(--series-2);
+  fill: var(--series-2);
+}
+.export-preview .recharts-legend-item.legend-item-2 .recharts-legend-icon {
+  stroke: var(--series-3);
+  fill: var(--series-3);
+}
+.export-preview .recharts-legend-item.legend-item-3 .recharts-legend-icon {
+  stroke: var(--series-4);
+  fill: var(--series-4);
+}
+.export-preview .recharts-legend-item.legend-item-4 .recharts-legend-icon {
+  stroke: var(--series-5);
+  fill: var(--series-5);
+}
+.export-preview .recharts-legend-item.legend-item-5 .recharts-legend-icon {
+  stroke: var(--series-6);
+  fill: var(--series-6);
 }
 
 /* ------------------------------------------------------ reduced motion --- */

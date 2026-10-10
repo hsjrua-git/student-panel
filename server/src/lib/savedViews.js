@@ -1,7 +1,12 @@
 import { isUuid } from './ids.js';
-import { MAX_PERIOD, isValidPeriodNumber } from './parameterUse.js';
 
-export const MAX_VIEWS_PER_USER = 50;
+// Validation for saved result/dashboard views. Global in the single-operator
+// build (no user ownership). A view pins an optional group and period, a set of
+// parameter columns, value filters, a sort and a search — enough to restore a
+// results screen exactly. A null groupId/periodId means "let the page choose"
+// (e.g. the latest period), so views stay valid as periods come and go.
+
+export const MAX_VIEWS = 50;
 export const OPERATORS = ['lt', 'lte', 'gt', 'gte', 'eq', 'missing', 'present'];
 
 const VALUE_OPERATORS = new Set(['lt', 'lte', 'gt', 'gte', 'eq']);
@@ -49,18 +54,13 @@ export function parseViewConfig(input) {
     return { error: 'The view settings are missing.' };
   }
 
-  const { periodMode = 'current' } = input;
-  if (periodMode !== 'current' && periodMode !== 'fixed') {
-    return { error: 'periodMode must be "current" or "fixed".' };
+  const groupId = input.groupId ?? null;
+  if (groupId !== null && !isUuid(groupId)) {
+    return { error: 'groupId must be a valid ID or null.' };
   }
-  let periodNumber = null;
-  if (periodMode === 'fixed') {
-    if (!isValidPeriodNumber(input.periodNumber)) {
-      return {
-        error: `A fixed period must be a whole number from 1 to ${MAX_PERIOD}.`,
-      };
-    }
-    periodNumber = input.periodNumber;
+  const periodId = input.periodId ?? null;
+  if (periodId !== null && !isUuid(periodId)) {
+    return { error: 'periodId must be a valid ID or null.' };
   }
 
   const parameterIds = input.parameterIds ?? [];
@@ -109,8 +109,8 @@ export function parseViewConfig(input) {
 
   return {
     value: {
-      periodMode,
-      periodNumber,
+      groupId,
+      periodId,
       parameterIds,
       filters,
       sort: { key: sort.key, direction: sort.direction },

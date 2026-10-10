@@ -4,10 +4,7 @@ import { Navigate, Route, Routes, matchPath, useLocation } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import Layout from './components/Layout.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
-import RequirePermission from './components/RequirePermission.jsx';
 import ConnectionBanner from './components/ConnectionBanner.jsx';
-import { useAuth } from './auth/AuthContext.jsx';
-import { firstAllowedPath } from './lib/navigation.js';
 import { lazyWithReload } from './lib/lazyWithReload.js';
 import {
   MOTION,
@@ -38,11 +35,12 @@ const StudentDetailPage = lazyWithReload(() => import('./pages/StudentDetailPage
 const EvaluatePage = lazyWithReload(() => import('./pages/EvaluatePage.jsx'));
 const ParametersPage = lazyWithReload(() => import('./pages/ParametersPage.jsx'));
 const ResultsPage = lazyWithReload(() => import('./pages/ResultsPage.jsx'));
+const ExportPage = lazyWithReload(() => import('./pages/ExportPage.jsx'));
 const ImportStudentsPage = lazyWithReload(() => import('./pages/ImportStudentsPage.jsx'));
 const ImportScoresPage = lazyWithReload(() => import('./pages/ImportScoresPage.jsx'));
-const UsersPage = lazyWithReload(() => import('./pages/UsersPage.jsx'));
-const RolesPage = lazyWithReload(() => import('./pages/RolesPage.jsx'));
 const GroupsPage = lazyWithReload(() => import('./pages/GroupsPage.jsx'));
+const PeriodsPage = lazyWithReload(() => import('./pages/PeriodsPage.jsx'));
+const TasksPage = lazyWithReload(() => import('./pages/TasksPage.jsx'));
 const FieldsPage = lazyWithReload(() => import('./pages/FieldsPage.jsx'));
 const PreferencesPage = lazyWithReload(() => import('./pages/PreferencesPage.jsx'));
 const SettingsPage = lazyWithReload(() => import('./pages/SettingsPage.jsx'));
@@ -64,9 +62,10 @@ const ROUTE_PRELOADS = [
   ['/evaluate', EvaluatePage],
   ['/parameters', ParametersPage],
   ['/results', ResultsPage],
-  ['/users', UsersPage],
-  ['/roles', RolesPage],
+  ['/export', ExportPage],
   ['/groups', GroupsPage],
+  ['/periods', PeriodsPage],
+  ['/tasks', TasksPage],
   ['/fields', FieldsPage],
   ['/preferences', PreferencesPage],
   ['/settings', SettingsPage],
@@ -420,12 +419,10 @@ function settleThenEnter(host, isFetching, superseded) {
   };
 }
 
-// Sends a freshly signed-in user to the first page their role can actually
-// open. This is why "/" and every login land somewhere useful instead of a
-// hardcoded /dashboard the user might not have permission to see.
+// Single-operator: there is one home. Signing in (and "/") lands on the
+// dashboard; there are no roles to pick a per-role landing spot for.
 function LandingRedirect() {
-  const { can } = useAuth();
-  return <Navigate to={firstAllowedPath(can)} replace />;
+  return <Navigate to="/dashboard" replace />;
 }
 
 function App() {
@@ -579,26 +576,25 @@ function AnimatedRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route element={<RequirePermission />}>
-            <Route path="/" element={<LandingRedirect />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/students" element={<StudentsPage />} />
-            <Route path="/students/:id" element={<StudentDetailPage />} />
-            <Route path="/evaluate" element={<EvaluatePage />} />
-            <Route path="/parameters" element={<ParametersPage />} />
-            <Route path="/results" element={<ResultsPage />} />
-            <Route path="/students/import" element={<ImportStudentsPage />} />
-            <Route path="/evaluate/import" element={<ImportScoresPage />} />
-            <Route path="/users" element={<UsersPage />} />
-            <Route path="/roles" element={<RolesPage />} />
-            <Route path="/groups" element={<GroupsPage />} />
-            <Route path="/fields" element={<FieldsPage />} />
-            <Route path="/preferences" element={<PreferencesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/change-password" element={<ChangePasswordPage />} />
-            <Route path="/audit" element={<AuditPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
+          <Route path="/" element={<LandingRedirect />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/students" element={<StudentsPage />} />
+          <Route path="/students/:id" element={<StudentDetailPage />} />
+          <Route path="/evaluate" element={<EvaluatePage />} />
+          <Route path="/parameters" element={<ParametersPage />} />
+          <Route path="/results" element={<ResultsPage />} />
+          <Route path="/export" element={<ExportPage />} />
+          <Route path="/students/import" element={<ImportStudentsPage />} />
+          <Route path="/evaluate/import" element={<ImportScoresPage />} />
+          <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/periods" element={<PeriodsPage />} />
+          <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/fields" element={<FieldsPage />} />
+          <Route path="/preferences" element={<PreferencesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/change-password" element={<ChangePasswordPage />} />
+          <Route path="/audit" element={<AuditPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
     </Routes>

@@ -1,70 +1,46 @@
-import { test } from 'node:test';
+import './_env.js';
+import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildResults } from '../src/lib/results.js';
+import { buildParameterTree } from '../src/lib/parameters.js';
+import { buildGroupResults, buildStudentResults } from '../src/lib/results.js';
 
-const speed = { id: 'speed', name: 'Speed', unit: null, minValue: 0, maxValue: 10 };
-const balance = { id: 'balance', name: 'Balance', unit: null, minValue: null, maxValue: null };
-const old = { id: 'old', name: 'Old', unit: null, minValue: null, maxValue: null };
-const ghost = { id: 'ghost', name: 'Ghost', unit: null, minValue: null, maxValue: null };
-const parameters = [speed, balance, old, ghost];
-
-const students = [
-  { id: 's1', fullName: 'Ana', studentCode: 'AAAAAAAA' },
-  { id: 's2', fullName: 'Ben', studentCode: 'BBBBBBBB' },
-  { id: 's3', fullName: 'Cleo', studentCode: 'CCCCCCCC' },
+const rows = [
+  { id: 'p', parentId: null, name: 'Parent', unit: 'u', minValue: 0, maxValue: 100, normMin: 40, normMax: 60 },
+  { id: 'c1', parentId: 'p', name: 'C1', unit: 'u', minValue: 10, maxValue: 50, normMin: 20, normMax: 30 },
+  { id: 'c2', parentId: 'p', name: 'C2', unit: 'u', minValue: 5, maxValue: 80, normMin: 25, normMax: 45 },
 ];
+const roots = buildParameterTree(rows);
 
-const evaluations = [
-  { studentId: 's1', parameterId: 'speed', periodNumber: 5, value: 7 },
-  { studentId: 's1', parameterId: 'speed', periodNumber: 4, value: 6 },
-  { studentId: 's2', parameterId: 'speed', periodNumber: 4, value: 3 },
-  { studentId: 's2', parameterId: 'old', periodNumber: 5, value: 2 },
-  { studentId: 'gone', parameterId: 'ghost', periodNumber: 5, value: 9 },
-  { studentId: 's1', parameterId: 'speed', periodNumber: 2, value: 1 },
-];
-
-const usedIds = new Set(['speed', 'balance']);
-
-test('current and previous scores are separated; other periods are ignored', () => {
-  const result = buildResults({ periodNumber: 5, parameters, usedIds, students, evaluations });
-  assert.deepEqual(result.students[0], {
-    id: 's1',
-    fullName: 'Ana',
-    studentCode: 'AAAAAAAA',
-    values: { speed: 7 },
-    previous: { speed: 6 },
+test('buildGroupResults rolls up the group own value and aggregates members', () => {
+  const out = buildGroupResults(roots, {
+    ownValueByLeaf: new Map([['c1', 10], ['c2', 20]]),
+    memberMaps: [
+      { studentId: 's1', valueByLeaf: new Map([['c1', 10], ['c2', 30]]) },
+      { studentId: 's2', valueByLeaf: new Map([['c1', 20], ['c2', 40]]) },
+    ],
   });
-  assert.deepEqual(result.students[1].values, { old: 2 });
-  assert.deepEqual(result.students[1].previous, { speed: 3 });
+  const parent = out.find((r) => r.id === 'p');
+  assert.equal(parent.own, 15); // mean(10, 20)
+  // member p-values: s1 -> mean(10,30)=20, s2 -> mean(20,40)=30
+  assert.deepEqual(parent.members, { avg: 25, min: 20, max: 30, count: 2 });
+  assert.equal(parent.isLeaf, false);
+  assert.deepEqual(parent.effective, { minValue: 5, maxValue: 80, normMin: 20, normMax: 45 });
 });
 
-test('parameters in use are shown, plus ones with scores; scores of deleted students do not count', () => {
-  const result = buildResults({ periodNumber: 5, parameters, usedIds, students, evaluations });
-  assert.deepEqual(
-    result.parameters.map((p) => [p.id, p.inUse]),
-    [
-      ['speed', true],
-      ['balance', true],
-      ['old', false],
-    ]
-  );
+test('buildGroupResults reports null/zero aggregates when there are no members', () => {
+  const out = buildGroupResults(roots, { ownValueByLeaf: new Map([['c1', 10]]) });
+  const leaf = out.find((r) => r.id === 'c1');
+  assert.equal(leaf.own, 10);
+  assert.deepEqual(leaf.members, { avg: null, min: null, max: null, count: 0 });
 });
 
-test('period 1 has no previous scores and students without scores have empty rows', () => {
-  const result = buildResults({
-    periodNumber: 1,
-    parameters,
-    usedIds,
-    students,
-    evaluations: [{ studentId: 's1', parameterId: 'speed', periodNumber: 1, value: 8 }],
-  });
-  assert.deepEqual(result.students[0].values, { speed: 8 });
-  assert.deepEqual(result.students[0].previous, {});
-  assert.deepEqual(result.students[2], {
-    id: 's3',
-    fullName: 'Cleo',
-    studentCode: 'CCCCCCCC',
-    values: {},
-    previous: {},
-  });
+test('buildStudentResults rolls each parameter up for one student', () => {
+  const out = buildStudentResults(roots, new Map([['c1', 10], ['c2', 20]]));
+  assert.deepEqual(out.map((r) => `${r.id}=${r.value}`), ['p=15', 'c1=10', 'c2=20']);
+});
+
+test('results rows carry parentId and DFS depth', () => {
+  const out = buildStudentResults(roots, new Map());
+  assert.deepEqual(out.map((r) => `${r.id}@${r.depth}`), ['p@0', 'c1@1', 'c2@1']);
+  assert.equal(out[1].parentId, 'p');
 });

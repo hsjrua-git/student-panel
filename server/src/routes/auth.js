@@ -7,7 +7,13 @@ import {
   validateNewPassword,
   verifyPassword,
 } from '../lib/passwords.js';
-import { USER_COLUMNS, attachPermissions } from '../lib/users.js';
+import {
+  KEYS,
+  getSetting,
+  isInitialized,
+  setSetting,
+  getPublicSettings,
+} from '../lib/settings.js';
 import { requireLogin } from '../middleware/auth.js';
 
 const router = Router();
@@ -35,55 +41,75 @@ const loginLimiter = rateLimit({
   },
 });
 
+// Mark the current session signed-in. Regenerate first so a pre-login session
+// id can never be reused as a signed-in one (session fixation defence).
+async function signIn(req) {
+  await viaCallback((done) => req.session.regenerate(done));
+  req.session.authed = true;
+  await viaCallback((done) => req.session.save(done));
+}
+
+// The client bootstraps from this: `initialized` decides whether to show the
+// first-run "create a password" screen or the normal login, and `authed` tells
+// it whether a session already exists. Always 200 (no session is not an error).
+router.get('/me', async (req, res) => {
+  const initialized = await isInitialized();
+  const settings = await getPublicSettings();
+  res.json({
+    authed: Boolean(req.authed),
+    initialized,
+    operatorName: settings[KEYS.operatorName] ?? 'operator',
+    appTitle: settings[KEYS.appTitle] ?? null,
+  });
+});
+
+// First-run setup: choose the single password. Only works before initialization.
+router.post('/setup', loginLimiter, async (req, res) => {
+  if (await isInitialized()) {
+    return res.status(409).json({ error: 'A password has already been set.' });
+  }
+  const { password, operatorName } = req.body ?? {};
+  const problem = validateNewPassword(password);
+  if (problem) return res.status(400).json({ error: problem });
+
+  await setSetting(KEYS.passwordHash, await hashPassword(password));
+  await setSetting(KEYS.initialized, 'true');
+  const name =
+    typeof operatorName === 'string' && operatorName.trim()
+      ? operatorName.trim().slice(0, 60)
+      : 'operator';
+  await setSetting(KEYS.operatorName, name);
+
+  await signIn(req);
+  res.json({ authed: true, initialized: true, operatorName: name });
+});
+
 router.post('/login', loginLimiter, async (req, res) => {
-  const username =
-    typeof req.body?.username === 'string'
-      ? req.body.username.trim().toLowerCase()
-      : '';
   const password =
     typeof req.body?.password === 'string' ? req.body.password : '';
-
-  if (!username || !password || password.length > MAX_PASSWORD_LENGTH) {
-    return res.status(400).json({ error: 'Enter your username and password.' });
+  if (!password || password.length > MAX_PASSWORD_LENGTH) {
+    return res.status(400).json({ error: 'Enter your password.' });
+  }
+  if (!(await isInitialized())) {
+    return res
+      .status(409)
+      .json({ error: 'No password has been set yet.', code: 'NOT_INITIALIZED' });
   }
 
-  const result = await pool.query(
-    `SELECT ${USER_COLUMNS}, password_hash AS "passwordHash"
-     FROM users WHERE lower(username) = $1`,
-    [username]
-  );
-  const found = result.rows[0];
-
-  const hash = found ? found.passwordHash : await getDummyHash();
-  const passwordOk = await verifyPassword(hash, password);
-  if (!found || !found.isActive || !passwordOk) {
-    return res.status(401).json({ error: 'Wrong username or password.' });
+  const hash = (await getSetting(KEYS.passwordHash)) ?? (await getDummyHash());
+  const ok = await verifyPassword(hash, password);
+  if (!ok) {
+    return res.status(401).json({ error: 'Wrong password.' });
   }
 
-  await viaCallback((done) => req.session.regenerate(done));
-  req.session.userId = found.id;
-  await viaCallback((done) => req.session.save(done));
-
-  await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [
-    found.id,
-  ]);
-
-  const { passwordHash, ...user } = found;
-  await attachPermissions(user);
-  res.json({ user });
+  await signIn(req);
+  res.json({ authed: true });
 });
 
 router.post('/logout', async (req, res) => {
   await viaCallback((done) => req.session.destroy(done));
   res.clearCookie('sid');
   res.status(204).end();
-});
-
-router.get('/me', (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Not signed in.' });
-  }
-  res.json({ user: req.user });
 });
 
 router.post('/change-password', requireLogin, async (req, res) => {
@@ -96,40 +122,24 @@ router.post('/change-password', requireLogin, async (req, res) => {
   ) {
     return res.status(400).json({ error: 'Enter your current password.' });
   }
-  const problem = validateNewPassword(newPassword, {
-    username: req.user.username,
-  });
-  if (problem) {
-    return res.status(400).json({ error: problem });
-  }
+  const problem = validateNewPassword(newPassword);
+  if (problem) return res.status(400).json({ error: problem });
   if (newPassword === currentPassword) {
     return res.status(400).json({
       error: 'The new password must be different from the current one.',
     });
   }
 
-  const found = await pool.query(
-    'SELECT password_hash AS "passwordHash" FROM users WHERE id = $1',
-    [req.user.id]
-  );
-  if (!(await verifyPassword(found.rows[0].passwordHash, currentPassword))) {
-    return res
-      .status(400)
-      .json({ error: 'The current password is incorrect.' });
+  const hash = await getSetting(KEYS.passwordHash);
+  if (!hash || !(await verifyPassword(hash, currentPassword))) {
+    return res.status(400).json({ error: 'The current password is incorrect.' });
   }
 
-  await pool.query(
-    `UPDATE users
-     SET password_hash = $1, must_change_password = false, updated_at = now()
-     WHERE id = $2`,
-    [await hashPassword(newPassword), req.user.id]
-  );
-  await pool.query(
-    `DELETE FROM user_sessions WHERE (sess->>'userId') = $1 AND sid <> $2`,
-    [req.user.id, req.sessionID]
-  );
+  await setSetting(KEYS.passwordHash, await hashPassword(newPassword));
+  // Sign every other device out; keep this session.
+  await pool.query('DELETE FROM user_sessions WHERE sid <> $1', [req.sessionID]);
 
-  res.json({ user: { ...req.user, mustChangePassword: false } });
+  res.json({ authed: true });
 });
 
 export default router;
