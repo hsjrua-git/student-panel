@@ -121,12 +121,14 @@ test('resetPreferences: forgets stored settings and returns defaults', async () 
   try {
     await updatePreferences({ theme: 'light', studentsShowCode: false });
     const { preferences } = await resetPreferences();
-    assert.equal(preferences.theme, 'system');
+    // The working lineage is dark-first: an unset theme falls back to 'dark'
+    // (lib/preferences.js + lib/theme.js agree on this).
+    assert.equal(preferences.theme, 'dark');
     assert.equal(preferences.studentsShowCode, true);
 
     // And it is gone from storage.
     const read = await getPreferences();
-    assert.equal(read.preferences.theme, 'system');
+    assert.equal(read.preferences.theme, 'dark');
   } finally {
     await pool.end();
   }
