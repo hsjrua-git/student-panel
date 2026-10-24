@@ -17,6 +17,12 @@ const RULES = [
   { method: 'PATCH', pattern: /^\/api\/assignments\/[^/]+$/, action: 'assignment.update', entityType: 'assignment' },
   { method: 'DELETE', pattern: /^\/api\/assignments\/[^/]+$/, action: 'assignment.archive', entityType: 'assignment' },
   { method: 'PATCH', pattern: /^\/api\/sessions\/[^/]+$/, action: 'session.update', entityType: 'session' },
+  { method: 'POST', pattern: /^\/api\/tasks$/, action: 'task.create', entityType: 'task' },
+  { method: 'PATCH', pattern: /^\/api\/tasks\/[^/]+$/, action: 'task.update', entityType: 'task' },
+  { method: 'DELETE', pattern: /^\/api\/tasks\/[^/]+$/, action: 'task.delete', entityType: 'task' },
+  { method: 'POST', pattern: /^\/api\/task-templates$/, action: 'task_template.create', entityType: 'task_template' },
+  { method: 'PATCH', pattern: /^\/api\/task-templates\/[^/]+$/, action: 'task_template.update', entityType: 'task_template' },
+  { method: 'DELETE', pattern: /^\/api\/task-templates\/[^/]+$/, action: 'task_template.archive', entityType: 'task_template' },
   { method: 'POST', pattern: /^\/api\/parameters$/, action: 'parameter.create', entityType: 'parameter' },
   { method: 'PATCH', pattern: /^\/api\/parameters\/[^/]+$/, action: 'parameter.update', entityType: 'parameter' },
   { method: 'POST', pattern: /^\/api\/parameter-changes$/, action: 'parameter_change.create', entityType: 'parameter_change' },
@@ -36,6 +42,7 @@ const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/groups(\/|$)/,
   /^\/api\/field-definitions(\/|$)/,
   /^\/api\/sessions\/generate$/,
+  /^\/api\/tasks\/from-template$/,
 ];
 
 export function normalisePath(url) {

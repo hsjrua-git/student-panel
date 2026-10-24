@@ -19,6 +19,8 @@ const SESSION_COLUMNS = `
   s.canceled_at    AS "canceledAt",
   s.note,
   s.archived_at    AS "archivedAt",
+  (SELECT count(*)::int FROM tasks tk WHERE tk.session_id = s.id)
+                  AS "taskCount",
   a.code           AS "assignmentCode",
   a.name           AS "assignmentName",
   t.full_name      AS "teacherName",

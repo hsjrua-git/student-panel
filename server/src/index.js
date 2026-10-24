@@ -24,6 +24,8 @@ import teachersRouter from './routes/teachers.js';
 import intervalsRouter from './routes/intervals.js';
 import assignmentsRouter from './routes/assignments.js';
 import sessionsRouter from './routes/sessions.js';
+import tasksRouter from './routes/tasks.js';
+import taskTemplatesRouter from './routes/taskTemplates.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -275,6 +277,26 @@ app.use(
     PATCH: 'schedule.manage',
   }),
   sessionsRouter
+);
+app.use(
+  '/api/tasks',
+  authorize({
+    GET: 'schedule.view',
+    POST: 'schedule.manage',
+    PATCH: 'schedule.manage',
+    DELETE: 'schedule.manage',
+  }),
+  tasksRouter
+);
+app.use(
+  '/api/task-templates',
+  authorize({
+    GET: 'schedule.view',
+    POST: 'schedule.manage',
+    PATCH: 'schedule.manage',
+    DELETE: 'schedule.manage',
+  }),
+  taskTemplatesRouter
 );
 app.use(
   '/api/preferences',

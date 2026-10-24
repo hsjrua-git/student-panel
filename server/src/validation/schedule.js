@@ -53,6 +53,44 @@ function requiredIsoDate(input, label) {
   return { value: input };
 }
 
+// Tasks and task templates share their title/description rules.
+export function parseTaskFields(body, { partial = false } = {}) {
+  const updates = {};
+
+  if (!partial || 'title' in body) {
+    if (typeof body?.title !== 'string') {
+      return { error: 'Title is required.' };
+    }
+    const title = body.title.trim().replace(/\s+/g, ' ');
+    if (title.length < 1 || title.length > 120) {
+      return { error: 'Title must be 1 to 120 characters.' };
+    }
+    updates.title = title;
+  }
+
+  if ('description' in body) {
+    const description = body?.description;
+    if (description !== undefined && description !== null && description !== '') {
+      if (typeof description !== 'string' || description.length > 2000) {
+        return { error: 'Description must be 2000 characters or fewer.' };
+      }
+      const trimmed = description.trim();
+      updates.description = trimmed === '' ? null : trimmed;
+    } else {
+      updates.description = null;
+    }
+  }
+
+  if ('sortOrder' in body) {
+    if (!Number.isInteger(body.sortOrder) || body.sortOrder < 0) {
+      return { error: 'Sort order must be a whole number from 0.' };
+    }
+    updates.sortOrder = body.sortOrder;
+  }
+
+  return { value: updates };
+}
+
 // An assignment targets a group (groupId) or exactly one membership
 // (membershipId); teacherId + intervalId + anchorDate are always required.
 // The code may be blank (auto-generated); the name is optional.
