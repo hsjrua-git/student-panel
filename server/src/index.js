@@ -21,6 +21,8 @@ import rolesRouter from './routes/roles.js';
 import groupsRouter from './routes/groups.js';
 import fieldDefinitionsRouter from './routes/fieldDefinitions.js';
 import teachersRouter from './routes/teachers.js';
+import intervalsRouter from './routes/intervals.js';
+import assignmentsRouter from './routes/assignments.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -243,6 +245,26 @@ app.use(
     DELETE: 'teachers.manage',
   }),
   teachersRouter
+);
+app.use(
+  '/api/intervals',
+  authorize({
+    GET: 'schedule.view',
+    POST: 'schedule.manage',
+    PATCH: 'schedule.manage',
+    DELETE: 'schedule.manage',
+  }),
+  intervalsRouter
+);
+app.use(
+  '/api/assignments',
+  authorize({
+    GET: 'schedule.view',
+    POST: 'schedule.manage',
+    PATCH: 'schedule.manage',
+    DELETE: 'schedule.manage',
+  }),
+  assignmentsRouter
 );
 app.use(
   '/api/preferences',
