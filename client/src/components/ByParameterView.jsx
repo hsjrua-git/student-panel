@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Area,
   AreaChart,
@@ -14,6 +15,7 @@ import { buildHistory } from '../lib/history.js';
 import { parameterView } from '../lib/views.js';
 
 function ByParameterView({ evaluations, periods, parameters }) {
+  const { t } = useTranslation(['reports', 'common']);
   const [chosenId, setChosenId] = useState(null);
   const gradientId = useId();
 
@@ -24,7 +26,7 @@ function ByParameterView({ evaluations, periods, parameters }) {
   );
 
   if (columns.length === 0) {
-    return <p>No parameters are in use yet. Add some on the Parameters page.</p>;
+    return <p>{t('shared.noParametersYet')}</p>;
   }
 
   const inUseNow = new Set(list[list.length - 1]?.parameterIds ?? []);
@@ -41,14 +43,14 @@ function ByParameterView({ evaluations, periods, parameters }) {
     periods: list,
   });
   const chartData = points.map((point) => ({
-    label: `P${point.periodNumber}`,
+    label: t('shared.periodNumber', { number: point.periodNumber }),
     value: point.value,
   }));
 
   return (
     <>
       <label className="inline">
-        Parameter
+        {t('shared.parameter')}
         <select
           value={parameterId}
           onChange={(event) => setChosenId(event.target.value)}
@@ -56,27 +58,28 @@ function ByParameterView({ evaluations, periods, parameters }) {
           {columns.map((column) => (
             <option key={column.id} value={column.id}>
               {column.name}
-              {inUseNow.has(column.id) ? '' : ' (not in use now)'}
+              {inUseNow.has(column.id) ? '' : t('byParameter.notInUseNow')}
             </option>
           ))}
         </select>
       </label>
 
       {!stats ? (
-        <p>No scores for {parameter.name} yet.</p>
+        <p>{t('byParameter.noScores', { name: parameter.name })}</p>
       ) : (
         <>
           <p className="summary">
-            Latest <strong>{stats.latest.value}</strong> (Period{' '}
-            {stats.latest.periodNumber}) · Average{' '}
-            <strong>{stats.average}</strong>
+            {t('byParameter.latest')} <strong>{stats.latest.value}</strong>{' '}
+            {t('byParameter.inPeriod', { number: stats.latest.periodNumber })} ·{' '}
+            {t('charts.averageLabel')} <strong>{stats.average}</strong>
             {stats.change !== null && (
               <>
                 {' '}
-                · Since first score <strong>{formatChange(stats.change)}</strong>
+                · {t('byParameter.sinceFirst')}{' '}
+                <strong>{formatChange(stats.change)}</strong>
               </>
             )}{' '}
-            · {stats.count} score{stats.count === 1 ? '' : 's'}
+            · {t('byParameter.scoreCount', { count: stats.count })}
           </p>
 
           <div className="chart-box">
@@ -127,15 +130,15 @@ function ByParameterView({ evaluations, periods, parameters }) {
             <table>
               <thead>
                 <tr>
-                  <th>Period</th>
-                  <th>Dates</th>
-                  <th className="num">Score</th>
+                  <th>{t('shared.period')}</th>
+                  <th>{t('byParameter.dates')}</th>
+                  <th className="num">{t('shared.score')}</th>
                 </tr>
               </thead>
               <tbody>
                 {[...points].reverse().map((point) => (
                   <tr key={point.periodNumber}>
-                    <td>Period {point.periodNumber}</td>
+                    <td>{t('shared.periodNumber', { number: point.periodNumber })}</td>
                     <td>
                       {formatShortIsoDate(point.startDate)} –{' '}
                       {formatShortIsoDate(point.endDate)}

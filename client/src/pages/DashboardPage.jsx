@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { getTrends } from '../api/dashboard.js';
 import { getResults } from '../api/results.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import GroupFilter from '../components/GroupFilter.jsx';
 import CohortHero from '../components/CohortHero.jsx';
 import CohortDrawer from '../components/CohortDrawer.jsx';
@@ -26,6 +28,7 @@ import { formatIsoDate } from '../lib/format.js';
 import { usePeriods } from '../lib/usePeriods.js';
 
 function DashboardPage() {
+  const { t } = useTranslation(['reports', 'common']);
   const { can } = useAuth();
   const periodsQuery = usePeriods();
   const periods = periodsQuery.data;
@@ -63,7 +66,7 @@ function DashboardPage() {
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );
@@ -73,8 +76,8 @@ function DashboardPage() {
       <main>
         <EmptyState
           tone="danger"
-          title="Couldn't load the dashboard"
-          description={periodsQuery.error.message}
+          title={t('dashboard.errorTitle')}
+          description={errorMessage(periodsQuery.error)}
         />
       </main>
     );
@@ -82,21 +85,21 @@ function DashboardPage() {
   if (!periods.anchorDate) {
     return (
       <main>
-        <h1>Dashboard</h1>
+        <h1>{t('dashboard.title')}</h1>
         <SessionAlertsCard />
         {can('settings.manage') ? (
           <EmptyState
-            title="Set up the calendar"
-            description="Set the period start date to begin tracking scores."
+            title={t('setup.title')}
+            description={t('dashboard.setupHint')}
           >
             <p>
-              <Link to="/settings">Go to Settings</Link>
+              <Link to="/settings">{t('setup.goToSettings')}</Link>
             </p>
           </EmptyState>
         ) : (
           <EmptyState
-            title="Not set up yet"
-            description="An administrator needs to set the period start date first."
+            title={t('setup.notSetUpTitle')}
+            description={t('setup.adminNeeded')}
           />
         )}
       </main>
@@ -105,11 +108,11 @@ function DashboardPage() {
   if (periods.current === null) {
     return (
       <main>
-        <h1>Dashboard</h1>
+        <h1>{t('dashboard.title')}</h1>
         <SessionAlertsCard />
         <EmptyState
-          title="Period 1 hasn't started"
-          description="Once the first period begins, results will show up here."
+          title={t('setup.notStartedTitle')}
+          description={t('dashboard.notStartedHint')}
         />
       </main>
     );
@@ -146,11 +149,11 @@ function DashboardPage() {
   return (
     <main className="wide">
       <div className="page-head">
-        <h1>Dashboard</h1>
+        <h1>{t('dashboard.title')}</h1>
         {can('scores.enter') && periodNumber === periods.current && (
           <div className="page-head-actions">
             <Link className="btn primary" to="/evaluate">
-              Enter scores
+              {t('dashboard.enterScores')}
             </Link>
           </div>
         )}
@@ -173,39 +176,46 @@ function DashboardPage() {
         />
       </div>
 
-      {resultsQuery.isPending && <p className="hint">Loading…</p>}
+      {resultsQuery.isPending && (
+        <p className="hint">{t('common:status.loading')}</p>
+      )}
       {resultsQuery.isError && (
-        <p className="error">{resultsQuery.error.message}</p>
+        <p className="error">{errorMessage(resultsQuery.error)}</p>
       )}
 
       {results && (
         <>
           <p className="summary-line">
-            Period {results.periodNumber} ({formatIsoDate(results.startDate)} –{' '}
-            {formatIsoDate(results.endDate)})
+            {t('dashboard.periodLine', {
+              number: results.periodNumber,
+              start: formatIsoDate(results.startDate),
+              end: formatIsoDate(results.endDate),
+            })}
           </p>
           {results.truncated && (
             <p className="hint">
-              Only the first {results.students.length} of {results.total}{' '}
-              students are included.
+              {t('dashboard.truncated', {
+                shown: results.students.length,
+                total: results.total,
+              })}
             </p>
           )}
 
           {results.students.length === 0 ? (
             <EmptyState
-              title="No students yet"
-              description="Add students to start entering and reviewing scores."
+              title={t('dashboard.noStudentsTitle')}
+              description={t('dashboard.noStudentsHint')}
             >
               {can('students.create') && (
                 <p>
-                  <Link to="/students">Go to Students</Link>
+                  <Link to="/students">{t('dashboard.goToStudents')}</Link>
                 </p>
               )}
             </EmptyState>
           ) : results.parameters.length === 0 ? (
             <EmptyState
-              title="Nothing measured this period"
-              description="No parameters were used in this period, and no scores were entered yet."
+              title={t('dashboard.nothingMeasuredTitle')}
+              description={t('dashboard.nothingMeasuredHint')}
             />
           ) : (
             <>
@@ -217,7 +227,7 @@ function DashboardPage() {
               />
 
               <section>
-                <h2>Needs scoring</h2>
+                <h2>{t('dashboard.needsScoring')}</h2>
                 <UnmeasuredList items={unmeasured} />
               </section>
             </>
@@ -229,7 +239,9 @@ function DashboardPage() {
         open={openTarget?.type === 'parameter' && Boolean(openStat)}
         stat={openStat}
         trend={openTrend}
-        trendError={trendsQuery.isError ? trendsQuery.error.message : null}
+        trendError={
+          trendsQuery.isError ? errorMessage(trendsQuery.error) : null
+        }
         onClose={closeDrawer}
       />
       <StudentDrawer

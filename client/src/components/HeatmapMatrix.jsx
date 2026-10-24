@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { buildHeatmap } from '../lib/heatmap.js';
 
 // A student × axis matrix, each cell shaded by where the score sits in the
@@ -16,6 +17,7 @@ function truncate(text, max = 20) {
 }
 
 function HeatmapMatrix({ cube, axis = 'period', parameterId = null, periodNumber = null }) {
+  const { t } = useTranslation(['reports', 'common']);
   const model = useMemo(
     () => buildHeatmap(cube, { axis, parameterId, periodNumber }),
     [cube, axis, parameterId, periodNumber]
@@ -23,15 +25,15 @@ function HeatmapMatrix({ cube, axis = 'period', parameterId = null, periodNumber
 
   const { rows, columns, cells } = model;
   if (rows.length === 0 || columns.length === 0) {
-    return <p className="hint">Nothing to chart for this scope.</p>;
+    return <p className="hint">{t('heatmap.empty')}</p>;
   }
 
   const width = LEFT + columns.length * CELL_W;
   const height = TOP + rows.length * CELL_H;
   const caption =
     axis === 'parameter'
-      ? `Period ${model.periodNumber ?? '—'} · columns are parameters`
-      : `${model.parameterName ?? '—'} · columns are periods`;
+      ? t('heatmap.captionParameter', { number: model.periodNumber ?? '—' })
+      : t('heatmap.captionPeriod', { name: model.parameterName ?? '—' });
 
   return (
     <div className="chart-box">
@@ -43,7 +45,7 @@ function HeatmapMatrix({ cube, axis = 'period', parameterId = null, periodNumber
           height={height}
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={`Heatmap — ${caption}`}
+          aria-label={t('heatmap.aria', { caption })}
         >
           {columns.map((column, columnIndex) => (
             <text
@@ -89,8 +91,16 @@ function HeatmapMatrix({ cube, axis = 'period', parameterId = null, periodNumber
                     style={{ fill, stroke: 'var(--surface)', strokeWidth: 1 }}
                   >
                     <title>
-                      {row.label} — {column.label}:{' '}
-                      {cell.value === null ? 'no score' : cell.value}
+                      {cell.value === null
+                        ? t('heatmap.cellNoScore', {
+                            row: row.label,
+                            column: column.label,
+                          })
+                        : t('heatmap.cellScore', {
+                            row: row.label,
+                            column: column.label,
+                            value: cell.value,
+                          })}
                     </title>
                   </rect>
                   {cell.value !== null && (

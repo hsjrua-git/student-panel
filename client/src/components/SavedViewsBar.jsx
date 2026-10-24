@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 function SavedViewsBar({
   views,
   activeId,
@@ -11,16 +13,18 @@ function SavedViewsBar({
   onDelete,
   onReset,
 }) {
+  const { t } = useTranslation(['reports', 'common']);
+
   return (
     <>
       <div className="views-bar">
         <label className="inline">
-          View
+          {t('savedViews.label')}
           <select
             value={activeId ?? ''}
             onChange={(event) => onLoad(event.target.value || null)}
           >
-            <option value="">Unsaved view</option>
+            <option value="">{t('savedViews.unsaved')}</option>
             {views.map((view) => (
               <option key={view.id} value={view.id}>
                 {view.name}
@@ -34,7 +38,7 @@ function SavedViewsBar({
           onClick={onSaveAs}
           disabled={busy}
         >
-          Save as new…
+          {t('savedViews.saveAs')}
         </button>
         {activeId && (
           <>
@@ -44,10 +48,10 @@ function SavedViewsBar({
               onClick={onUpdate}
               disabled={busy || !dirty}
             >
-              Update view
+              {t('savedViews.update')}
             </button>
             <button type="button" onClick={onRename} disabled={busy}>
-              Rename…
+              {t('savedViews.rename')}
             </button>
             <button
               type="button"
@@ -55,14 +59,16 @@ function SavedViewsBar({
               onClick={onDelete}
               disabled={busy}
             >
-              Delete view
+              {t('savedViews.delete')}
             </button>
           </>
         )}
         <button type="button" className="quiet" onClick={onReset}>
-          Reset
+          {t('common:actions.reset')}
         </button>
-        {activeId && dirty && <span className="hint">Changed since saved</span>}
+        {activeId && dirty && (
+          <span className="hint">{t('savedViews.dirty')}</span>
+        )}
       </div>
       {error && <p className="error">{error}</p>}
     </>

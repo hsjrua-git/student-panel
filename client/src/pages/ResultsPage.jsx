@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { getResults } from '../api/results.js';
 import {
   createSavedView,
@@ -9,6 +10,7 @@ import {
   updateSavedView,
 } from '../api/savedViews.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import EmptyState from '../components/EmptyState.jsx';
 import FilterEditor from '../components/FilterEditor.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
@@ -35,6 +37,7 @@ const EMPTY = [];
 
 function ResultsPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation(['reports', 'common']);
   const { can } = useAuth();
   const periodsQuery = usePeriods();
   const periods = periodsQuery.data;
@@ -92,9 +95,9 @@ function ResultsPage() {
 
   const busy = create.isPending || update.isPending || remove.isPending;
   const actionError =
-    create.error?.message ??
-    update.error?.message ??
-    remove.error?.message ??
+    errorMessage(create.error) ||
+    errorMessage(update.error) ||
+    errorMessage(remove.error) ||
     null;
 
   function resetErrors() {
@@ -147,7 +150,7 @@ function ResultsPage() {
   }
 
   function handleSaveAs() {
-    const name = window.prompt('Name for this view (up to 60 characters):');
+    const name = window.prompt(t('results.promptName'));
     if (name === null || name.trim() === '') return;
     resetErrors();
     create.mutate({ name, config: normalizeConfig(config) });
@@ -162,14 +165,15 @@ function ResultsPage() {
   }
 
   function handleRename() {
-    const name = window.prompt('New name:', activeView.name);
+    const name = window.prompt(t('results.promptRename'), activeView.name);
     if (name === null || name.trim() === '') return;
     resetErrors();
     update.mutate({ id: activeView.id, fields: { name } });
   }
 
   function handleDelete() {
-    if (!window.confirm(`Delete the view "${activeView.name}"?`)) return;
+    if (!window.confirm(t('results.confirmDelete', { name: activeView.name })))
+      return;
     resetErrors();
     remove.mutate(activeView.id);
   }
@@ -185,7 +189,7 @@ function ResultsPage() {
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );
@@ -195,8 +199,8 @@ function ResultsPage() {
       <main>
         <EmptyState
           tone="danger"
-          title="Couldn't load results"
-          description={periodsQuery.error.message}
+          title={t('results.errorTitle')}
+          description={errorMessage(periodsQuery.error)}
         />
       </main>
     );
@@ -204,18 +208,18 @@ function ResultsPage() {
   if (!periods.anchorDate) {
     return (
       <main>
-        <h1>Results</h1>
+        <h1>{t('results.title')}</h1>
         <EmptyState
-          title="Set up the calendar"
+          title={t('setup.title')}
           description={
             can('settings.manage')
-              ? 'Set the period start date first, then results will appear here.'
-              : 'An administrator needs to set the period start date first.'
+              ? t('results.setupHint')
+              : t('setup.adminNeeded')
           }
         >
           {can('settings.manage') && (
             <p>
-              <Link to="/settings">Go to Settings</Link>
+              <Link to="/settings">{t('setup.goToSettings')}</Link>
             </p>
           )}
         </EmptyState>
@@ -225,10 +229,10 @@ function ResultsPage() {
   if (periods.current === null) {
     return (
       <main>
-        <h1>Results</h1>
+        <h1>{t('results.title')}</h1>
         <EmptyState
-          title="Period 1 hasn't started"
-          description="Once the first period begins, results will appear here."
+          title={t('setup.notStartedTitle')}
+          description={t('results.notStartedHint')}
         />
       </main>
     );
@@ -241,11 +245,8 @@ function ResultsPage() {
 
   return (
     <main className="wide results">
-      <h1>Results</h1>
-      <p className="hint">
-        Compare all students in one period. Filter, sort, and save the setup as
-        a named view.
-      </p>
+      <h1>{t('results.title')}</h1>
+      <p className="hint">{t('results.subtitle')}</p>
 
       <div className="toolbar">
         <PeriodPicker
@@ -276,8 +277,8 @@ function ResultsPage() {
           className="search"
           value={config.search}
           onChange={(event) => patch({ search: event.target.value })}
-          placeholder="Search by name or code"
-          aria-label="Search students"
+          placeholder={t('results.searchPlaceholder')}
+          aria-label={t('results.searchLabel')}
         />
         <label className="inline">
           <input
@@ -285,11 +286,11 @@ function ResultsPage() {
             checked={config.showChange}
             onChange={(event) => patch({ showChange: event.target.checked })}
           />
-          Show change vs previous period
+          {t('results.showChange')}
         </label>
         {can('data.export') && (
           <ExportButton
-            label="Export this table (CSV)"
+            label={t('results.exportCsv')}
             filename={`results-period-${periodNumber}.csv`}
             disabled={!data || parameters.length === 0 || view.rows.length === 0}
             buildRows={() =>
@@ -318,7 +319,10 @@ function ResultsPage() {
       {parameters.length > 0 && (
         <details className="panel">
           <summary>
-            Columns ({columns.length} of {parameters.length})
+            {t('results.columnsSummary', {
+              chosen: columns.length,
+              total: parameters.length,
+            })}
           </summary>
           <div className="columns-list">
             {parameters.map((parameter) => (
@@ -345,7 +349,7 @@ function ResultsPage() {
       )}
 
       <section className="section-card">
-        <h2 className="group-title">Filters</h2>
+        <h2 className="group-title">{t('filter.title')}</h2>
         <FilterEditor
           filters={config.filters}
           parameters={parameters}
@@ -353,17 +357,23 @@ function ResultsPage() {
         />
       </section>
 
-      {resultsQuery.isPending && <p className="hint">Loading…</p>}
+      {resultsQuery.isPending && (
+        <p className="hint">{t('common:status.loading')}</p>
+      )}
       {resultsQuery.isError && (
-        <p className="error">{resultsQuery.error.message}</p>
+        <p className="error">{errorMessage(resultsQuery.error)}</p>
       )}
 
       {data && (
         <section className="section-card">
           <p className="summary-line">
-            Period {data.periodNumber} ({formatIsoDate(data.startDate)} –{' '}
-            {formatIsoDate(data.endDate)}) · Showing {view.rows.length} of{' '}
-            {students.length} students
+            {t('results.summaryLine', {
+              number: data.periodNumber,
+              start: formatIsoDate(data.startDate),
+              end: formatIsoDate(data.endDate),
+              shown: view.rows.length,
+              total: students.length,
+            })}
           </p>
           {filterTexts.length > 0 && (
             <span className="chip-row">
@@ -379,31 +389,29 @@ function ResultsPage() {
           )}
           {data.truncated && (
             <p className="hint">
-              Only the first {students.length} of {data.total} students are
-              included.
+              {t('results.truncated', {
+                shown: students.length,
+                total: data.total,
+              })}
             </p>
           )}
           {view.ignoredFilters > 0 && (
             <p className="hint">
-              {view.ignoredFilters} filter{view.ignoredFilters === 1 ? '' : 's'}{' '}
-              refer to parameters this period does not use, and{' '}
-              {view.ignoredFilters === 1 ? 'is' : 'are'} ignored.
+              {t('results.ignoredFilters', { count: view.ignoredFilters })}
             </p>
           )}
 
           {parameters.length === 0 ? (
-            <p>
-              No parameters were used in this period and no scores were entered.
-            </p>
+            <p>{t('results.noParameters')}</p>
           ) : view.rows.length === 0 ? (
             <p>
-              No students match.{' '}
+              {t('results.noMatch')}{' '}
               <button
                 type="button"
                 className="quiet"
                 onClick={() => patch({ filters: [], search: '' })}
               >
-                Clear filters and search
+                {t('results.clearFilters')}
               </button>
             </p>
           ) : (

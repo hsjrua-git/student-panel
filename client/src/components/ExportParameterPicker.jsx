@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // The "what parameters" selector: all parameters, or a chosen subset. `value`
 // is the config.parameters slice ({ mode, ids }); `parameters` is the full list
 // (already loaded by the page). Mirrors the Results "Columns" multiselect.
 function ExportParameterPicker({ value, parameters, onChange }) {
+  const { t } = useTranslation(['reports', 'common']);
   const [search, setSearch] = useState('');
   const selecting = value.mode === 'selection';
   const selected = useMemo(() => new Set(value.ids), [value.ids]);
@@ -24,7 +26,7 @@ function ExportParameterPicker({ value, parameters, onChange }) {
 
   return (
     <fieldset className="export-fieldset">
-      <legend>Parameters</legend>
+      <legend>{t('pickers.parametersLegend')}</legend>
       <div className="radio-row">
         <label className="inline">
           <input
@@ -33,7 +35,7 @@ function ExportParameterPicker({ value, parameters, onChange }) {
             checked={value.mode === 'all'}
             onChange={() => setMode('all')}
           />
-          All parameters
+          {t('pickers.allParameters')}
         </label>
         <label className="inline">
           <input
@@ -42,7 +44,7 @@ function ExportParameterPicker({ value, parameters, onChange }) {
             checked={value.mode === 'selection'}
             onChange={() => setMode('selection')}
           />
-          Pick parameters
+          {t('pickers.pickParameters')}
         </label>
       </div>
 
@@ -54,12 +56,12 @@ function ExportParameterPicker({ value, parameters, onChange }) {
               className="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search parameters"
-              aria-label="Search parameters"
+              placeholder={t('pickers.searchParameters')}
+              aria-label={t('pickers.searchParameters')}
             />
           )}
           <p className="hint">
-            {value.ids.length} selected
+            {t('pickers.selected', { count: value.ids.length })}
             {value.ids.length > 0 && (
               <>
                 {' · '}
@@ -68,7 +70,7 @@ function ExportParameterPicker({ value, parameters, onChange }) {
                   className="quiet"
                   onClick={() => onChange({ ...value, ids: [] })}
                 >
-                  Clear
+                  {t('pickers.clear')}
                 </button>
               </>
             )}
@@ -84,7 +86,9 @@ function ExportParameterPicker({ value, parameters, onChange }) {
                 {parameter.name}
               </label>
             ))}
-            {shown.length === 0 && <p className="hint">No parameters match.</p>}
+            {shown.length === 0 && (
+              <p className="hint">{t('pickers.noParametersMatch')}</p>
+            )}
           </div>
         </div>
       )}

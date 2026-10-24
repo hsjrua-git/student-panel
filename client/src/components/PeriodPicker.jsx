@@ -1,23 +1,25 @@
+import { useTranslation } from 'react-i18next';
 import { formatIsoDate } from '../lib/format.js';
 
 function PeriodPicker({ periods, value, onChange }) {
+  const { t } = useTranslation(['reports', 'common']);
   const list = periods.periods;
   const selected = list.find((period) => period.number === value);
 
   return (
     <div className="period-picker">
       <button type="button" onClick={() => onChange(value - 1)} disabled={value <= 1}>
-        Previous
+        {t('periodPicker.previous')}
       </button>
       <select
-        aria-label="Period"
+        aria-label={t('shared.period')}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       >
         {[...list].reverse().map((period) => (
           <option key={period.number} value={period.number}>
-            Period {period.number}
-            {period.number === periods.current ? ' (current)' : ''}
+            {t('shared.periodNumber', { number: period.number })}
+            {period.number === periods.current ? t('shared.currentSuffix') : ''}
           </option>
         ))}
       </select>
@@ -26,11 +28,14 @@ function PeriodPicker({ periods, value, onChange }) {
         onClick={() => onChange(value + 1)}
         disabled={value >= periods.current}
       >
-        Next
+        {t('periodPicker.next')}
       </button>
       {selected && (
         <span className="hint">
-          {formatIsoDate(selected.startDate)} to {formatIsoDate(selected.endDate)}
+          {t('periodPicker.range', {
+            start: formatIsoDate(selected.startDate),
+            end: formatIsoDate(selected.endDate),
+          })}
         </span>
       )}
     </div>

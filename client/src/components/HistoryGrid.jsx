@@ -1,21 +1,23 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatParameterHint, formatShortIsoDate } from '../lib/format.js';
 import { buildHistory, visibleRows } from '../lib/history.js';
 
 function Cell({ cell }) {
+  const { t } = useTranslation(['reports', 'common']);
   if (cell.state === 'value') {
     return <td className="num">{cell.value}</td>;
   }
   if (cell.state === 'missing') {
     return (
-      <td className="num muted" title="In use, but not measured">
+      <td className="num muted" title={t('history.inUseNotMeasured')}>
         —
       </td>
     );
   }
   return (
-    <td className="num na" title="Not used in this period">
-      n/a
+    <td className="num na" title={t('shared.notUsedThisPeriod')}>
+      {t('history.na')}
     </td>
   );
 }
@@ -26,6 +28,7 @@ function HistoryGrid({
   parameters,
   initialShowAll = false,
 }) {
+  const { t } = useTranslation(['reports', 'common']);
   const [showAll, setShowAll] = useState(initialShowAll);
 
   const history = useMemo(
@@ -38,9 +41,9 @@ function HistoryGrid({
   );
 
   if (history.columns.length === 0) {
-    return <p>No parameters are in use yet. Add some on the Parameters page.</p>;
+    return <p>{t('shared.noParametersYet')}</p>;
   }
-  if (rows.length === 0) return <p>No periods have started yet.</p>;
+  if (rows.length === 0) return <p>{t('history.noPeriods')}</p>;
 
   return (
     <>
@@ -50,18 +53,15 @@ function HistoryGrid({
           checked={showAll}
           onChange={(event) => setShowAll(event.target.checked)}
         />
-        Show all periods
+        {t('history.showAll')}
       </label>
-      <p className="hint">
-        Periods before the first score are hidden. "—" means the parameter was
-        in use but not measured. "n/a" means it was not used that period.
-      </p>
+      <p className="hint">{t('history.legend')}</p>
 
       <div className="table-wrap">
         <table className="history">
           <thead>
             <tr>
-              <th>Period</th>
+              <th>{t('shared.period')}</th>
               {history.columns.map((parameter) => (
                 <th key={parameter.id} className="num">
                   {parameter.name}
@@ -74,7 +74,7 @@ function HistoryGrid({
             {rows.map((row) => (
               <tr key={row.periodNumber}>
                 <th scope="row">
-                  Period {row.periodNumber}
+                  {t('shared.periodNumber', { number: row.periodNumber })}
                   <div className="hint">
                     {formatShortIsoDate(row.startDate)} –{' '}
                     {formatShortIsoDate(row.endDate)}

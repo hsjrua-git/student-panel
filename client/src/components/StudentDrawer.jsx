@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatChange, formatStudentCode } from '../lib/format.js';
 import { CloseIcon } from './icons.jsx';
 import Drawer from './Drawer.jsx';
@@ -10,6 +11,7 @@ import Drawer from './Drawer.jsx';
 // control — opens straight away with no extra fetch. The core, satellites and
 // nodes each open a matching drawer; this is the node's.
 function StudentBody({ breakdown, titleId, onClose }) {
+  const { t } = useTranslation(['reports', 'common']);
   const { fullName, studentCode, measured, inUse, rows } = breakdown;
 
   return (
@@ -25,28 +27,26 @@ function StudentBody({ breakdown, titleId, onClose }) {
           type="button"
           className="drawer-close"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t('common:actions.close')}
         >
           <CloseIcon size={18} />
         </button>
       </header>
 
       <p className="summary">
-        <strong>
-          {measured} of {inUse}
-        </strong>{' '}
-        measured this period
+        <strong>{t('shared.of', { a: measured, b: inUse })}</strong>{' '}
+        {t('studentDrawer.measuredThisPeriod')}
       </p>
 
       {rows.length === 0 ? (
-        <p>No parameters are in use this period.</p>
+        <p>{t('studentDrawer.noParameters')}</p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th scope="col">Parameter</th>
-              <th scope="col">Score</th>
-              <th scope="col">Change</th>
+              <th scope="col">{t('shared.parameter')}</th>
+              <th scope="col">{t('shared.score')}</th>
+              <th scope="col">{t('studentDrawer.change')}</th>
             </tr>
           </thead>
           <tbody>

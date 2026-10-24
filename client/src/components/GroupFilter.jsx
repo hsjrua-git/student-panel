@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listGroups } from '../api/groups.js';
 
 // Build the same indented, tree-ordered list the Groups page uses.
@@ -19,7 +20,8 @@ function orderTree(groups) {
 }
 
 // A dropdown that lets the user narrow a page to one group (and its subgroups).
-function GroupFilter({ value, onChange, label = 'Group' }) {
+function GroupFilter({ value, onChange, label }) {
+  const { t } = useTranslation(['reports', 'common']);
   const { data } = useQuery({ queryKey: ['groups'], queryFn: () => listGroups() });
   const ordered = useMemo(() => (data ? orderTree(data) : []), [data]);
 
@@ -27,9 +29,9 @@ function GroupFilter({ value, onChange, label = 'Group' }) {
 
   return (
     <label className="group-filter">
-      {label}
+      {label ?? t('groupFilter.label')}
       <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">All students</option>
+        <option value="">{t('shared.allStudents')}</option>
         {ordered.map((group) => (
           <option key={group.id} value={group.id}>
             {'  '.repeat(group.depth)}

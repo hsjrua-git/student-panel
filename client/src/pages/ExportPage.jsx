@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useReducer, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { usePeriods } from '../lib/usePeriods.js';
 import { listParameters, listParameterChanges } from '../api/parameters.js';
 import { fetchAuditTrail } from '../api/audit.js';
@@ -11,6 +12,7 @@ import {
   includesTabular,
   mergePrefill,
 } from '../lib/exportConfig.js';
+import { errorMessage } from '../i18n/errors.js';
 import EmptyState from '../components/EmptyState.jsx';
 import FilterEditor from '../components/FilterEditor.jsx';
 import ExportStudentPicker from '../components/ExportStudentPicker.jsx';
@@ -32,6 +34,7 @@ function reducer(state, patch) {
 }
 
 function ExportPage() {
+  const { t } = useTranslation(['reports', 'common']);
   const location = useLocation();
   const periodsQuery = usePeriods();
   const periods = periodsQuery.data;
@@ -113,7 +116,7 @@ function ExportPage() {
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );
@@ -123,8 +126,8 @@ function ExportPage() {
       <main>
         <EmptyState
           tone="danger"
-          title="Couldn't open the Export Center"
-          description={periodsQuery.error.message}
+          title={t('export.errorTitle')}
+          description={errorMessage(periodsQuery.error)}
         />
       </main>
     );
@@ -132,10 +135,10 @@ function ExportPage() {
   if (!periods.anchorDate) {
     return (
       <main>
-        <h1>Export Center</h1>
+        <h1>{t('export.title')}</h1>
         <EmptyState
-          title="Set up the calendar"
-          description="An administrator needs to set the period start date before there is anything to export."
+          title={t('setup.title')}
+          description={t('export.setupHint')}
         />
       </main>
     );
@@ -143,10 +146,10 @@ function ExportPage() {
   if (periods.current === null) {
     return (
       <main>
-        <h1>Export Center</h1>
+        <h1>{t('export.title')}</h1>
         <EmptyState
-          title="Period 1 hasn't started"
-          description="Once the first period begins there will be data to export."
+          title={t('setup.notStartedTitle')}
+          description={t('export.notStartedHint')}
         />
       </main>
     );
@@ -160,12 +163,8 @@ function ExportPage() {
 
   return (
     <main className="wide export-center">
-      <h1>Export Center</h1>
-      <p className="hint">
-        Export any slice of the data — pick the students, parameters, and periods,
-        choose what to include (scores, changes, charts) and a format, then run it.
-        A single selection downloads one file; several are bundled into one ZIP.
-      </p>
+      <h1>{t('export.title')}</h1>
+      <p className="hint">{t('export.subtitle')}</p>
 
       <div className="export-layout">
         <div className="export-config">
@@ -184,7 +183,7 @@ function ExportPage() {
             onChange={(next) => dispatch({ periods: next })}
           />
           <section className="section-card">
-            <h2 className="group-title">Filters</h2>
+            <h2 className="group-title">{t('filter.title')}</h2>
             <FilterEditor
               filters={config.filters}
               parameters={parameters}
@@ -233,21 +232,22 @@ function ExportPage() {
           </div>
 
           {scope.periods.length === 0 && (
-            <p className="hint">No periods selected yet.</p>
+            <p className="hint">{t('export.noPeriods')}</p>
           )}
           {cubeQuery.isPending && scope.periods.length > 0 && (
-            <p className="hint">Loading data…</p>
+            <p className="hint">{t('export.loadingData')}</p>
           )}
           {cubeQuery.isError && (
-            <p className="error">{cubeQuery.error.message}</p>
+            <p className="error">{errorMessage(cubeQuery.error)}</p>
           )}
           {(changesLoading || auditLoading) && (
-            <p className="hint">Loading change history…</p>
+            <p className="hint">{t('export.loadingChanges')}</p>
           )}
           {truncated && (
             <p className="hint">
-              This export is capped at {cubeQuery.data.students.length} students —
-              narrow the scope (a group or a selection) to include everyone.
+              {t('export.truncated', {
+                count: cubeQuery.data.students.length,
+              })}
             </p>
           )}
 
@@ -255,7 +255,7 @@ function ExportPage() {
             (includesTabular(config) || config.charts.length > 0 ? (
               <ExportPreview config={config} cube={cube} registerChart={registerChart} />
             ) : (
-              <p className="hint">Choose something to export to see a preview.</p>
+              <p className="hint">{t('export.chooseSomething')}</p>
             ))}
         </div>
       </div>

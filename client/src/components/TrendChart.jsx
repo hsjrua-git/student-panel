@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   CartesianGrid,
   Legend,
@@ -18,6 +19,7 @@ import { CHART_TOOLTIP, seriesClass } from '../lib/chartTheme.js';
 // the geometry is final the moment it paints — the Export run captures this very
 // SVG, and a mid-tween capture would freeze half-drawn lines.
 function TrendChart({ cube, parameterIds }) {
+  const { t } = useTranslation(['reports', 'common']);
   const ids = useMemo(() => new Set(parameterIds), [parameterIds]);
   const params = useMemo(
     () => cube.parameters.filter((parameter) => ids.has(parameter.id)),
@@ -30,17 +32,17 @@ function TrendChart({ cube, parameterIds }) {
       points: cohortAverages(cube, parameter.id),
     }));
     return cube.periods.map((period, index) => {
-      const row = { label: `P${period.number}` };
+      const row = { label: t('shared.periodNumber', { number: period.number }) };
       for (const item of series) row[item.parameter.id] = item.points[index].average;
       return row;
     });
-  }, [cube, params]);
+  }, [cube, params, t]);
 
   if (params.length === 0) {
-    return <p className="hint">Choose at least one parameter to plot.</p>;
+    return <p className="hint">{t('charts.trendNeedParameter')}</p>;
   }
   if (cube.periods.length === 0) {
-    return <p className="hint">No periods in range.</p>;
+    return <p className="hint">{t('charts.noPeriods')}</p>;
   }
 
   return (

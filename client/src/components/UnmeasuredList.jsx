@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { formatStudentCode } from '../lib/format.js';
 
 const SHOWN = 20;
@@ -9,12 +10,10 @@ const SHOWN = 20;
 // A horizontal rail keeps the glowing hero the page's vertical focus instead of
 // a long list pushing everything down.
 function UnmeasuredList({ items }) {
+  const { t } = useTranslation(['reports', 'common']);
+
   if (items.length === 0) {
-    return (
-      <p className="needs-clear">
-        Every student has a score for every parameter in use.
-      </p>
-    );
+    return <p className="needs-clear">{t('unmeasured.clear')}</p>;
   }
 
   const shown = items.slice(0, SHOWN);
@@ -23,8 +22,7 @@ function UnmeasuredList({ items }) {
   return (
     <>
       <p className="hint">
-        {items.length} student{items.length === 1 ? '' : 's'} still need a score
-        {items.length > 1 ? ' — most incomplete first' : ''}.
+        {t('unmeasured.needsScore', { count: items.length })}
       </p>
       <ul className="needs-rail">
         {shown.map((item) => (
@@ -48,7 +46,7 @@ function UnmeasuredList({ items }) {
         ))}
         {rest > 0 && (
           <li className="needs-ticket needs-more" aria-hidden="true">
-            +{rest} more
+            {t('unmeasured.more', { count: rest })}
           </li>
         )}
       </ul>

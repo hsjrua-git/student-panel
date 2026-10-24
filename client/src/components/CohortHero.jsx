@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import CompletionHub from './CompletionHub.jsx';
 import { useReducedMotion } from '../lib/useReducedMotion.js';
 import { hasWebGL } from '../lib/webgl.js';
@@ -20,6 +21,7 @@ const CohortConstellation = lazyWithReload(() =>
 // element is needed here.
 export default function CohortHero(props) {
   const reduced = useReducedMotion();
+  const { t } = useTranslation(['reports', 'common']);
 
   if (reduced || !hasWebGL()) {
     return <CompletionHub {...props} />;
@@ -27,7 +29,7 @@ export default function CohortHero(props) {
 
   return (
     <Suspense fallback={<CompletionHub {...props} />}>
-      <section className="cohort-hero" aria-label="Class measurement overview">
+      <section className="cohort-hero" aria-label={t('cohort.heroLabel')}>
         <CohortConstellation {...props} />
       </section>
     </Suspense>

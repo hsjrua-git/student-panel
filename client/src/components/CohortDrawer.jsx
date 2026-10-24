@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CloseIcon } from './icons.jsx';
 import Drawer from './Drawer.jsx';
 
@@ -8,6 +9,7 @@ import Drawer from './Drawer.jsx';
 // numbers, since this is the overview the core stands in for at rest. Opened by
 // clicking the core or its focusable "Class summary" control.
 function CohortBody({ summary, titleId, onClose }) {
+  const { t } = useTranslation(['reports', 'common']);
   const {
     completion,
     students,
@@ -20,22 +22,22 @@ function CohortBody({ summary, titleId, onClose }) {
   } = summary;
 
   const rows = [
-    { key: 'full', label: 'Fully measured', value: studentsComplete },
-    { key: 'partial', label: 'Partly measured', value: studentsPartial },
-    { key: 'none', label: 'Not started', value: studentsNone },
+    { key: 'full', label: t('cohort.fullyMeasured'), value: studentsComplete },
+    { key: 'partial', label: t('cohort.partlyMeasured'), value: studentsPartial },
+    { key: 'none', label: t('cohort.notStarted'), value: studentsNone },
   ];
 
   return (
     <>
       <header className="drawer-head">
         <h2 id={titleId} className="drawer-title">
-          Class summary
+          {t('cohort.classSummary')}
         </h2>
         <button
           type="button"
           className="drawer-close"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={t('common:actions.close')}
         >
           <CloseIcon size={18} />
         </button>
@@ -43,12 +45,16 @@ function CohortBody({ summary, titleId, onClose }) {
 
       <p className="summary">
         {completion === null ? (
-          'Nothing measured this period yet.'
+          t('cohort.nothingYet')
         ) : (
           <>
-            <strong>{completion}%</strong> of expected scores recorded — {measured}{' '}
-            of {expected} across {students} student{students === 1 ? '' : 's'} and{' '}
-            {parametersInUse} parameter{parametersInUse === 1 ? '' : 's'} in use.
+            <strong>{completion}%</strong>{' '}
+            {t('cohort.recordedTail', {
+              measured,
+              expected,
+              students,
+              parametersInUse,
+            })}
           </>
         )}
       </p>
@@ -56,7 +62,7 @@ function CohortBody({ summary, titleId, onClose }) {
       <table>
         <thead>
           <tr>
-            <th scope="col">Students</th>
+            <th scope="col">{t('cohort.students')}</th>
             <th scope="col">{students}</th>
           </tr>
         </thead>

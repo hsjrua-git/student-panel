@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // The "which periods" selector: all periods, a from–to range, or a hand-picked
 // set. `value` is the config.periods slice ({ mode, from, to, numbers });
 // `periods` is the loaded calendar ({ periods:[{number}], current }). Only
 // periods that have started (≤ current) are offered.
 function PeriodRangePicker({ value, periods, onChange }) {
+  const { t } = useTranslation(['reports', 'common']);
   // Destructure `current` into a local so the memo below reads a plain variable
   // rather than a `.current` property — the React Compiler otherwise mistakes
   // `periods.current` for a ref access and skips optimizing the component.
@@ -39,7 +41,7 @@ function PeriodRangePicker({ value, periods, onChange }) {
 
   return (
     <fieldset className="export-fieldset">
-      <legend>Periods</legend>
+      <legend>{t('periodRange.legend')}</legend>
       <div className="radio-row">
         <label className="inline">
           <input
@@ -48,7 +50,7 @@ function PeriodRangePicker({ value, periods, onChange }) {
             checked={value.mode === 'all'}
             onChange={() => setMode('all')}
           />
-          All periods
+          {t('periodRange.all')}
         </label>
         <label className="inline">
           <input
@@ -57,7 +59,7 @@ function PeriodRangePicker({ value, periods, onChange }) {
             checked={value.mode === 'range'}
             onChange={() => setMode('range')}
           />
-          Range
+          {t('periodRange.range')}
         </label>
         <label className="inline">
           <input
@@ -66,34 +68,34 @@ function PeriodRangePicker({ value, periods, onChange }) {
             checked={value.mode === 'selection'}
             onChange={() => setMode('selection')}
           />
-          Pick periods
+          {t('periodRange.pick')}
         </label>
       </div>
 
       {value.mode === 'range' && (
         <div className="range-row">
           <label className="inline">
-            From
+            {t('periodRange.from')}
             <select value={from} onChange={(event) => setFrom(Number(event.target.value))}>
               {available.map((number) => (
                 <option key={number} value={number}>
-                  Period {number}
+                  {t('shared.periodNumber', { number })}
                 </option>
               ))}
             </select>
           </label>
           <label className="inline">
-            To
+            {t('periodRange.to')}
             <select value={to} onChange={(event) => setTo(Number(event.target.value))}>
               {available.map((number) => (
                 <option key={number} value={number}>
-                  Period {number}
+                  {t('shared.periodNumber', { number })}
                 </option>
               ))}
             </select>
           </label>
           {from > to && (
-            <span className="hint">The range will be read low-to-high.</span>
+            <span className="hint">{t('periodRange.lowToHigh')}</span>
           )}
         </div>
       )}
@@ -107,8 +109,8 @@ function PeriodRangePicker({ value, periods, onChange }) {
                 checked={selected.has(number)}
                 onChange={(event) => toggle(number, event.target.checked)}
               />
-              Period {number}
-              {number === current ? ' (current)' : ''}
+              {t('shared.periodNumber', { number })}
+              {number === current ? t('shared.currentSuffix') : ''}
             </label>
           ))}
         </div>

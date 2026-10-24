@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   CHART_KINDS,
   COMPARISON_SHAPES,
@@ -5,15 +6,6 @@ import {
   IMAGE_FORMATS,
   MAX_CHARTS,
 } from '../lib/exportConfig.js';
-
-const KIND_LABELS = {
-  trend: 'Trend over periods',
-  distribution: 'Score distribution',
-  comparison: 'Parameter comparison',
-  heatmap: 'Heatmap matrix',
-};
-const SHAPE_LABELS = { bar: 'Grouped bars', radar: 'Radar' };
-const AXIS_LABELS = { period: 'Periods across, one parameter', parameter: 'Parameters across, one period' };
 
 function newChart(kind = 'trend') {
   return {
@@ -28,6 +20,7 @@ function newChart(kind = 'trend') {
 
 // A compact multi-select for parameters, used by the trend/comparison charts.
 function ParameterChecklist({ chosen, parameters, onChange }) {
+  const { t } = useTranslation(['reports', 'common']);
   const selected = new Set(chosen);
   function toggle(id, on) {
     const ids = on ? [...selected, id] : chosen.filter((item) => item !== id);
@@ -45,12 +38,15 @@ function ParameterChecklist({ chosen, parameters, onChange }) {
           {parameter.name}
         </label>
       ))}
-      {parameters.length === 0 && <p className="hint">No parameters available.</p>}
+      {parameters.length === 0 && (
+        <p className="hint">{t('charts.noParametersAvailable')}</p>
+      )}
     </div>
   );
 }
 
 function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRemove }) {
+  const { t } = useTranslation(['reports', 'common']);
   function patch(changes) {
     onChange({ ...chart, ...changes });
   }
@@ -60,17 +56,17 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
     <div className="section-card chart-editor">
       <div className="toolbar">
         <label className="inline">
-          Chart
+          {t('charts.chartLabel')}
           <select value={chart.kind} onChange={(event) => patch({ kind: event.target.value })}>
             {CHART_KINDS.map((kind) => (
               <option key={kind} value={kind}>
-                {KIND_LABELS[kind]}
+                {t(`charts.kind.${kind}`)}
               </option>
             ))}
           </select>
         </label>
         <label className="inline">
-          Image
+          {t('charts.imageLabel')}
           <select
             value={chart.imageFormat}
             onChange={(event) => patch({ imageFormat: event.target.value })}
@@ -83,13 +79,13 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
           </select>
         </label>
         <button type="button" className="quiet" onClick={onRemove}>
-          Remove
+          {t('charts.remove')}
         </button>
       </div>
 
       {(chart.kind === 'trend' || chart.kind === 'comparison') && (
         <>
-          <p className="hint">Parameters to plot</p>
+          <p className="hint">{t('charts.paramsToPlot')}</p>
           <ParameterChecklist
             chosen={chart.parameterIds}
             parameters={parameters}
@@ -100,14 +96,14 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
 
       {chart.kind === 'comparison' && (
         <label className="inline">
-          Shape
+          {t('charts.shapeLabel')}
           <select
             value={chart.comparisonShape}
             onChange={(event) => patch({ comparisonShape: event.target.value })}
           >
             {COMPARISON_SHAPES.map((shape) => (
               <option key={shape} value={shape}>
-                {SHAPE_LABELS[shape]}
+                {t(`charts.shape.${shape}`)}
               </option>
             ))}
           </select>
@@ -117,12 +113,12 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
       {chart.kind === 'distribution' && (
         <>
           <label className="inline">
-            Parameter
+            {t('shared.parameter')}
             <select
               value={chart.parameterIds[0] ?? ''}
               onChange={(event) => patch({ parameterIds: event.target.value ? [event.target.value] : [] })}
             >
-              <option value="">Choose a parameter…</option>
+              <option value="">{t('charts.chooseParameterPlaceholder')}</option>
               {parameters.map((parameter) => (
                 <option key={parameter.id} value={parameter.id}>
                   {parameter.name}
@@ -131,14 +127,14 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
             </select>
           </label>
           <label className="inline">
-            Period
+            {t('shared.period')}
             <select
               value={chart.periodNumber ?? current}
               onChange={(event) => patch({ periodNumber: Number(event.target.value) })}
             >
               {periodOptions.map((number) => (
                 <option key={number} value={number}>
-                  Period {number}
+                  {t('shared.periodNumber', { number })}
                 </option>
               ))}
             </select>
@@ -149,26 +145,26 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
       {chart.kind === 'heatmap' && (
         <>
           <label className="inline">
-            Layout
+            {t('charts.layoutLabel')}
             <select
               value={chart.heatmapAxis}
               onChange={(event) => patch({ heatmapAxis: event.target.value })}
             >
               {HEATMAP_AXES.map((axis) => (
                 <option key={axis} value={axis}>
-                  {AXIS_LABELS[axis]}
+                  {t(`charts.axis.${axis}`)}
                 </option>
               ))}
             </select>
           </label>
           {chart.heatmapAxis === 'period' && (
             <label className="inline">
-              Parameter
+              {t('shared.parameter')}
               <select
                 value={chart.parameterIds[0] ?? ''}
                 onChange={(event) => patch({ parameterIds: event.target.value ? [event.target.value] : [] })}
               >
-                <option value="">First available</option>
+                <option value="">{t('charts.firstAvailable')}</option>
                 {parameters.map((parameter) => (
                   <option key={parameter.id} value={parameter.id}>
                     {parameter.name}
@@ -179,14 +175,14 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
           )}
           {chart.heatmapAxis === 'parameter' && (
             <label className="inline">
-              Period
+              {t('shared.period')}
               <select
                 value={chart.periodNumber ?? current}
                 onChange={(event) => patch({ periodNumber: Number(event.target.value) })}
               >
                 {periodOptions.map((number) => (
                   <option key={number} value={number}>
-                    Period {number}
+                    {t('shared.periodNumber', { number })}
                   </option>
                 ))}
               </select>
@@ -201,6 +197,8 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
 // Add, configure, and remove any number of charts (up to MAX_CHARTS). `value`
 // is config.charts; `onChange` receives the next charts array.
 function ChartConfigPanel({ value, parameters, periodNumbers, current, onChange }) {
+  const { t } = useTranslation(['reports', 'common']);
+
   function add() {
     onChange([...value, newChart()]);
   }
@@ -213,9 +211,9 @@ function ChartConfigPanel({ value, parameters, periodNumbers, current, onChange 
 
   return (
     <fieldset className="export-fieldset">
-      <legend>Charts</legend>
+      <legend>{t('charts.legend')}</legend>
       {value.length === 0 && (
-        <p className="hint">No charts. Add one to include a chart image in the export.</p>
+        <p className="hint">{t('charts.empty')}</p>
       )}
       {value.map((chart, index) => (
         <ChartEditor
@@ -234,10 +232,10 @@ function ChartConfigPanel({ value, parameters, periodNumbers, current, onChange 
         onClick={add}
         disabled={value.length >= MAX_CHARTS}
       >
-        Add chart
+        {t('charts.add')}
       </button>
       {value.length >= MAX_CHARTS && (
-        <span className="hint"> Maximum of {MAX_CHARTS} charts.</span>
+        <span className="hint"> {t('charts.max', { count: MAX_CHARTS })}</span>
       )}
     </fieldset>
   );

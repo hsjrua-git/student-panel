@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import {
   formatChange,
   formatParameterHint,
@@ -32,6 +33,7 @@ function ResultsTable({
   showChange,
   periodNumber,
 }) {
+  const { t } = useTranslation(['reports', 'common']);
   const withChange = showChange && periodNumber > 1;
 
   return (
@@ -39,8 +41,18 @@ function ResultsTable({
       <table className="results-table">
         <thead>
           <tr>
-            <SortHeader label="Student" sortKey="name" sort={sort} onSort={onSort} />
-            <SortHeader label="Code" sortKey="code" sort={sort} onSort={onSort} />
+            <SortHeader
+              label={t('resultsTable.studentCol')}
+              sortKey="name"
+              sort={sort}
+              onSort={onSort}
+            />
+            <SortHeader
+              label={t('common:table.code')}
+              sortKey="code"
+              sort={sort}
+              onSort={onSort}
+            />
             {columns.map((parameter) => (
               <SortHeader
                 key={parameter.id}
@@ -54,7 +66,7 @@ function ResultsTable({
                     <span className="hint">
                       {' '}
                       {formatParameterHint(parameter)}
-                      {parameter.inUse ? '' : ' (not in use)'}
+                      {parameter.inUse ? '' : t('resultsTable.notInUse')}
                     </span>
                   </>
                 }
@@ -97,7 +109,7 @@ function ResultsTable({
         <tfoot>
           <tr>
             <th colSpan={2} scope="row">
-              Average
+              {t('resultsTable.average')}
             </th>
             {columns.map((parameter) => (
               <td key={parameter.id} className="num">
@@ -107,11 +119,14 @@ function ResultsTable({
           </tr>
           <tr>
             <th colSpan={2} scope="row">
-              Measured
+              {t('resultsTable.measured')}
             </th>
             {columns.map((parameter) => (
               <td key={parameter.id} className="num">
-                {stats[parameter.id]?.count ?? 0} of {rows.length}
+                {t('shared.of', {
+                  a: stats[parameter.id]?.count ?? 0,
+                  b: rows.length,
+                })}
               </td>
             ))}
           </tr>

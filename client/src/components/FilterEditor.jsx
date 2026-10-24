@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MAX_FILTERS, OPERATORS, newFilterKey } from '../lib/resultsView.js';
 
 function FilterRow({ filter, parameters, onChange, onRemove }) {
+  const { t } = useTranslation(['reports', 'common']);
   const [text, setText] = useState(
     filter.value === undefined ? '' : String(filter.value)
   );
@@ -41,13 +43,17 @@ function FilterRow({ filter, parameters, onChange, onRemove }) {
   return (
     <div className="filter-row">
       <select
-        aria-label="Parameter"
+        aria-label={t('filter.parameterAria')}
         value={filter.parameterId}
         onChange={(event) =>
           onChange({ ...filter, parameterId: event.target.value })
         }
       >
-        {!known && <option value={filter.parameterId}>Unknown parameter</option>}
+        {!known && (
+          <option value={filter.parameterId}>
+            {t('filter.unknownParameter')}
+          </option>
+        )}
         {parameters.map((parameter) => (
           <option key={parameter.id} value={parameter.id}>
             {parameter.name}
@@ -55,7 +61,7 @@ function FilterRow({ filter, parameters, onChange, onRemove }) {
         ))}
       </select>
       <select
-        aria-label="Condition"
+        aria-label={t('filter.conditionAria')}
         value={filter.op}
         onChange={handleOperatorChange}
       >
@@ -69,7 +75,7 @@ function FilterRow({ filter, parameters, onChange, onRemove }) {
         <input
           type="number"
           step="any"
-          aria-label="Value"
+          aria-label={t('filter.valueAria')}
           aria-invalid={invalid}
           className={invalid ? 'invalid' : undefined}
           value={text}
@@ -77,13 +83,14 @@ function FilterRow({ filter, parameters, onChange, onRemove }) {
         />
       )}
       <button type="button" className="quiet" onClick={onRemove}>
-        Remove
+        {t('filter.remove')}
       </button>
     </div>
   );
 }
 
 function FilterEditor({ filters, parameters, onChange }) {
+  const { t } = useTranslation(['reports', 'common']);
   const canAdd = parameters.length > 0 && filters.length < MAX_FILTERS;
 
   function add() {
@@ -96,7 +103,7 @@ function FilterEditor({ filters, parameters, onChange }) {
   return (
     <div>
       {filters.length === 0 && (
-        <p className="hint">No filters. Every student is shown.</p>
+        <p className="hint">{t('filter.none')}</p>
       )}
       {filters.map((filter, index) => (
         <FilterRow
@@ -110,10 +117,13 @@ function FilterEditor({ filters, parameters, onChange }) {
         />
       ))}
       <button type="button" className="primary" onClick={add} disabled={!canAdd}>
-        Add filter
+        {t('filter.add')}
       </button>
       {filters.length >= MAX_FILTERS && (
-        <span className="hint"> Maximum of {MAX_FILTERS} filters.</span>
+        <span className="hint">
+          {' '}
+          {t('filter.max', { count: MAX_FILTERS })}
+        </span>
       )}
     </div>
   );

@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import { toCsv } from '../lib/csv.js';
 import { downloadBlob, downloadTextFile } from '../lib/download.js';
 import { buildWorkbookBlob } from '../lib/xlsx.js';
@@ -69,6 +71,7 @@ function ExportRunButton({
   chartNodes,
   disabled = false,
 }) {
+  const { t } = useTranslation(['reports', 'common']);
   const { preferences } = usePreferences();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -117,9 +120,7 @@ function ExportRunButton({
       const chart = config.charts[index];
       const svg = chartNodes.current.get(index)?.querySelector('svg');
       if (!svg) {
-        throw new Error(
-          `Couldn't capture chart ${index + 1}. Keep the preview visible and try again.`
-        );
+        throw new Error(t('exportRun.captureFailed', { index: index + 1 }));
       }
       const base = `chart-${index + 1}-${chart.kind}`;
       if (chart.imageFormat === 'png' && canExportPng()) {
@@ -143,7 +144,7 @@ function ExportRunButton({
     try {
       const files = [...(await tabularFiles()), ...(await chartFiles())];
       if (files.length === 0) {
-        setError('Nothing selected to export.');
+        setError(t('exportRun.nothing'));
         return;
       }
       if (files.length === 1) {
@@ -153,14 +154,14 @@ function ExportRunButton({
         } else {
           downloadBlob(file.name, file.data);
         }
-        setNote(`Downloaded ${file.name}.`);
+        setNote(t('exportRun.downloadedOne', { name: file.name }));
         return;
       }
       const zip = await buildZipBlob(files);
       downloadBlob('export.zip', zip);
-      setNote(`Downloaded export.zip · ${files.length} files.`);
+      setNote(t('exportRun.downloadedZip', { count: files.length }));
     } catch (err) {
-      setError(err.message || 'Export failed.');
+      setError(errorMessage(err) || t('exportRun.failed'));
     } finally {
       setBusy(false);
     }
@@ -174,7 +175,7 @@ function ExportRunButton({
         onClick={run}
         disabled={disabled || busy}
       >
-        {busy ? 'Preparing…' : 'Export'}
+        {busy ? t('exportRun.preparing') : t('exportRun.button')}
       </button>
       {note && <span className="hint">{note}</span>}
       {error && <span className="error-text">{error}</span>}

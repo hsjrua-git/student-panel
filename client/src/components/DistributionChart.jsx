@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Bar,
   BarChart,
@@ -17,6 +18,7 @@ import { CHART_TOOLTIP } from '../lib/chartTheme.js';
 // come from the shared `distribution` helper the dashboard uses, fed the cube's
 // values so the chart agrees with the exported data.
 function DistributionChart({ cube, parameterId, periodNumber }) {
+  const { t } = useTranslation(['reports', 'common']);
   const parameter = useMemo(
     () =>
       cube.parameters.find((item) => item.id === parameterId) ??
@@ -32,12 +34,12 @@ function DistributionChart({ cube, parameterId, periodNumber }) {
   }, [cube, parameter, period]);
 
   if (!parameter) {
-    return <p className="hint">Choose a parameter to chart.</p>;
+    return <p className="hint">{t('charts.chooseParameter')}</p>;
   }
   if (bins.length === 0) {
     return (
       <p className="hint">
-        No scores for {parameter.name} in period {period ?? '—'}.
+        {t('charts.noScoresFor', { name: parameter.name, number: period ?? '—' })}
       </p>
     );
   }
@@ -54,7 +56,11 @@ function DistributionChart({ cube, parameterId, periodNumber }) {
             width={40}
           />
           <Tooltip {...CHART_TOOLTIP} cursor={false} />
-          <Bar dataKey="count" name="Students" isAnimationActive={false} />
+          <Bar
+            dataKey="count"
+            name={t('charts.seriesStudents')}
+            isAnimationActive={false}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatChange } from '../lib/format.js';
 import { periodView } from '../lib/views.js';
 import PeriodPicker from './PeriodPicker.jsx';
@@ -13,6 +14,7 @@ function Meter({ percent }) {
 }
 
 function ByPeriodView({ evaluations, periods, parameters }) {
+  const { t } = useTranslation(['reports', 'common']);
   const [chosen, setChosen] = useState(null);
 
   const scoredPeriods = evaluations.map((item) => item.periodNumber);
@@ -32,19 +34,16 @@ function ByPeriodView({ evaluations, periods, parameters }) {
       <PeriodPicker periods={periods} value={periodNumber} onChange={setChosen} />
 
       {rows.length === 0 ? (
-        <p>
-          No parameters were used in Period {periodNumber}, and no scores were
-          entered.
-        </p>
+        <p>{t('byPeriod.empty', { number: periodNumber })}</p>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Parameter</th>
-                <th className="num">Score</th>
-                <th>Within range</th>
-                <th className="num">Change vs previous period</th>
+                <th>{t('shared.parameter')}</th>
+                <th className="num">{t('shared.score')}</th>
+                <th>{t('byPeriod.withinRange')}</th>
+                <th className="num">{t('byPeriod.changeVsPrevious')}</th>
               </tr>
             </thead>
             <tbody>
@@ -53,7 +52,9 @@ function ByPeriodView({ evaluations, periods, parameters }) {
                   <td>
                     {row.parameter.name}
                     {!row.inUse && (
-                      <span className="hint"> (not used this period)</span>
+                      <span className="hint">
+                        {t('byPeriod.notUsedSuffix')}
+                      </span>
                     )}
                   </td>
                   <td className="num">{row.value === null ? '—' : row.value}</td>

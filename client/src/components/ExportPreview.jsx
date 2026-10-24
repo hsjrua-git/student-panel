@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { includesTabular } from '../lib/exportConfig.js';
 import { cubeLongRows, cubeWideRows } from '../lib/exports.js';
 import TrendChart from './TrendChart.jsx';
@@ -6,13 +7,6 @@ import ComparisonChart from './ComparisonChart.jsx';
 import HeatmapMatrix from './HeatmapMatrix.jsx';
 
 const PREVIEW_ROWS = 8;
-
-const CHART_TITLES = {
-  trend: 'Trend over periods',
-  distribution: 'Score distribution',
-  comparison: 'Parameter comparison',
-  heatmap: 'Heatmap matrix',
-};
 
 // One chart, chosen by kind. Rendered into the visible preview (not hidden) so
 // the Export run can read its final, measured <svg> for image export.
@@ -52,8 +46,9 @@ function ChartView({ cube, chart }) {
 
 // A bounded table taken from a 2-D row array (first row is the header).
 function PreviewTable({ rows }) {
+  const { t } = useTranslation(['reports', 'common']);
   if (rows.length <= 1) {
-    return <p className="hint">No rows for the current scope.</p>;
+    return <p className="hint">{t('exportPreview.noRows')}</p>;
   }
   const [header, ...body] = rows;
   const shown = body.slice(0, PREVIEW_ROWS);
@@ -78,7 +73,9 @@ function PreviewTable({ rows }) {
         </tbody>
       </table>
       {body.length > shown.length && (
-        <p className="hint">+ {body.length - shown.length} more rows in the file.</p>
+        <p className="hint">
+          {t('exportPreview.moreRows', { count: body.length - shown.length })}
+        </p>
       )}
     </div>
   );
@@ -88,20 +85,23 @@ function PreviewTable({ rows }) {
 // preview of the scores, and the live chart(s). `registerChart(index, node)`
 // hands each chart's container back to the page so the run can grab its <svg>.
 function ExportPreview({ config, cube, registerChart }) {
+  const { t } = useTranslation(['reports', 'common']);
   const dataRows =
     config.layout === 'long' ? cubeLongRows(cube) : cubeWideRows(cube);
 
   return (
     <div className="export-preview">
       <p className="summary-line">
-        {cube.students.length} student{cube.students.length === 1 ? '' : 's'} ·{' '}
-        {cube.parameters.length} parameter{cube.parameters.length === 1 ? '' : 's'} ·{' '}
-        {cube.periods.length} period{cube.periods.length === 1 ? '' : 's'}
+        {t('exportPreview.counts', {
+          students: cube.students.length,
+          parameters: cube.parameters.length,
+          periods: cube.periods.length,
+        })}
       </p>
 
       {includesTabular(config) && config.include.data && (
         <section className="section-card">
-          <h3 className="group-title">Scores preview</h3>
+          <h3 className="group-title">{t('exportPreview.scoresTitle')}</h3>
           <PreviewTable rows={dataRows} />
         </section>
       )}
@@ -109,7 +109,7 @@ function ExportPreview({ config, cube, registerChart }) {
       {config.charts.map((chart, index) => (
         <section className="section-card" key={index}>
           <h3 className="group-title">
-            {CHART_TITLES[chart.kind]} · {chart.imageFormat.toUpperCase()}
+            {t(`charts.kind.${chart.kind}`)} · {chart.imageFormat.toUpperCase()}
           </h3>
           <div
             className="chart-capture"
@@ -121,7 +121,7 @@ function ExportPreview({ config, cube, registerChart }) {
       ))}
 
       {config.charts.length === 0 && !includesTabular(config) && (
-        <p className="hint">Nothing selected to export yet.</p>
+        <p className="hint">{t('exportPreview.nothingSelected')}</p>
       )}
     </div>
   );

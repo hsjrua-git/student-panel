@@ -1,12 +1,19 @@
+import { useTranslation } from 'react-i18next';
 import CountUp from './CountUp.jsx';
 
 // A student dot's hover label — honest about what "measured" means for that dot.
-function dotTitle(student) {
-  if (student.state === 'full') return `${student.fullName} — fully measured`;
-  if (student.state === 'partial') {
-    return `${student.fullName} — ${student.measured} of ${student.inUse} measured`;
+function dotTitle(t, student) {
+  if (student.state === 'full') {
+    return t('cohort.stateFull', { name: student.fullName });
   }
-  return `${student.fullName} — not measured yet`;
+  if (student.state === 'partial') {
+    return t('cohort.statePartial', {
+      name: student.fullName,
+      measured: student.measured,
+      inUse: student.inUse,
+    });
+  }
+  return t('cohort.stateNone', { name: student.fullName });
 }
 
 // Lay the class out as an even halo in the band between the centre readout and
@@ -43,12 +50,15 @@ const SAT_R = 16;
 const SAT_C = 2 * Math.PI * SAT_R;
 
 function Satellite({ stat, total, index, onSelect }) {
+  const { t } = useTranslation(['reports', 'common']);
   const { parameter, count } = stat;
   const coverage = total > 0 ? count / total : 0;
   const filled = coverage * SAT_C;
-  const label = `${parameter.name}: ${count} of ${total} student${
-    total === 1 ? '' : 's'
-  } measured — open details`;
+  const label = t('cohort.satelliteLabel', {
+    name: parameter.name,
+    measured: count,
+    count: total,
+  });
 
   return (
     <li className="cohort-sat" style={{ '--i': index }}>
@@ -94,6 +104,7 @@ function Satellite({ stat, total, index, onSelect }) {
 // field states reconcile exactly with the KPI totals because cohortField() and
 // summarize() classify against the same set of in-use parameters.
 function CompletionHub({ summary, field, stats = [], onSelect }) {
+  const { t } = useTranslation(['reports', 'common']);
   const pct = summary.completion; // 0–100, or null when nothing is expected
   const hasPct = pct !== null;
 
@@ -114,20 +125,22 @@ function CompletionHub({ summary, field, stats = [], onSelect }) {
   const satellites = stats.filter((stat) => stat.parameter.inUse);
   const ring = satellites.length >= 1 && satellites.length <= 6;
 
-  const fieldLabel =
-    `${summary.students} ${summary.students === 1 ? 'student' : 'students'}: ` +
-    `${summary.studentsComplete} fully measured, ` +
-    `${summary.studentsPartial} partly, ${summary.studentsNone} not yet`;
+  const fieldLabel = t('cohort.who', {
+    count: summary.students,
+    full: summary.studentsComplete,
+    partial: summary.studentsPartial,
+    none: summary.studentsNone,
+  });
 
   const kpis = [
-    { key: 'students', label: 'Students', value: summary.students, swatch: 'total' },
-    { key: 'full', label: 'Fully measured', value: summary.studentsComplete, swatch: 'full' },
-    { key: 'partial', label: 'Partly', value: summary.studentsPartial, swatch: 'partial' },
-    { key: 'none', label: 'Not yet', value: summary.studentsNone, swatch: 'none' },
+    { key: 'students', label: t('cohort.kpiStudents'), value: summary.students, swatch: 'total' },
+    { key: 'full', label: t('cohort.kpiFull'), value: summary.studentsComplete, swatch: 'full' },
+    { key: 'partial', label: t('cohort.kpiPartial'), value: summary.studentsPartial, swatch: 'partial' },
+    { key: 'none', label: t('cohort.kpiNone'), value: summary.studentsNone, swatch: 'none' },
   ];
 
   return (
-    <section className="cohort-hero" aria-label="Class measurement overview">
+    <section className="cohort-hero" aria-label={t('cohort.heroLabel')}>
       <div className={ring ? 'cohort-orbit ring' : 'cohort-orbit'}>
         <div className="cohort-core">
           <svg className="cohort-arc" viewBox="0 0 120 120" aria-hidden="true">
@@ -152,7 +165,7 @@ function CompletionHub({ summary, field, stats = [], onSelect }) {
               <span
                 key={student.id}
                 className={`field-dot ${student.state}`}
-                title={dotTitle(student)}
+                title={dotTitle(t, student)}
                 style={{ left: `${positions[i].left}%`, top: `${positions[i].top}%` }}
               />
             ))}
@@ -162,15 +175,17 @@ function CompletionHub({ summary, field, stats = [], onSelect }) {
             type="button"
             className="cohort-readout cohort-readout-btn"
             aria-haspopup="dialog"
-            aria-label={`Class summary — ${
-              hasPct ? `${pct}% measured` : 'nothing measured yet'
-            } — open details`}
+            aria-label={
+              `${t('cohort.classSummary')} — ${
+                hasPct ? t('cohort.measuredPct', { pct }) : t('cohort.nothingYet')
+              }${t('cohort.openDetails')}`
+            }
             onClick={() => onSelect?.({ type: 'cohort' })}
           >
             <span className="cohort-pct">
               {hasPct ? <CountUp value={pct} suffix="%" /> : '—'}
             </span>
-            <span className="cohort-pct-label">measured</span>
+            <span className="cohort-pct-label">{t('cohort.measured')}</span>
           </button>
         </div>
 

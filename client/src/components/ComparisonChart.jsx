@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Bar,
   BarChart,
@@ -22,6 +23,7 @@ import { CHART_TOOLTIP, seriesClass } from '../lib/chartTheme.js';
 // (period per spoke, a polygon per parameter). Series are coloured through the
 // --series-* CSS slots via seriesClass, so they stay distinct and theme-aware.
 function ComparisonChart({ cube, parameterIds, shape = 'bar' }) {
+  const { t } = useTranslation(['reports', 'common']);
   const ids = useMemo(() => new Set(parameterIds), [parameterIds]);
   const params = useMemo(
     () => cube.parameters.filter((parameter) => ids.has(parameter.id)),
@@ -34,17 +36,17 @@ function ComparisonChart({ cube, parameterIds, shape = 'bar' }) {
       points: cohortAverages(cube, parameter.id),
     }));
     return cube.periods.map((period, index) => {
-      const row = { label: `P${period.number}` };
+      const row = { label: t('shared.periodNumber', { number: period.number }) };
       for (const item of series) row[item.parameter.id] = item.points[index].average;
       return row;
     });
-  }, [cube, params]);
+  }, [cube, params, t]);
 
   if (params.length === 0) {
-    return <p className="hint">Choose at least one parameter to compare.</p>;
+    return <p className="hint">{t('charts.compareNeedParameter')}</p>;
   }
   if (cube.periods.length === 0) {
-    return <p className="hint">No periods in range.</p>;
+    return <p className="hint">{t('charts.noPeriods')}</p>;
   }
 
   if (shape === 'radar') {

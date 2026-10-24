@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as THREE from 'three';
 import {
   spherePoints,
@@ -180,22 +181,26 @@ function uniqueVertices(geometry) {
 
 // The accessible label for a student's jump button — mirrors the 3D node's hover
 // title, plus the affordance that activating it opens that student's drawer.
-function nodeLabel(student) {
+function nodeLabel(t, student) {
   const base =
     student.state === 'full'
-      ? `${student.fullName} — fully measured`
+      ? t('cohort.stateFull', { name: student.fullName })
       : student.state === 'partial'
-        ? `${student.fullName} — ${student.measured} of ${student.inUse} measured`
-        : `${student.fullName} — not measured yet`;
-  return `${base} — open details`;
+        ? t('cohort.statePartial', {
+            name: student.fullName,
+            measured: student.measured,
+            inUse: student.inUse,
+          })
+        : t('cohort.stateNone', { name: student.fullName });
+  return `${base}${t('cohort.openDetails')}`;
 }
 
 // The screen-reader description of the hero as a whole — the headline completion
 // and the roster split — read once before the jump lists. The WebGL canvas is
 // aria-hidden, so this paragraph (and the buttons under it) carry the meaning the
 // glowing object conveys visually.
-function summaryText(summary) {
-  if (!summary) return 'Class measurement overview.';
+function summaryText(t, summary) {
+  if (!summary) return t('cohort.heroLabel');
   const {
     completion,
     students,
@@ -205,13 +210,15 @@ function summaryText(summary) {
   } = summary;
   const head =
     completion === null
-      ? 'Nothing measured this period yet.'
-      : `${completion}% of expected scores recorded.`;
-  const who =
-    `${students} ${students === 1 ? 'student' : 'students'}: ` +
-    `${studentsComplete} fully measured, ${studentsPartial} partly, ` +
-    `${studentsNone} not yet.`;
-  return `Class measurement overview. ${head} ${who}`;
+      ? t('cohort.nothingYet')
+      : t('cohort.headRecorded', { completion });
+  const who = t('cohort.who', {
+    count: students,
+    full: studentsComplete,
+    partial: studentsPartial,
+    none: studentsNone,
+  });
+  return `${t('cohort.heroLabel')}. ${head} ${who}`;
 }
 
 // The 3D cohort hero: a small spinning core sphere (glow ∝ completion) encircled
@@ -231,6 +238,7 @@ export default function CohortConstellation({
   stats = [],
   onSelect,
 }) {
+  const { t } = useTranslation(['reports', 'common']);
   const hostRef = useRef(null);
   const sceneRef = useRef(null);
   const pctRef = useRef(summary?.completion ?? null);
@@ -974,14 +982,14 @@ export default function CohortConstellation({
     <>
       <div ref={hostRef} className="cohort-canvas" aria-hidden="true" />
       <div className="cohort-controls">
-        <p className="sr-only">{summaryText(summary)}</p>
+        <p className="sr-only">{summaryText(t, summary)}</p>
         <button
           type="button"
           className="cohort-jump"
           aria-haspopup="dialog"
           onClick={() => onSelect?.({ type: 'cohort' })}
         >
-          Class summary
+          {t('cohort.classSummary')}
         </button>
         {jumpStats.length > 0 && (
           <ul className="cohort-jump-list">
@@ -1000,7 +1008,10 @@ export default function CohortConstellation({
                       onSelect?.({ type: 'parameter', id: stat.parameter.id })
                     }
                   >
-                    {stat.parameter.name}: {pct}% measured — open details
+                    {t('cohort.paramMeasured', {
+                      name: stat.parameter.name,
+                      pct,
+                    })}
                   </button>
                 </li>
               );
@@ -1017,7 +1028,7 @@ export default function CohortConstellation({
                   aria-haspopup="dialog"
                   onClick={() => onSelect?.({ type: 'student', id: student.id })}
                 >
-                  {nodeLabel(student)}
+                  {nodeLabel(t, student)}
                 </button>
               </li>
             ))}

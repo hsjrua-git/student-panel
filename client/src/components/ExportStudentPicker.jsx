@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { fetchAllStudents } from '../api/students.js';
+import { errorMessage } from '../i18n/errors.js';
 import GroupFilter from './GroupFilter.jsx';
 
 // The "who" selector for the Export Center: all students, one group (and its
@@ -8,6 +10,7 @@ import GroupFilter from './GroupFilter.jsx';
 // ({ mode, groupId, ids }); `onChange` receives the next slice. The full roster
 // is only fetched when the user actually switches to hand-picking.
 function ExportStudentPicker({ value, onChange }) {
+  const { t } = useTranslation(['reports', 'common']);
   const [search, setSearch] = useState('');
   const selecting = value.mode === 'selection';
 
@@ -40,7 +43,7 @@ function ExportStudentPicker({ value, onChange }) {
 
   return (
     <fieldset className="export-fieldset">
-      <legend>Students</legend>
+      <legend>{t('pickers.studentsLegend')}</legend>
       <div className="radio-row">
         <label className="inline">
           <input
@@ -49,7 +52,7 @@ function ExportStudentPicker({ value, onChange }) {
             checked={value.mode === 'all'}
             onChange={() => setMode('all')}
           />
-          All students
+          {t('shared.allStudents')}
         </label>
         <label className="inline">
           <input
@@ -58,7 +61,7 @@ function ExportStudentPicker({ value, onChange }) {
             checked={value.mode === 'group'}
             onChange={() => setMode('group')}
           />
-          By group
+          {t('pickers.byGroup')}
         </label>
         <label className="inline">
           <input
@@ -67,7 +70,7 @@ function ExportStudentPicker({ value, onChange }) {
             checked={value.mode === 'selection'}
             onChange={() => setMode('selection')}
           />
-          Pick students
+          {t('pickers.pickStudents')}
         </label>
       </div>
 
@@ -85,11 +88,11 @@ function ExportStudentPicker({ value, onChange }) {
             className="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name or code"
-            aria-label="Search students"
+            placeholder={t('pickers.searchStudentsPlaceholder')}
+            aria-label={t('pickers.searchStudentsLabel')}
           />
           <p className="hint">
-            {value.ids.length} selected
+            {t('pickers.selected', { count: value.ids.length })}
             {value.ids.length > 0 && (
               <>
                 {' · '}
@@ -98,14 +101,16 @@ function ExportStudentPicker({ value, onChange }) {
                   className="quiet"
                   onClick={() => onChange({ ...value, ids: [] })}
                 >
-                  Clear
+                  {t('pickers.clear')}
                 </button>
               </>
             )}
           </p>
-          {rosterQuery.isPending && <p className="hint">Loading students…</p>}
+          {rosterQuery.isPending && (
+            <p className="hint">{t('pickers.loadingStudents')}</p>
+          )}
           {rosterQuery.isError && (
-            <p className="error">{rosterQuery.error.message}</p>
+            <p className="error">{errorMessage(rosterQuery.error)}</p>
           )}
           <div className="columns-list scroll-list">
             {shown.map((student) => (
@@ -120,7 +125,7 @@ function ExportStudentPicker({ value, onChange }) {
               </label>
             ))}
             {!rosterQuery.isPending && shown.length === 0 && (
-              <p className="hint">No students match.</p>
+              <p className="hint">{t('pickers.noStudentsMatch')}</p>
             )}
           </div>
         </div>

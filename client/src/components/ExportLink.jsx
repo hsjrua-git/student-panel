@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 // Warm the Export Center chunk before the click. A bare dynamic import fills the
@@ -14,7 +15,8 @@ function preload() {
 // deep-merges the scope slices onto the defaults and normalises the result — so
 // a partial prefill (only the slices this page knows) is enough. Renders nothing
 // for users without data.export, mirroring the CSV ExportButton's own gate.
-function ExportLink({ prefill, label = 'Open in Export Center' }) {
+function ExportLink({ prefill, label }) {
+  const { t } = useTranslation(['reports', 'common']);
   const { can } = useAuth();
   if (!can('data.export')) return null;
   return (
@@ -25,7 +27,7 @@ function ExportLink({ prefill, label = 'Open in Export Center' }) {
       onMouseEnter={preload}
       onFocus={preload}
     >
-      {label}
+      {label ?? t('export.openInCenter')}
     </Link>
   );
 }

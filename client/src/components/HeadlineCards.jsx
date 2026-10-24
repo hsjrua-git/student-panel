@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import CountUp from './CountUp.jsx';
 
 function Card({ label, value, note, tone }) {
@@ -11,18 +12,20 @@ function Card({ label, value, note, tone }) {
 }
 
 function HeadlineCards({ summary }) {
-  const plural = summary.parametersInUse === 1 ? '' : 's';
+  const { t } = useTranslation(['reports', 'common']);
   const allMeasured =
     summary.students > 0 && summary.studentsComplete === summary.students;
   return (
     <div className="stat-grid">
       <Card
-        label="Students"
+        label={t('headlineCards.students')}
         value={<CountUp value={summary.students} />}
-        note={`${summary.parametersInUse} parameter${plural} in use`}
+        note={t('headlineCards.parametersInUse', {
+          count: summary.parametersInUse,
+        })}
       />
       <Card
-        label="Scores entered"
+        label={t('headlineCards.scoresEntered')}
         value={
           summary.completion === null ? (
             '—'
@@ -30,20 +33,25 @@ function HeadlineCards({ summary }) {
             <CountUp value={summary.completion} suffix="%" />
           )
         }
-        note={`${summary.measured} of ${summary.expected}`}
+        note={t('headlineCards.ofExpected', {
+          measured: summary.measured,
+          expected: summary.expected,
+        })}
       />
       <Card
-        label="Fully measured"
+        label={t('headlineCards.fullyMeasured')}
         value={<CountUp value={summary.studentsComplete} />}
-        note={`of ${summary.students} students`}
+        note={t('headlineCards.ofStudents', { count: summary.students })}
         tone={allMeasured ? 'ok' : undefined}
       />
       <Card
-        label="Not measured at all"
+        label={t('headlineCards.notMeasuredAtAll')}
         value={<CountUp value={summary.studentsNone} />}
         note={
           summary.studentsPartial > 0
-            ? `${summary.studentsPartial} partly measured`
+            ? t('headlineCards.partlyMeasured', {
+                count: summary.studentsPartial,
+              })
             : undefined
         }
         tone={summary.studentsNone > 0 ? 'danger' : undefined}
