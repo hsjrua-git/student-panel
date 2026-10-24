@@ -1,0 +1,64 @@
+{
+  "sections": {
+    "overview": "Overview",
+    "teaching": "Teaching",
+    "setup": "Setup",
+    "administration": "Administration"
+  },
+  "items": {
+    "dashboard": "Dashboard",
+    "results": "Results",
+    "export": "Export",
+    "students": "Students",
+    "evaluate": "Evaluate",
+    "teachers": "Teachers",
+    "schedule": "Schedule",
+    "sessions": "Sessions",
+    "parameters": "Parameters",
+    "groups": "Groups",
+    "fields": "Fields",
+    "settings": "Settings",
+    "users": "Users",
+    "roles": "Roles",
+    "audit": "Audit log",
+    "preferences": "Preferences",
+    "changePassword": "Change password"
+  },
+  "titles": {
+    "preferences": "Preferences",
+    "changePassword": "Change password",
+    "importStudents": "Import students",
+    "importScores": "Import scores",
+    "studentDetail": "Student details"
+  },
+  "account": {
+    "signout": "Sign out",
+    "signingOut": "Signing out…"
+  },
+  "aria": {
+    "primaryNav": "Primary",
+    "toggleMenu": "Toggle menu",
+    "closeMenu": "Close menu",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar"
+  },
+  "skipToContent": "Skip to content",
+  "connection": {
+    "offline": "Cannot reach the server. Check that it is running, then this will recover automatically."
+  },
+  "auth": {
+    "sessionErrorTitle": "Couldn't load your session"
+  },
+  "errors": {
+    "ui": {
+      "title": "Something went wrong",
+      "description": "This screen hit an unexpected error. Reloading the page usually fixes it.",
+      "reload": "Reload"
+    }
+  },
+  "notFound": {
+    "title": "Page not found",
+    "hint": "That page doesn't exist or may have moved.",
+    "home": "Go to the students list"
+  }
+}

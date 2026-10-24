@@ -1,10 +1,41 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
+import { LANGUAGES, setLanguage } from '../i18n/index.js';
 import { firstAllowedPath } from '../lib/navigation.js';
+
+// The pre-login surface: fully bilingual before any preference can load. The
+// remembered draft (localStorage) picks the language at boot; the switcher in
+// the corner writes it back, so the next visit starts where the last one
+// ended. Once signed in, the stored `language` preference takes over.
+
+function LanguageSwitcher({ current }) {
+  return (
+    <div
+      className="segmented auth-language"
+      role="radiogroup"
+      aria-label={current.t('language.switch')}
+    >
+      {LANGUAGES.map((code) => (
+        <label key={code}>
+          <input
+            type="radio"
+            name="auth-language"
+            checked={current.language === code}
+            onChange={() => setLanguage(code)}
+          />
+          {current.t(`language.${code}`)}
+        </label>
+      ))}
+    </div>
+  );
+}
 
 function LoginPage() {
   const { user, isLoading, login, can } = useAuth();
+  const { t, i18n } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -32,15 +63,16 @@ function LoginPage() {
   return (
     <main className="auth-screen">
       <div className="auth-card">
+        <LanguageSwitcher current={{ t, language: i18n.resolvedLanguage }} />
         <div className="auth-brand">
           <span className="brand-mark" aria-hidden="true" />
-          <span className="auth-brand-name">Student Panel</span>
+          <span className="auth-brand-name">{t('appName')}</span>
         </div>
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-subtitle">Sign in to continue to your panel.</p>
+        <h1 className="auth-title">{t('login.title')}</h1>
+        <p className="auth-subtitle">{t('login.subtitle')}</p>
         <form onSubmit={handleSubmit} className="edit-form">
           <label>
-            Username
+            {t('login.username')}
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
@@ -49,7 +81,7 @@ function LoginPage() {
             />
           </label>
           <label>
-            Password
+            {t('login.password')}
             <input
               type="password"
               value={password}
@@ -58,11 +90,11 @@ function LoginPage() {
             />
           </label>
           <button type="submit" disabled={login.isPending}>
-            {login.isPending ? 'Signing in...' : 'Sign in'}
+            {login.isPending ? t('login.submitting') : t('login.submit')}
           </button>
           {login.isError && (
             <p className="error" role="alert">
-              {login.error.message}
+              {errorMessage(login.error)}
             </p>
           )}
         </form>

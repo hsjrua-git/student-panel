@@ -10,6 +10,9 @@ import {
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import { applyRememberedTheme } from './lib/theme.js';
 import { PreferencesProvider } from './preferences/PreferencesProvider.jsx';
+// Initializes the i18next instance (with the remembered language draft) and
+// syncs <html lang/dir> before anything renders.
+import './i18n/index.js';
 import './index.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listParameters } from '../api/parameters.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { LANGUAGES } from '../i18n/index.js';
 import { toggleHidden } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
@@ -104,6 +106,7 @@ const TABS = [
 function PreferencesPage() {
   const { preferences, update, reset } = usePreferences();
   const { can } = useAuth();
+  const { t } = useTranslation();
   // The "hide parameters from the overview" control only makes sense for a role
   // that can actually see parameters; without parameters.view the query would
   // 403. Gate both the fetch and the section on the permission.
@@ -219,6 +222,31 @@ function PreferencesPage() {
             color. Each palette has a light and a dark version, so the theme
             setting above still applies.
           </p>
+        </fieldset>
+      </section>
+
+      <section className="section-card">
+        <h2>{t('preferences.languageTitle')}</h2>
+        <p className="hint">{t('preferences.languageHint')}</p>
+        <fieldset className="pref-group">
+          <legend aria-hidden="true">{t('preferences.languageTitle')}</legend>
+          <div
+            className="segmented"
+            role="radiogroup"
+            aria-label={t('preferences.languageTitle')}
+          >
+            {LANGUAGES.map((code) => (
+              <label key={code}>
+                <input
+                  type="radio"
+                  name="language"
+                  checked={(preferences.language ?? 'fa') === code}
+                  onChange={() => change({ language: code })}
+                />
+                {t(`language.${code}`)}
+              </label>
+            ))}
+          </div>
         </fieldset>
       </section>
 

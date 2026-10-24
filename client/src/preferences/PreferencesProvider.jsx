@@ -6,6 +6,7 @@ import {
   savePreferences,
 } from '../api/preferences.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { setLanguage } from '../i18n/index.js';
 import { applyPalette, applyTheme } from '../lib/theme.js';
 import { DEFAULT_PREFERENCES } from './defaults.js';
 import { PreferencesContext } from './PreferencesContext.jsx';
@@ -39,6 +40,14 @@ export function PreferencesProvider({ children }) {
   useEffect(() => {
     if (palette) applyPalette(palette);
   }, [palette]);
+
+  // The stored preference is authoritative once it arrives; setLanguage also
+  // refreshes the pre-login draft so the next visit boots in the same
+  // language. Like the theme, an absent value keeps the boot-time choice.
+  const language = query.data?.language;
+  useEffect(() => {
+    if (language) setLanguage(language);
+  }, [language]);
 
   const update = useMutation({
     mutationKey: KEY,

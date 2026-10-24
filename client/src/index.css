@@ -32,6 +32,41 @@
   src: url('./assets/fonts/manrope-variable.woff2') format('woff2');
 }
 
+/* Vazirmatn — self-hosted Persian face (four static weights; the project's
+   weights land on 400/500/600/700 and the browser snaps the few in-between
+   micro-weights to the nearest). Same self-origin story as Manrope: no
+   external requests, CSP font-src 'self' holds on an offline LAN. It only
+   leads the stack while <html lang> is Persian — see the [lang='fa'] block
+   below the tokens. */
+@font-face {
+  font-family: 'Vazirmatn';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/vazirmatn-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/vazirmatn-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/vazirmatn-SemiBold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/vazirmatn-Bold.woff2') format('woff2');
+}
+
 /* ------------------------------------------------------------------ tokens - */
 :root {
   color-scheme: light;
@@ -128,6 +163,8 @@
   --font: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-numeric: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto,
     sans-serif;
+  --font-fa: 'Vazirmatn', 'Manrope', system-ui, -apple-system, 'Segoe UI',
+    Roboto, sans-serif;
 
   font-family: var(--font);
   line-height: 1.55;
@@ -143,6 +180,14 @@
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+}
+
+/* While the UI language is Persian, Vazirmatn leads the interface stack (its
+   Latin glyphs companion well with its Persian). --font-numeric deliberately
+   stays Manrope-first: tabular KPI/table numbers keep lining Latin digits
+   even in the Persian UI; Persian digits appear in prose contexts only. */
+:root[lang='fa'] {
+  --font: var(--font-fa);
 }
 
 /* Dark theme: applied when the user picks Dark, or picks System and the OS is
@@ -681,6 +726,15 @@ main.auth-screen::before {
   border-radius: calc(var(--radius) + 4px);
   box-shadow: var(--shadow-pop);
   animation: auth-card-in 640ms var(--ease) both;
+}
+
+/* Pre-login language switcher, pinned to the card's top corner. Logical
+   insets only, so it mirrors automatically in RTL. */
+.auth-language {
+  position: absolute;
+  inset-inline-end: 1.25rem;
+  top: 1rem;
+  font-size: 0.78rem;
 }
 
 @keyframes auth-card-in {
