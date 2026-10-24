@@ -16,6 +16,7 @@ const RULES = [
   { method: 'POST', pattern: /^\/api\/assignments$/, action: 'assignment.create', entityType: 'assignment' },
   { method: 'PATCH', pattern: /^\/api\/assignments\/[^/]+$/, action: 'assignment.update', entityType: 'assignment' },
   { method: 'DELETE', pattern: /^\/api\/assignments\/[^/]+$/, action: 'assignment.archive', entityType: 'assignment' },
+  { method: 'PATCH', pattern: /^\/api\/sessions\/[^/]+$/, action: 'session.update', entityType: 'session' },
   { method: 'POST', pattern: /^\/api\/parameters$/, action: 'parameter.create', entityType: 'parameter' },
   { method: 'PATCH', pattern: /^\/api\/parameters\/[^/]+$/, action: 'parameter.update', entityType: 'parameter' },
   { method: 'POST', pattern: /^\/api\/parameter-changes$/, action: 'parameter_change.create', entityType: 'parameter_change' },
@@ -34,6 +35,7 @@ const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/roles(\/|$)/,
   /^\/api\/groups(\/|$)/,
   /^\/api\/field-definitions(\/|$)/,
+  /^\/api\/sessions\/generate$/,
 ];
 
 export function normalisePath(url) {

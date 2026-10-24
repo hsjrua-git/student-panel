@@ -25,6 +25,7 @@ import {
   DownloadIcon,
   TeacherIcon,
   CalendarIcon,
+  SessionIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
@@ -40,6 +41,7 @@ export const ROUTE_PERMISSIONS = {
   '/fields': 'fields.manage',
   '/teachers': 'teachers.view',
   '/schedule': 'schedule.view',
+  '/sessions': 'schedule.view',
   '/settings': 'settings.manage',
   '/users': 'users.manage',
   '/roles': 'roles.manage',
@@ -67,6 +69,7 @@ export const NAV_SECTIONS = [
       { to: '/evaluate', label: 'Evaluate', icon: EvaluateIcon },
       { to: '/teachers', label: 'Teachers', icon: TeacherIcon },
       { to: '/schedule', label: 'Schedule', icon: CalendarIcon },
+      { to: '/sessions', label: 'Sessions', icon: SessionIcon },
     ],
   },
   {

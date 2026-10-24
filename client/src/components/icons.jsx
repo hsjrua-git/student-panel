@@ -216,6 +216,16 @@ export function CalendarIcon(props) {
   );
 }
 
+// A calendar sheet with entries: the generated sessions.
+export function SessionIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="1.5" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4M7.5 13h9M7.5 16.5h5.5" />
+    </Svg>
+  );
+}
+
 // A shield with a check: roles/permissions.
 export function RolesIcon(props) {
   return (

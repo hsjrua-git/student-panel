@@ -23,6 +23,7 @@ import fieldDefinitionsRouter from './routes/fieldDefinitions.js';
 import teachersRouter from './routes/teachers.js';
 import intervalsRouter from './routes/intervals.js';
 import assignmentsRouter from './routes/assignments.js';
+import sessionsRouter from './routes/sessions.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -265,6 +266,15 @@ app.use(
     DELETE: 'schedule.manage',
   }),
   assignmentsRouter
+);
+app.use(
+  '/api/sessions',
+  authorize({
+    GET: 'schedule.view',
+    POST: 'schedule.manage',
+    PATCH: 'schedule.manage',
+  }),
+  sessionsRouter
 );
 app.use(
   '/api/preferences',
