@@ -56,6 +56,9 @@ export async function request(url, options = {}) {
     );
     error.status = response.status;
     error.data = data;
+    // Machine-readable twins of the message, for translating errors by code.
+    error.code = data?.code ?? null;
+    error.params = data?.params ?? null;
     throw error;
   }
   return data;

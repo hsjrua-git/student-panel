@@ -11,7 +11,11 @@ export function parseParameterInput(body, { partial = false } = {}) {
         ? input.name.trim().replace(/\s+/g, ' ')
         : '';
     if (name.length < 1 || name.length > MAX_NAME) {
-      return { error: `Name must be between 1 and ${MAX_NAME} characters.` };
+      return {
+        error: `Name must be between 1 and ${MAX_NAME} characters.`,
+        code: 'VALIDATION_INVALID_LENGTH',
+        params: { min: 1, max: MAX_NAME },
+      };
     }
     values.name = name;
   }
@@ -25,7 +29,11 @@ export function parseParameterInput(body, { partial = false } = {}) {
     ) {
       values.unit = input.unit.trim();
     } else {
-      return { error: `Unit must be text of at most ${MAX_UNIT} characters.` };
+      return {
+        error: `Unit must be text of at most ${MAX_UNIT} characters.`,
+        code: 'VALIDATION_TOO_LONG',
+        params: { max: MAX_UNIT },
+      };
     }
   }
 
@@ -36,7 +44,11 @@ export function parseParameterInput(body, { partial = false } = {}) {
       } else if (typeof input[key] === 'number' && Number.isFinite(input[key])) {
         values[key] = input[key];
       } else {
-        return { error: `${key} must be a number or null.` };
+        return {
+          error: `${key} must be a number or null.`,
+          code: 'VALIDATION_INVALID_TYPE',
+          params: { field: key },
+        };
       }
     }
   }
@@ -45,12 +57,19 @@ export function parseParameterInput(body, { partial = false } = {}) {
     values.maxValue != null &&
     values.minValue > values.maxValue
   ) {
-    return { error: 'The minimum cannot be larger than the maximum.' };
+    return {
+      error: 'The minimum cannot be larger than the maximum.',
+      code: 'PARAMETERS_MIN_ABOVE_MAX',
+    };
   }
 
   if ('sortOrder' in input) {
     if (!Number.isInteger(input.sortOrder)) {
-      return { error: 'sortOrder must be a whole number.' };
+      return {
+        error: 'sortOrder must be a whole number.',
+        code: 'VALIDATION_INVALID_TYPE',
+        params: { field: 'sortOrder' },
+      };
     }
     values.sortOrder = input.sortOrder;
   }

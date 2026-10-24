@@ -18,13 +18,19 @@ router.get('/', async (req, res) => {
   if (!isDigits || !isValidPeriodNumber(Number(raw))) {
     return res.status(400).json({
       error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
+      code: 'VALIDATION_INVALID_RANGE',
+      params: { min: 1, max: MAX_PERIOD },
     });
   }
   const periodNumber = Number(raw);
 
   const { groupId } = req.query;
   if (groupId !== undefined && !isUuid(groupId)) {
-    return res.status(400).json({ error: 'groupId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'groupId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'groupId' },
+    });
   }
   // Build an optional "student belongs to this group tree" SQL condition.
   let groupFilter = '';
@@ -42,14 +48,21 @@ router.get('/', async (req, res) => {
   );
   const anchorDate = anchorResult.rows[0]?.value;
   if (!anchorDate) {
-    return res.status(409).json({ error: 'Set the period start date first.' });
+    return res.status(409).json({
+      error: 'Set the period start date first.',
+      code: 'PERIODS_ANCHOR_NOT_SET',
+    });
   }
 
   const current = periodForDate(anchorDate, todayIso());
   if (current === null || periodNumber > current) {
     return res
       .status(400)
-      .json({ error: `Period ${periodNumber} has not started yet.` });
+      .json({
+        error: `Period ${periodNumber} has not started yet.`,
+        code: 'PERIODS_NOT_STARTED',
+        params: { period: periodNumber },
+      });
   }
 
   const [

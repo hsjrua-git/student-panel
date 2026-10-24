@@ -32,6 +32,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     error: 'Too many failed attempts. Please wait 15 minutes and try again.',
+    code: 'AUTH_RATE_LIMITED',
   },
 });
 
@@ -44,7 +45,10 @@ router.post('/login', loginLimiter, async (req, res) => {
     typeof req.body?.password === 'string' ? req.body.password : '';
 
   if (!username || !password || password.length > MAX_PASSWORD_LENGTH) {
-    return res.status(400).json({ error: 'Enter your username and password.' });
+    return res.status(400).json({
+      error: 'Enter your username and password.',
+      code: 'AUTH_CREDENTIALS_REQUIRED',
+    });
   }
 
   const result = await pool.query(
@@ -57,7 +61,9 @@ router.post('/login', loginLimiter, async (req, res) => {
   const hash = found ? found.passwordHash : await getDummyHash();
   const passwordOk = await verifyPassword(hash, password);
   if (!found || !found.isActive || !passwordOk) {
-    return res.status(401).json({ error: 'Wrong username or password.' });
+    return res
+      .status(401)
+      .json({ error: 'Wrong username or password.', code: 'AUTH_INVALID_CREDENTIALS' });
   }
 
   await viaCallback((done) => req.session.regenerate(done));
@@ -81,7 +87,9 @@ router.post('/logout', async (req, res) => {
 
 router.get('/me', (req, res) => {
   if (!req.user) {
-    return res.status(401).json({ error: 'Not signed in.' });
+    return res
+      .status(401)
+      .json({ error: 'Not signed in.', code: 'AUTH_SIGNIN_REQUIRED' });
   }
   res.json({ user: req.user });
 });
@@ -94,17 +102,25 @@ router.post('/change-password', requireLogin, async (req, res) => {
     currentPassword === '' ||
     currentPassword.length > MAX_PASSWORD_LENGTH
   ) {
-    return res.status(400).json({ error: 'Enter your current password.' });
+    return res.status(400).json({
+      error: 'Enter your current password.',
+      code: 'AUTH_PASSWORD_CURRENT_REQUIRED',
+    });
   }
   const problem = validateNewPassword(newPassword, {
     username: req.user.username,
   });
   if (problem) {
-    return res.status(400).json({ error: problem });
+    return res.status(400).json({
+      error: problem.error,
+      code: problem.code,
+      params: problem.params,
+    });
   }
   if (newPassword === currentPassword) {
     return res.status(400).json({
       error: 'The new password must be different from the current one.',
+      code: 'AUTH_PASSWORD_SAME_AS_CURRENT',
     });
   }
 
@@ -113,9 +129,10 @@ router.post('/change-password', requireLogin, async (req, res) => {
     [req.user.id]
   );
   if (!(await verifyPassword(found.rows[0].passwordHash, currentPassword))) {
-    return res
-      .status(400)
-      .json({ error: 'The current password is incorrect.' });
+    return res.status(400).json({
+      error: 'The current password is incorrect.',
+      code: 'AUTH_PASSWORD_CURRENT_INCORRECT',
+    });
   }
 
   await pool.query(

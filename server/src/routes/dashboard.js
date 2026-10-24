@@ -8,7 +8,11 @@ const router = Router();
 router.get('/trends', async (req, res) => {
   const { groupId } = req.query;
   if (groupId !== undefined && !isUuid(groupId)) {
-    return res.status(400).json({ error: 'groupId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'groupId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'groupId' },
+    });
   }
 
   let groupJoin = '';

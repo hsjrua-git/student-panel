@@ -19,24 +19,43 @@ const DEFINITION_COLUMNS = `
 `;
 
 function parseLabel(input) {
-  if (typeof input !== 'string') return { error: 'Field label is required.' };
+  if (typeof input !== 'string') {
+    return { error: 'Field label is required.', code: 'VALIDATION_REQUIRED' };
+  }
   const value = input.trim().replace(/\s+/g, ' ');
   if (value.length < 1 || value.length > 60) {
-    return { error: 'Field label must be 1 to 60 characters.' };
+    return {
+      error: 'Field label must be 1 to 60 characters.',
+      code: 'VALIDATION_INVALID_LENGTH',
+      params: { min: 1, max: 60 },
+    };
   }
   return { value };
 }
 
 function parseChoices(input) {
   if (input === undefined) return { value: [] };
-  if (!Array.isArray(input)) return { error: 'Choices must be a list.' };
+  if (!Array.isArray(input)) {
+    return { error: 'Choices must be a list.', code: 'VALIDATION_INVALID_TYPE' };
+  }
   const seen = new Set();
   const value = [];
   for (const choice of input) {
-    if (typeof choice !== 'string') return { error: 'Each choice must be text.' };
+    if (typeof choice !== 'string') {
+      return {
+        error: 'Each choice must be text.',
+        code: 'VALIDATION_INVALID_TYPE',
+      };
+    }
     const trimmed = choice.trim();
     if (trimmed === '') continue;
-    if (trimmed.length > 60) return { error: 'A choice is too long (max 60).' };
+    if (trimmed.length > 60) {
+      return {
+        error: 'A choice is too long (max 60).',
+        code: 'VALIDATION_TOO_LONG',
+        params: { max: 60 },
+      };
+    }
     if (!seen.has(trimmed.toLowerCase())) {
       seen.add(trimmed.toLowerCase());
       value.push(trimmed);
@@ -47,7 +66,9 @@ function parseChoices(input) {
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Field not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Field not found.', code: 'NOT_FOUND', params: { entity: 'field' } });
   }
   next();
 });
@@ -69,16 +90,30 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const label = parseLabel(req.body?.label);
-  if (label.error) return res.status(400).json({ error: label.error });
+  if (label.error) {
+    return res
+      .status(400)
+      .json({ error: label.error, code: label.code, params: label.params });
+  }
 
   const fieldType = req.body?.fieldType;
   if (!FIELD_TYPES.includes(fieldType)) {
-    return res.status(400).json({ error: 'Choose a valid field type.' });
+    return res.status(400).json({
+      error: 'Choose a valid field type.',
+      code: 'VALIDATION_INVALID_CHOICE',
+    });
   }
   const choices = parseChoices(req.body?.choices);
-  if (choices.error) return res.status(400).json({ error: choices.error });
+  if (choices.error) {
+    return res
+      .status(400)
+      .json({ error: choices.error, code: choices.code, params: choices.params });
+  }
   if (fieldType === 'choice' && choices.value.length === 0) {
-    return res.status(400).json({ error: 'A choice field needs at least one choice.' });
+    return res.status(400).json({
+      error: 'A choice field needs at least one choice.',
+      code: 'FIELDS_CHOICES_REQUIRED',
+    });
   }
   const isRestricted = req.body?.isRestricted === true;
 
@@ -116,7 +151,10 @@ router.post('/', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: 'A field with that label already exists.' });
+      return res.status(409).json({
+        error: 'A field with that label already exists.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   } finally {
@@ -129,6 +167,7 @@ router.patch('/:id', async (req, res) => {
   if ('fieldType' in body) {
     return res.status(400).json({
       error: 'A field type cannot be changed. Create a new field instead.',
+      code: 'FIELDS_TYPE_IMMUTABLE',
     });
   }
 
@@ -142,7 +181,9 @@ router.patch('/:id', async (req, res) => {
     );
     if (existingResult.rowCount === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Field not found.' });
+      return res
+        .status(404)
+        .json({ error: 'Field not found.', code: 'NOT_FOUND', params: { entity: 'field' } });
     }
     const field = existingResult.rows[0];
 
@@ -153,7 +194,9 @@ router.patch('/:id', async (req, res) => {
       const label = parseLabel(body.label);
       if (label.error) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: label.error });
+        return res
+          .status(400)
+          .json({ error: label.error, code: label.code, params: label.params });
       }
       values.push(label.value);
       sets.push(`label = $${values.length}`);
@@ -161,7 +204,10 @@ router.patch('/:id', async (req, res) => {
     if ('isRestricted' in body) {
       if (typeof body.isRestricted !== 'boolean') {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'isRestricted must be true or false.' });
+        return res.status(400).json({
+          error: 'isRestricted must be true or false.',
+          code: 'VALIDATION_INVALID_TYPE',
+        });
       }
       values.push(body.isRestricted);
       sets.push(`is_restricted = $${values.length}`);
@@ -169,7 +215,11 @@ router.patch('/:id', async (req, res) => {
     if ('sortOrder' in body) {
       if (!Number.isInteger(body.sortOrder)) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'sortOrder must be a whole number.' });
+        return res.status(400).json({
+          error: 'sortOrder must be a whole number.',
+          code: 'VALIDATION_INVALID_TYPE',
+          params: { field: 'sortOrder' },
+        });
       }
       values.push(body.sortOrder);
       sets.push(`sort_order = $${values.length}`);
@@ -177,16 +227,24 @@ router.patch('/:id', async (req, res) => {
     if ('choices' in body) {
       if (field.fieldType !== 'choice') {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Only choice fields have choices.' });
+        return res.status(400).json({
+          error: 'Only choice fields have choices.',
+          code: 'FIELDS_CHOICES_NOT_ALLOWED',
+        });
       }
       const choices = parseChoices(body.choices);
       if (choices.error) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: choices.error });
+        return res
+          .status(400)
+          .json({ error: choices.error, code: choices.code, params: choices.params });
       }
       if (choices.value.length === 0) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'A choice field needs at least one choice.' });
+        return res.status(400).json({
+          error: 'A choice field needs at least one choice.',
+          code: 'FIELDS_CHOICES_REQUIRED',
+        });
       }
       // Don't remove a choice that some student is currently using.
       const usedResult = await client.query(
@@ -201,6 +259,8 @@ router.patch('/:id', async (req, res) => {
         await client.query('ROLLBACK');
         return res.status(409).json({
           error: `These choices are still in use and cannot be removed: ${removed.join(', ')}.`,
+          code: 'FIELDS_CHOICES_IN_USE',
+          params: { choices: removed },
         });
       }
       values.push(JSON.stringify(choices.value));
@@ -209,14 +269,20 @@ router.patch('/:id', async (req, res) => {
     if ('archived' in body) {
       if (typeof body.archived !== 'boolean') {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'archived must be true or false.' });
+        return res.status(400).json({
+          error: 'archived must be true or false.',
+          code: 'VALIDATION_INVALID_TYPE',
+        });
       }
       sets.push(`archived_at = ${body.archived ? 'now()' : 'NULL'}`);
     }
 
     if (sets.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'Nothing to change.' });
+      return res.status(400).json({
+        error: 'Nothing to change.',
+        code: 'VALIDATION_NOTHING_TO_CHANGE',
+      });
     }
 
     values.push(field.id);
@@ -239,7 +305,10 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: 'A field with that label already exists.' });
+      return res.status(409).json({
+        error: 'A field with that label already exists.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   } finally {
@@ -266,7 +335,9 @@ router.delete('/:id', async (req, res) => {
         [req.params.id]
       );
       return exists.rowCount === 0
-        ? res.status(404).json({ error: 'Field not found.' })
+        ? res
+            .status(404)
+            .json({ error: 'Field not found.', code: 'NOT_FOUND', params: { entity: 'field' } })
         : res.status(204).end();
     }
     await recordAudit(client, {

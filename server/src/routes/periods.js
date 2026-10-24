@@ -27,12 +27,17 @@ router.get('/settings/period-anchor', async (req, res) => {
 router.put('/settings/period-anchor', async (req, res) => {
   const anchorDate = req.body?.anchorDate;
   if (!isValidIsoDate(anchorDate)) {
-    return res
-      .status(400)
-      .json({ error: 'anchorDate must be a real date written as YYYY-MM-DD.' });
+    return res.status(400).json({
+      error: 'anchorDate must be a real date written as YYYY-MM-DD.',
+      code: 'VALIDATION_INVALID_DATE',
+      params: { field: 'anchorDate' },
+    });
   }
   if (!isSaturday(anchorDate)) {
-    return res.status(400).json({ error: 'The anchor date must be a Saturday.' });
+    return res.status(400).json({
+      error: 'The anchor date must be a Saturday.',
+      code: 'PERIODS_ANCHOR_NOT_SATURDAY',
+    });
   }
 
   if ((await readAnchor()) !== anchorDate) {
@@ -40,6 +45,7 @@ router.put('/settings/period-anchor', async (req, res) => {
     if (scores.rowCount > 0) {
       return res.status(409).json({
         error: 'The anchor date cannot be changed after scores exist.',
+        code: 'PERIODS_ANCHOR_LOCKED',
       });
     }
   }

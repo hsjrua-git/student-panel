@@ -11,23 +11,39 @@ const MAX_SEARCH = 100;
 const MAX_ABS_VALUE = 1_000_000_000;
 
 export function parseViewName(input) {
-  if (typeof input !== 'string') return { error: 'A name is required.' };
+  if (typeof input !== 'string') {
+    return { error: 'A name is required.', code: 'VALIDATION_REQUIRED' };
+  }
   const value = input.trim().replace(/\s+/g, ' ');
   if (value.length < 1 || value.length > 60) {
-    return { error: 'The name must be 1 to 60 characters.' };
+    return {
+      error: 'The name must be 1 to 60 characters.',
+      code: 'VALIDATION_INVALID_LENGTH',
+      params: { min: 1, max: 60 },
+    };
   }
   return { value };
 }
 
 function parseFilter(input) {
   if (input === null || typeof input !== 'object') {
-    return { error: 'Each filter must be an object.' };
+    return {
+      error: 'Each filter must be an object.',
+      code: 'VALIDATION_INVALID_TYPE',
+    };
   }
   if (!isUuid(input.parameterId)) {
-    return { error: 'Each filter needs a valid parameterId.' };
+    return {
+      error: 'Each filter needs a valid parameterId.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'parameterId' },
+    };
   }
   if (!OPERATORS.includes(input.op)) {
-    return { error: `A filter condition must be one of: ${OPERATORS.join(', ')}.` };
+    return {
+      error: `A filter condition must be one of: ${OPERATORS.join(', ')}.`,
+      code: 'VALIDATION_INVALID_CHOICE',
+    };
   }
   if (!VALUE_OPERATORS.has(input.op)) {
     return { value: { parameterId: input.parameterId, op: input.op } };
@@ -39,25 +55,36 @@ function parseFilter(input) {
     !Number.isFinite(value) ||
     Math.abs(value) > MAX_ABS_VALUE
   ) {
-    return { error: 'This filter needs a number as its value.' };
+    return {
+      error: 'This filter needs a number as its value.',
+      code: 'VALIDATION_INVALID_TYPE',
+    };
   }
   return { value: { parameterId: input.parameterId, op: input.op, value } };
 }
 
 export function parseViewConfig(input) {
   if (input === null || typeof input !== 'object' || Array.isArray(input)) {
-    return { error: 'The view settings are missing.' };
+    return {
+      error: 'The view settings are missing.',
+      code: 'VALIDATION_REQUIRED',
+    };
   }
 
   const { periodMode = 'current' } = input;
   if (periodMode !== 'current' && periodMode !== 'fixed') {
-    return { error: 'periodMode must be "current" or "fixed".' };
+    return {
+      error: 'periodMode must be "current" or "fixed".',
+      code: 'VALIDATION_INVALID_CHOICE',
+    };
   }
   let periodNumber = null;
   if (periodMode === 'fixed') {
     if (!isValidPeriodNumber(input.periodNumber)) {
       return {
         error: `A fixed period must be a whole number from 1 to ${MAX_PERIOD}.`,
+        code: 'VALIDATION_INVALID_RANGE',
+        params: { min: 1, max: MAX_PERIOD },
       };
     }
     periodNumber = input.periodNumber;
@@ -70,17 +97,27 @@ export function parseViewConfig(input) {
     !parameterIds.every(isUuid) ||
     new Set(parameterIds).size !== parameterIds.length
   ) {
-    return { error: 'parameterIds must be a list of unique valid IDs.' };
+    return {
+      error: 'parameterIds must be a list of unique valid IDs.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'parameterIds' },
+    };
   }
 
   const rawFilters = input.filters ?? [];
   if (!Array.isArray(rawFilters) || rawFilters.length > MAX_FILTERS) {
-    return { error: `Use at most ${MAX_FILTERS} filters.` };
+    return {
+      error: `Use at most ${MAX_FILTERS} filters.`,
+      code: 'VALIDATION_TOO_LONG',
+      params: { max: MAX_FILTERS },
+    };
   }
   const filters = [];
   for (const raw of rawFilters) {
     const parsed = parseFilter(raw);
-    if (parsed.error) return { error: parsed.error };
+    if (parsed.error) {
+      return { error: parsed.error, code: parsed.code, params: parsed.params };
+    }
     filters.push(parsed.value);
   }
 
@@ -94,17 +131,25 @@ export function parseViewConfig(input) {
     return {
       error:
         'sort needs a key (name, code or a parameter ID) and a direction (asc or desc).',
+      code: 'VALIDATION_INVALID_CHOICE',
     };
   }
 
   const search = input.search ?? '';
   if (typeof search !== 'string' || search.trim().length > MAX_SEARCH) {
-    return { error: `The search text can be at most ${MAX_SEARCH} characters.` };
+    return {
+      error: `The search text can be at most ${MAX_SEARCH} characters.`,
+      code: 'VALIDATION_TOO_LONG',
+      params: { max: MAX_SEARCH },
+    };
   }
 
   const showChange = input.showChange ?? false;
   if (typeof showChange !== 'boolean') {
-    return { error: 'showChange must be true or false.' };
+    return {
+      error: 'showChange must be true or false.',
+      code: 'VALIDATION_INVALID_TYPE',
+    };
   }
 
   return {

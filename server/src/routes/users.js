@@ -18,7 +18,9 @@ const GUARDED_PERMISSIONS = [
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'User not found.' });
+    return res
+      .status(404)
+      .json({ error: 'User not found.', code: 'NOT_FOUND', params: { entity: 'user' } });
   }
   next();
 });
@@ -60,7 +62,9 @@ async function countOtherActiveWithPermission(db, key, excludeUserId) {
 router.post('/', async (req, res) => {
   const parsed = parseNewUser(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const temporaryPassword = generatePassword();
@@ -69,7 +73,11 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN');
     if (!(await roleExists(client, parsed.values.roleId))) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'That role no longer exists.' });
+      return res.status(400).json({
+        error: 'That role no longer exists.',
+        code: 'NOT_FOUND',
+        params: { entity: 'role' },
+      });
     }
     const user = await createUser({
       ...parsed.values,
@@ -94,7 +102,10 @@ router.post('/', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: 'That username already exists.' });
+      return res.status(409).json({
+        error: 'That username already exists.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   } finally {
@@ -105,7 +116,9 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const parsed = parseUserUpdate(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const client = await pool.connect();
@@ -122,13 +135,19 @@ router.patch('/:id', async (req, res) => {
     );
     if (targetResult.rowCount === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'User not found.' });
+      return res
+        .status(404)
+        .json({ error: 'User not found.', code: 'NOT_FOUND', params: { entity: 'user' } });
     }
     const target = targetResult.rows[0];
 
     if (parsed.values.roleId && !(await roleExists(client, parsed.values.roleId))) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: 'That role no longer exists.' });
+      return res.status(400).json({
+        error: 'That role no longer exists.',
+        code: 'NOT_FOUND',
+        params: { entity: 'role' },
+      });
     }
 
     const newRoleId = parsed.values.roleId ?? target.roleId;
@@ -154,7 +173,11 @@ router.patch('/:id', async (req, res) => {
     });
     if (problem) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: problem });
+      return res.status(409).json({
+        error: problem.error,
+        code: problem.code,
+        params: problem.params,
+      });
     }
 
     const columns = {
@@ -219,6 +242,7 @@ router.post('/:id/reset-password', async (req, res) => {
   if (req.params.id === req.user.id) {
     return res.status(409).json({
       error: 'Use "Change password" for your own account.',
+      code: 'USERS_SELF_PASSWORD_RESET',
     });
   }
 
@@ -237,7 +261,9 @@ router.post('/:id/reset-password', async (req, res) => {
     );
     if (updated.rowCount === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'User not found.' });
+      return res
+        .status(404)
+        .json({ error: 'User not found.', code: 'NOT_FOUND', params: { entity: 'user' } });
     }
     const user = updated.rows[0];
 

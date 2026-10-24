@@ -16,7 +16,11 @@ const INTERVAL_COLUMNS = `
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Interval not found.' });
+    return res.status(404).json({
+      error: 'Interval not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'interval' },
+    });
   }
   next();
 });
@@ -36,7 +40,9 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const parsed = parseIntervalBody(req.body ?? {});
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
   try {
     const result = await pool.query(
@@ -48,9 +54,10 @@ router.post('/', async (req, res) => {
     return res.status(201).json({ interval: result.rows[0] });
   } catch (err) {
     if (err.code === UNIQUE_VIOLATION) {
-      return res
-        .status(409)
-        .json({ error: 'An interval with that name already exists.' });
+      return res.status(409).json({
+        error: 'An interval with that name already exists.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   }
@@ -59,7 +66,9 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const parsed = parseIntervalBody(req.body ?? {}, { partial: true });
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const sets = [];
@@ -93,14 +102,19 @@ router.patch('/:id', async (req, res) => {
     interval = result.rows[0];
   } catch (err) {
     if (err.code === UNIQUE_VIOLATION) {
-      return res
-        .status(409)
-        .json({ error: 'An interval with that name already exists.' });
+      return res.status(409).json({
+        error: 'An interval with that name already exists.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   }
   if (!interval) {
-    return res.status(404).json({ error: 'Interval not found.' });
+    return res.status(404).json({
+      error: 'Interval not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'interval' },
+    });
   }
   res.json({ interval });
 });
@@ -114,7 +128,11 @@ router.delete('/:id', async (req, res) => {
     [req.params.id]
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Interval not found.' });
+    return res.status(404).json({
+      error: 'Interval not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'interval' },
+    });
   }
   res.status(204).end();
 });

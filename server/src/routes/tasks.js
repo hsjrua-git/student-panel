@@ -21,7 +21,11 @@ const TASK_COLUMNS = `
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Task not found.' });
+    return res.status(404).json({
+      error: 'Task not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'task' },
+    });
   }
   next();
 });
@@ -29,7 +33,11 @@ router.param('id', (req, res, next, value) => {
 router.get('/', async (req, res) => {
   const { sessionId } = req.query;
   if (!isUuid(sessionId)) {
-    return res.status(400).json({ error: 'sessionId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'sessionId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'sessionId' },
+    });
   }
   const result = await pool.query(
     `SELECT ${TASK_COLUMNS}
@@ -44,11 +52,17 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { sessionId } = req.body ?? {};
   if (!isUuid(sessionId)) {
-    return res.status(400).json({ error: 'sessionId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'sessionId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'sessionId' },
+    });
   }
   const parsed = parseTaskFields(req.body ?? {});
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const session = await pool.query(
@@ -56,9 +70,10 @@ router.post('/', async (req, res) => {
     [sessionId]
   );
   if (session.rowCount === 0) {
-    return res
-      .status(400)
-      .json({ error: 'That session does not exist or is archived.' });
+    return res.status(400).json({
+      error: 'That session does not exist or is archived.',
+      code: 'TASKS_SESSION_ARCHIVED',
+    });
   }
 
   const result = await pool.query(
@@ -81,7 +96,11 @@ router.post('/from-template', async (req, res) => {
   const { templateId } = req.body ?? {};
   const sessionIds = Array.isArray(req.body?.sessionIds) ? req.body.sessionIds : [];
   if (!isUuid(templateId)) {
-    return res.status(400).json({ error: 'templateId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'templateId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'templateId' },
+    });
   }
   if (
     sessionIds.length === 0 ||
@@ -90,6 +109,8 @@ router.post('/from-template', async (req, res) => {
   ) {
     return res.status(400).json({
       error: `sessionIds must be 1 to ${MAX_SESSIONS_PER_ASSIGN} valid IDs.`,
+      code: 'VALIDATION_INVALID_LENGTH',
+      params: { min: 1, max: MAX_SESSIONS_PER_ASSIGN },
     });
   }
 
@@ -104,9 +125,10 @@ router.post('/from-template', async (req, res) => {
     );
     if (template.rowCount === 0) {
       await client.query('ROLLBACK');
-      return res
-        .status(400)
-        .json({ error: 'That template does not exist or is archived.' });
+      return res.status(400).json({
+        error: 'That template does not exist or is archived.',
+        code: 'TASKS_TEMPLATE_ARCHIVED',
+      });
     }
 
     const result = await client.query(
@@ -151,10 +173,15 @@ router.patch('/:id', async (req, res) => {
   const body = req.body ?? {};
   const parsed = parseTaskFields(body, { partial: true });
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
   if ('done' in body && typeof body.done !== 'boolean') {
-    return res.status(400).json({ error: 'done must be true or false.' });
+    return res.status(400).json({
+      error: 'done must be true or false.',
+      code: 'VALIDATION_INVALID_TYPE',
+    });
   }
 
   const sets = [];
@@ -181,7 +208,10 @@ router.patch('/:id', async (req, res) => {
     }
   }
   if (sets.length === 0) {
-    return res.status(400).json({ error: 'Nothing to change.' });
+    return res.status(400).json({
+      error: 'Nothing to change.',
+      code: 'VALIDATION_NOTHING_TO_CHANGE',
+    });
   }
 
   values.push(req.params.id);
@@ -193,7 +223,11 @@ router.patch('/:id', async (req, res) => {
     values
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Task not found.' });
+    return res.status(404).json({
+      error: 'Task not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'task' },
+    });
   }
   res.json({ task: result.rows[0] });
 });
@@ -205,7 +239,11 @@ router.delete('/:id', async (req, res) => {
     req.params.id,
   ]);
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Task not found.' });
+    return res.status(404).json({
+      error: 'Task not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'task' },
+    });
   }
   res.status(204).end();
 });

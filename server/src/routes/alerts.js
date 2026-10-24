@@ -37,7 +37,11 @@ const ALERT_FROM = `
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Alert not found.' });
+    return res.status(404).json({
+      error: 'Alert not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'alert' },
+    });
   }
   next();
 });
@@ -47,7 +51,9 @@ router.param('id', (req, res, next, value) => {
 router.get('/', async (req, res) => {
   const status = parseAlertStatus(req.query.status);
   if (status.error) {
-    return res.status(400).json({ error: status.error });
+    return res
+      .status(400)
+      .json({ error: status.error, code: status.code, params: status.params });
   }
 
   let where = '';
@@ -100,7 +106,9 @@ router.post('/scan', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const parsed = parseAlertPatch(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const result = await pool.query(
@@ -111,7 +119,11 @@ router.patch('/:id', async (req, res) => {
     [req.params.id]
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Alert not found.' });
+    return res.status(404).json({
+      error: 'Alert not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'alert' },
+    });
   }
   const full = await pool.query(
     `SELECT ${ALERT_COLUMNS} ${ALERT_FROM} WHERE a.id = $1`,

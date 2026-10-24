@@ -336,7 +336,7 @@ app.use('/api', parametersRouter);
 app.use('/api', evaluationsRouter);
 
 app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'Not found.' });
+  res.status(404).json({ error: 'Not found.', code: 'NOT_FOUND' });
 });
 
 // Anything that is not an API call is a client-side route: hand back the app
@@ -353,6 +353,10 @@ app.use((err, req, res, next) => {
   if (status >= 500) console.error(err);
   res.status(status).json({
     error: status >= 500 ? 'Something went wrong on the server.' : err.message,
+    // Forward a machine-readable code (and its translation params) when the
+    // error carries one; JSON serialization drops the keys when undefined.
+    code: err.code,
+    params: err.params,
   });
 });
 

@@ -7,17 +7,27 @@ import { normalizeFullName } from './student.js';
 
 function requiredBirthDate(input) {
   if (typeof input !== 'string' || !isValidIsoDate(input)) {
-    return { error: 'Birth date must be a valid date (YYYY-MM-DD).' };
+    return {
+      error: 'Birth date must be a valid date (YYYY-MM-DD).',
+      code: 'VALIDATION_INVALID_DATE',
+    };
   }
   if (input > todayIso()) {
-    return { error: 'Birth date cannot be in the future.' };
+    return {
+      error: 'Birth date cannot be in the future.',
+      code: 'VALIDATION_DATE_IN_FUTURE',
+    };
   }
   return { value: input };
 }
 
 function requiredNationalId(input) {
   if (typeof input !== 'string' || !/^[0-9]{10}$/.test(input)) {
-    return { error: 'National ID must be exactly 10 digits.' };
+    return {
+      error: 'National ID must be exactly 10 digits.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { length: 10 },
+    };
   }
   return { value: input };
 }
@@ -59,12 +69,15 @@ export function parseTeacherUpdate(body) {
   }
   if ('archived' in body) {
     if (typeof body.archived !== 'boolean') {
-      return { error: 'archived must be true or false.' };
+      return {
+        error: 'archived must be true or false.',
+        code: 'VALIDATION_INVALID_TYPE',
+      };
     }
     updates.archived = body.archived;
   }
   if (Object.keys(updates).length === 0) {
-    return { error: 'Nothing to change.' };
+    return { error: 'Nothing to change.', code: 'VALIDATION_NOTHING_TO_CHANGE' };
   }
   return { value: updates };
 }

@@ -36,23 +36,43 @@ async function handleCube(req, res) {
 
   const { groupId } = source;
   if (groupId !== undefined && !isUuid(groupId)) {
-    return res.status(400).json({ error: 'groupId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'groupId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'groupId' },
+    });
   }
 
   const studentIds = normalizeList(source.studentIds);
   if (studentIds.length > MAX_IDS) {
-    return res.status(400).json({ error: `Too many students requested (max ${MAX_IDS}).` });
+    return res.status(400).json({
+      error: `Too many students requested (max ${MAX_IDS}).`,
+      code: 'EXPORT_TOO_MANY_IDS',
+      params: { field: 'studentIds', max: MAX_IDS },
+    });
   }
   if (studentIds.some((id) => !isUuid(id))) {
-    return res.status(400).json({ error: 'studentIds must all be valid IDs.' });
+    return res.status(400).json({
+      error: 'studentIds must all be valid IDs.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'studentIds' },
+    });
   }
 
   const parameterIds = normalizeList(source.parameterIds);
   if (parameterIds.length > MAX_IDS) {
-    return res.status(400).json({ error: `Too many parameters requested (max ${MAX_IDS}).` });
+    return res.status(400).json({
+      error: `Too many parameters requested (max ${MAX_IDS}).`,
+      code: 'EXPORT_TOO_MANY_IDS',
+      params: { field: 'parameterIds', max: MAX_IDS },
+    });
   }
   if (parameterIds.some((id) => !isUuid(id))) {
-    return res.status(400).json({ error: 'parameterIds must all be valid IDs.' });
+    return res.status(400).json({
+      error: 'parameterIds must all be valid IDs.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'parameterIds' },
+    });
   }
   const selectedParameterIds = parameterIds.length > 0 ? parameterIds : null;
 
@@ -62,11 +82,17 @@ async function handleCube(req, res) {
   );
   const anchorDate = anchorResult.rows[0]?.value;
   if (!anchorDate) {
-    return res.status(409).json({ error: 'Set the period start date first.' });
+    return res.status(409).json({
+      error: 'Set the period start date first.',
+      code: 'PERIODS_ANCHOR_NOT_SET',
+    });
   }
   const current = periodForDate(anchorDate, todayIso());
   if (!current) {
-    return res.status(400).json({ error: 'No periods have started yet.' });
+    return res.status(400).json({
+      error: 'No periods have started yet.',
+      code: 'PERIODS_NOT_STARTED',
+    });
   }
 
   // Requested periods: an explicit list, or "all" (1..current) when omitted or
@@ -82,16 +108,26 @@ async function handleCube(req, res) {
       if (!/^\d+$/.test(value) || !isValidPeriodNumber(Number(value))) {
         return res.status(400).json({
           error: `Each period must be a whole number from 1 to ${MAX_PERIOD}.`,
+          code: 'VALIDATION_INVALID_RANGE',
+          params: { min: 1, max: MAX_PERIOD },
         });
       }
       numbers.push(Number(value));
     }
     if (numbers.length === 0) {
-      return res.status(400).json({ error: 'Select at least one period.' });
+      return res.status(400).json({
+        error: 'Select at least one period.',
+        code: 'VALIDATION_REQUIRED',
+        params: { field: 'periods' },
+      });
     }
     const tooNew = numbers.find((number) => number > current);
     if (tooNew !== undefined) {
-      return res.status(400).json({ error: `Period ${tooNew} has not started yet.` });
+      return res.status(400).json({
+        error: `Period ${tooNew} has not started yet.`,
+        code: 'PERIODS_NOT_STARTED',
+        params: { period: tooNew },
+      });
     }
     periods = [...new Set(numbers)].sort((a, b) => a - b);
   }

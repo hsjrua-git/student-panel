@@ -19,7 +19,9 @@ export async function attachUser(req, res, next) {
 
 export function requireLogin(req, res, next) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Please sign in.' });
+    return res
+      .status(401)
+      .json({ error: 'Please sign in.', code: 'AUTH_SIGNIN_REQUIRED' });
   }
   next();
 }
@@ -40,7 +42,9 @@ function permissionFor(policy, method) {
 export function authorize(policy) {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ error: 'Please sign in.' });
+      return res
+        .status(401)
+        .json({ error: 'Please sign in.', code: 'AUTH_SIGNIN_REQUIRED' });
     }
     if (req.user.mustChangePassword) {
       return res.status(403).json({
@@ -50,14 +54,16 @@ export function authorize(policy) {
     }
     const need = permissionFor(policy, req.method);
     if (need === null) {
-      return res
-        .status(403)
-        .json({ error: 'You do not have permission to do that.' });
+      return res.status(403).json({
+        error: 'You do not have permission to do that.',
+        code: 'AUTH_FORBIDDEN',
+      });
     }
     if (need !== true && !userCan(req, need)) {
-      return res
-        .status(403)
-        .json({ error: 'You do not have permission to do that.' });
+      return res.status(403).json({
+        error: 'You do not have permission to do that.',
+        code: 'AUTH_FORBIDDEN',
+      });
     }
     next();
   };
@@ -66,7 +72,11 @@ export function authorize(policy) {
 // For routes that need one specific key regardless of method.
 export function requirePermission(key) {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Please sign in.' });
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ error: 'Please sign in.', code: 'AUTH_SIGNIN_REQUIRED' });
+    }
     if (req.user.mustChangePassword) {
       return res.status(403).json({
         error: 'You must change your password first.',
@@ -74,9 +84,10 @@ export function requirePermission(key) {
       });
     }
     if (!userCan(req, key)) {
-      return res
-        .status(403)
-        .json({ error: 'You do not have permission to do that.' });
+      return res.status(403).json({
+        error: 'You do not have permission to do that.',
+        code: 'AUTH_FORBIDDEN',
+      });
     }
     next();
   };
@@ -86,7 +97,11 @@ export function requirePermission(key) {
 // needed both to manage roles and to assign roles to users).
 export function requireAnyPermission(...keys) {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Please sign in.' });
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ error: 'Please sign in.', code: 'AUTH_SIGNIN_REQUIRED' });
+    }
     if (req.user.mustChangePassword) {
       return res.status(403).json({
         error: 'You must change your password first.',
@@ -94,9 +109,10 @@ export function requireAnyPermission(...keys) {
       });
     }
     if (!keys.some((key) => userCan(req, key))) {
-      return res
-        .status(403)
-        .json({ error: 'You do not have permission to do that.' });
+      return res.status(403).json({
+        error: 'You do not have permission to do that.',
+        code: 'AUTH_FORBIDDEN',
+      });
     }
     next();
   };

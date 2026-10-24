@@ -2,14 +2,22 @@ import { isValidIsoDate, todayIso } from '../lib/periods.js';
 
 export function normalizeFullName(input) {
   if (typeof input !== 'string') {
-    return { error: 'Full name is required.' };
+    return { error: 'Full name is required.', code: 'VALIDATION_REQUIRED' };
   }
   const name = input.trim().replace(/\s+/g, ' ');
   if (name.length < 2) {
-    return { error: 'Full name must be at least 2 characters.' };
+    return {
+      error: 'Full name must be at least 2 characters.',
+      code: 'VALIDATION_TOO_SHORT',
+      params: { min: 2 },
+    };
   }
   if (name.length > 100) {
-    return { error: 'Full name must be 100 characters or fewer.' };
+    return {
+      error: 'Full name must be 100 characters or fewer.',
+      code: 'VALIDATION_TOO_LONG',
+      params: { max: 100 },
+    };
   }
   return { value: name };
 }
@@ -20,16 +28,25 @@ export function normalizeFullName(input) {
 export function normalizeGender(input) {
   if (input === undefined || input === null || input === '') return { value: null };
   if (input === 'male' || input === 'female') return { value: input };
-  return { error: 'Gender must be "male" or "female".' };
+  return {
+    error: 'Gender must be "male" or "female".',
+    code: 'VALIDATION_INVALID_CHOICE',
+  };
 }
 
 export function normalizeBirthDate(input) {
   if (input === undefined || input === null || input === '') return { value: null };
   if (typeof input !== 'string' || !isValidIsoDate(input)) {
-    return { error: 'Birth date must be a valid date (YYYY-MM-DD).' };
+    return {
+      error: 'Birth date must be a valid date (YYYY-MM-DD).',
+      code: 'VALIDATION_INVALID_DATE',
+    };
   }
   if (input > todayIso()) {
-    return { error: 'Birth date cannot be in the future.' };
+    return {
+      error: 'Birth date cannot be in the future.',
+      code: 'VALIDATION_DATE_IN_FUTURE',
+    };
   }
   return { value: input };
 }
@@ -37,14 +54,25 @@ export function normalizeBirthDate(input) {
 export function normalizeFatherName(input) {
   if (input === undefined || input === null || input === '') return { value: null };
   if (typeof input !== 'string') {
-    return { error: 'Father name must be text.' };
+    return {
+      error: 'Father name must be text.',
+      code: 'VALIDATION_INVALID_TYPE',
+    };
   }
   const name = input.trim().replace(/\s+/g, ' ');
   if (name.length < 2) {
-    return { error: 'Father name must be at least 2 characters.' };
+    return {
+      error: 'Father name must be at least 2 characters.',
+      code: 'VALIDATION_TOO_SHORT',
+      params: { min: 2 },
+    };
   }
   if (name.length > 100) {
-    return { error: 'Father name must be 100 characters or fewer.' };
+    return {
+      error: 'Father name must be 100 characters or fewer.',
+      code: 'VALIDATION_TOO_LONG',
+      params: { max: 100 },
+    };
   }
   return { value: name };
 }
@@ -52,7 +80,11 @@ export function normalizeFatherName(input) {
 export function normalizeNationalId(input) {
   if (input === undefined || input === null || input === '') return { value: null };
   if (typeof input !== 'string' || !/^[0-9]{10}$/.test(input)) {
-    return { error: 'National ID must be exactly 10 digits.' };
+    return {
+      error: 'National ID must be exactly 10 digits.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { length: 10 },
+    };
   }
   return { value: input };
 }

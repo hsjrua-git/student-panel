@@ -40,7 +40,7 @@ const CHANGE_COLUMNS = `
 
 router.param('id', (req, res, next, value) => {
   if (!UUID_PATTERN.test(value)) {
-    return res.status(404).json({ error: 'Not found.' });
+    return res.status(404).json({ error: 'Not found.', code: 'NOT_FOUND' });
   }
   next();
 });
@@ -49,6 +49,8 @@ router.param('number', (req, res, next, value) => {
   if (!/^\d+$/.test(value) || !isValidPeriodNumber(Number(value))) {
     return res.status(400).json({
       error: `Period must be a whole number from 1 to ${MAX_PERIOD}.`,
+      code: 'VALIDATION_INVALID_RANGE',
+      params: { min: 1, max: MAX_PERIOD },
     });
   }
   next();
@@ -56,13 +58,17 @@ router.param('number', (req, res, next, value) => {
 
 function handleParameterError(err, res) {
   if (err.code === UNIQUE_VIOLATION) {
-    res.status(409).json({ error: 'A parameter with that name already exists.' });
+    res.status(409).json({
+      error: 'A parameter with that name already exists.',
+      code: 'VALIDATION_NOT_UNIQUE',
+    });
     return true;
   }
   if (err.code === CHECK_VIOLATION) {
-    res
-      .status(400)
-      .json({ error: 'The minimum cannot be larger than the maximum.' });
+    res.status(400).json({
+      error: 'The minimum cannot be larger than the maximum.',
+      code: 'PARAMETERS_MIN_ABOVE_MAX',
+    });
     return true;
   }
   return false;
@@ -80,13 +86,17 @@ router.get('/parameters', async (req, res) => {
 router.post('/parameters', async (req, res) => {
   const parsed = parseParameterInput(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const startPeriod = req.body?.startPeriod;
   if (!isValidPeriodNumber(startPeriod)) {
     return res.status(400).json({
       error: `startPeriod must be a whole number from 1 to ${MAX_PERIOD}.`,
+      code: 'VALIDATION_INVALID_RANGE',
+      params: { min: 1, max: MAX_PERIOD },
     });
   }
 
@@ -121,7 +131,9 @@ router.post('/parameters', async (req, res) => {
 router.patch('/parameters/:id', async (req, res) => {
   const parsed = parseParameterInput(req.body, { partial: true });
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const columns = {
@@ -133,7 +145,10 @@ router.patch('/parameters/:id', async (req, res) => {
   };
   const entries = Object.entries(parsed.values);
   if (entries.length === 0) {
-    return res.status(400).json({ error: 'Nothing to change.' });
+    return res.status(400).json({
+      error: 'Nothing to change.',
+      code: 'VALIDATION_NOTHING_TO_CHANGE',
+    });
   }
 
     if ('minValue' in parsed.values || 'maxValue' in parsed.values) {
@@ -143,7 +158,11 @@ router.patch('/parameters/:id', async (req, res) => {
       [req.params.id]
     );
     if (currentResult.rowCount === 0) {
-      return res.status(404).json({ error: 'Parameter not found.' });
+      return res.status(404).json({
+        error: 'Parameter not found.',
+        code: 'NOT_FOUND',
+        params: { entity: 'parameter' },
+      });
     }
     const row = currentResult.rows[0];
     const rangeChanges =
@@ -158,6 +177,7 @@ router.patch('/parameters/:id', async (req, res) => {
       if (scores.rowCount > 0) {
         return res.status(409).json({
           error: 'The range cannot be changed after scores exist for this parameter.',
+          code: 'PARAMETERS_RANGE_LOCKED',
         });
       }
     }
@@ -177,7 +197,11 @@ router.patch('/parameters/:id', async (req, res) => {
       [...values, req.params.id]
     );
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Parameter not found.' });
+      return res.status(404).json({
+        error: 'Parameter not found.',
+        code: 'NOT_FOUND',
+        params: { entity: 'parameter' },
+      });
     }
     res.json(result.rows[0]);
   } catch (err) {
@@ -206,24 +230,34 @@ router.get('/parameter-changes/impact', async (req, res) => {
   const { parameterId, periodNumber, scope, action } = req.query;
 
   if (!isUuid(parameterId)) {
-    return res.status(400).json({ error: 'parameterId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'parameterId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'parameterId' },
+    });
   }
   const isDigits =
     typeof periodNumber === 'string' && /^\d+$/.test(periodNumber);
   if (!isDigits || !isValidPeriodNumber(Number(periodNumber))) {
     return res.status(400).json({
       error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
+      code: 'VALIDATION_INVALID_RANGE',
+      params: { min: 1, max: MAX_PERIOD },
     });
   }
   if (!SCOPES.includes(scope)) {
-    return res
-      .status(400)
-      .json({ error: `scope must be one of: ${SCOPES.join(', ')}.` });
+    return res.status(400).json({
+      error: `scope must be one of: ${SCOPES.join(', ')}.`,
+      code: 'VALIDATION_INVALID_CHOICE',
+      params: { field: 'scope' },
+    });
   }
   if (!ACTIONS.includes(action)) {
-    return res
-      .status(400)
-      .json({ error: `action must be one of: ${ACTIONS.join(', ')}.` });
+    return res.status(400).json({
+      error: `action must be one of: ${ACTIONS.join(', ')}.`,
+      code: 'VALIDATION_INVALID_CHOICE',
+      params: { field: 'action' },
+    });
   }
 
   const [changesResult, countsResult] = await Promise.all([
@@ -264,22 +298,32 @@ router.post('/parameter-changes', async (req, res) => {
   const { parameterId, periodNumber, scope, action } = req.body ?? {};
 
   if (typeof parameterId !== 'string' || !UUID_PATTERN.test(parameterId)) {
-    return res.status(400).json({ error: 'parameterId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'parameterId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'parameterId' },
+    });
   }
   if (!isValidPeriodNumber(periodNumber)) {
     return res.status(400).json({
       error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
+      code: 'VALIDATION_INVALID_RANGE',
+      params: { min: 1, max: MAX_PERIOD },
     });
   }
   if (!SCOPES.includes(scope)) {
-    return res
-      .status(400)
-      .json({ error: `scope must be one of: ${SCOPES.join(', ')}.` });
+    return res.status(400).json({
+      error: `scope must be one of: ${SCOPES.join(', ')}.`,
+      code: 'VALIDATION_INVALID_CHOICE',
+      params: { field: 'scope' },
+    });
   }
   if (!ACTIONS.includes(action)) {
-    return res
-      .status(400)
-      .json({ error: `action must be one of: ${ACTIONS.join(', ')}.` });
+    return res.status(400).json({
+      error: `action must be one of: ${ACTIONS.join(', ')}.`,
+      code: 'VALIDATION_INVALID_CHOICE',
+      params: { field: 'action' },
+    });
   }
 
   try {
@@ -294,7 +338,11 @@ router.post('/parameter-changes', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === FOREIGN_KEY_VIOLATION) {
-      return res.status(404).json({ error: 'Parameter not found.' });
+      return res.status(404).json({
+        error: 'Parameter not found.',
+        code: 'NOT_FOUND',
+        params: { entity: 'parameter' },
+      });
     }
     throw err;
   }
@@ -306,7 +354,11 @@ router.delete('/parameter-changes/:id', async (req, res) => {
     [req.params.id]
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Change not found.' });
+    return res.status(404).json({
+      error: 'Change not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'change' },
+    });
   }
   res.status(204).end();
 });

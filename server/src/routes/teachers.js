@@ -23,7 +23,9 @@ function escapeLike(text) {
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Teacher not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Teacher not found.', code: 'NOT_FOUND', params: { entity: 'teacher' } });
   }
   next();
 });
@@ -33,7 +35,11 @@ router.get('/', async (req, res) => {
   const search =
     typeof req.query.search === 'string' ? req.query.search.trim() : '';
   if (search.length > 100) {
-    return res.status(400).json({ error: 'Search text is too long.' });
+    return res.status(400).json({
+      error: 'Search text is too long.',
+      code: 'VALIDATION_TOO_LONG',
+      params: { max: 100 },
+    });
   }
 
   const conditions = [includeArchived ? 'TRUE' : 'archived_at IS NULL'];
@@ -61,7 +67,9 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const parsed = parseNewTeacher(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   for (let attempt = 1; attempt <= 5; attempt++) {
@@ -83,21 +91,25 @@ router.post('/', async (req, res) => {
       if (err.constraint === 'teachers_national_id_unique') {
         return res.status(409).json({
           error: 'That national ID already belongs to another teacher.',
+          code: 'VALIDATION_NOT_UNIQUE',
         });
       }
       // A code collision is astronomically unlikely; try a fresh code.
     }
   }
 
-  res
-    .status(500)
-    .json({ error: 'Could not create a unique teacher code. Please try again.' });
+  res.status(500).json({
+    error: 'Could not create a unique teacher code. Please try again.',
+    code: 'TEACHERS_CODE_GENERATION_FAILED',
+  });
 });
 
 router.patch('/:id', async (req, res) => {
   const parsed = parseTeacherUpdate(req.body ?? {});
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const sets = [];
@@ -132,13 +144,16 @@ router.patch('/:id', async (req, res) => {
     if (err.code === UNIQUE_VIOLATION && err.constraint === 'teachers_national_id_unique') {
       return res.status(409).json({
         error: 'That national ID already belongs to another teacher.',
+        code: 'VALIDATION_NOT_UNIQUE',
       });
     }
     throw err;
   }
 
   if (!teacher) {
-    return res.status(404).json({ error: 'Teacher not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Teacher not found.', code: 'NOT_FOUND', params: { entity: 'teacher' } });
   }
   res.json({ teacher });
 });
@@ -152,7 +167,9 @@ router.delete('/:id', async (req, res) => {
     [req.params.id]
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Teacher not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Teacher not found.', code: 'NOT_FOUND', params: { entity: 'teacher' } });
   }
   res.status(204).end();
 });

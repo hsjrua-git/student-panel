@@ -15,7 +15,11 @@ const TEMPLATE_COLUMNS = `
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Task template not found.' });
+    return res.status(404).json({
+      error: 'Task template not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'taskTemplate' },
+    });
   }
   next();
 });
@@ -35,7 +39,9 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const parsed = parseTaskFields(req.body ?? {});
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
   const result = await pool.query(
     `INSERT INTO task_templates (title, description, sort_order)
@@ -54,10 +60,15 @@ router.patch('/:id', async (req, res) => {
   const body = req.body ?? {};
   const parsed = parseTaskFields(body, { partial: true });
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
   if ('archived' in body && typeof body.archived !== 'boolean') {
-    return res.status(400).json({ error: 'archived must be true or false.' });
+    return res.status(400).json({
+      error: 'archived must be true or false.',
+      code: 'VALIDATION_INVALID_TYPE',
+    });
   }
 
   const sets = [];
@@ -78,7 +89,10 @@ router.patch('/:id', async (req, res) => {
     sets.push(`archived_at = ${body.archived ? 'now()' : 'NULL'}`);
   }
   if (sets.length === 0) {
-    return res.status(400).json({ error: 'Nothing to change.' });
+    return res.status(400).json({
+      error: 'Nothing to change.',
+      code: 'VALIDATION_NOTHING_TO_CHANGE',
+    });
   }
 
   values.push(req.params.id);
@@ -90,7 +104,11 @@ router.patch('/:id', async (req, res) => {
     values
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Task template not found.' });
+    return res.status(404).json({
+      error: 'Task template not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'taskTemplate' },
+    });
   }
   res.json({ template: result.rows[0] });
 });
@@ -110,7 +128,11 @@ router.delete('/:id', async (req, res) => {
       [req.params.id]
     );
     if (exists.rowCount === 0) {
-      return res.status(404).json({ error: 'Task template not found.' });
+      return res.status(404).json({
+        error: 'Task template not found.',
+        code: 'NOT_FOUND',
+        params: { entity: 'taskTemplate' },
+      });
     }
   }
   res.status(204).end();

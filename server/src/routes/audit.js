@@ -33,14 +33,22 @@ router.get('/', async (req, res) => {
 
   if (category !== undefined) {
     if (typeof category !== 'string' || !CATEGORIES.includes(category)) {
-      return res.status(400).json({ error: 'Unknown category.' });
+      return res.status(400).json({
+        error: 'Unknown category.',
+        code: 'VALIDATION_INVALID_CHOICE',
+        params: { field: 'category' },
+      });
     }
     values.push(category);
     conditions.push(`split_part(a.action, '.', 1) = $${values.length}`);
   }
   if (actor !== undefined) {
     if (typeof actor !== 'string' || actor === '' || actor.length > 64) {
-      return res.status(400).json({ error: 'Invalid user filter.' });
+      return res.status(400).json({
+        error: 'Invalid user filter.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'actor' },
+      });
     }
     values.push(actor.toLowerCase());
     conditions.push(`lower(a.actor) = $${values.length}`);

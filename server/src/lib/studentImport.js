@@ -11,17 +11,32 @@ export function validateImportBody(body) {
     body !== null && typeof body === 'object' && !Array.isArray(body)
       ? body
       : null;
-  if (input === null) return { error: 'Send an object with a list of rows.' };
+  if (input === null) {
+    return {
+      error: 'Send an object with a list of rows.',
+      code: 'VALIDATION_INVALID_TYPE',
+    };
+  }
 
   const { rows, allowDuplicateNames = false, dryRun = false } = input;
   if (typeof allowDuplicateNames !== 'boolean' || typeof dryRun !== 'boolean') {
-    return { error: 'allowDuplicateNames and dryRun must be true or false.' };
+    return {
+      error: 'allowDuplicateNames and dryRun must be true or false.',
+      code: 'VALIDATION_INVALID_TYPE',
+    };
   }
   if (!Array.isArray(rows) || rows.length === 0) {
-    return { error: 'rows must be a non-empty list.' };
+    return {
+      error: 'rows must be a non-empty list.',
+      code: 'VALIDATION_REQUIRED',
+    };
   }
   if (rows.length > MAX_IMPORT_ROWS) {
-    return { error: `Import at most ${MAX_IMPORT_ROWS} rows at a time.` };
+    return {
+      error: `Import at most ${MAX_IMPORT_ROWS} rows at a time.`,
+      code: 'STUDENTS_IMPORT_TOO_MANY',
+      params: { max: MAX_IMPORT_ROWS },
+    };
   }
 
   const cleaned = [];
@@ -35,10 +50,16 @@ export function validateImportBody(body) {
       item.row <= 1_000_000 &&
       typeof item.fullName === 'string';
     if (!valid) {
-      return { error: 'Every row needs a row number and a fullName.' };
+      return {
+        error: 'Every row needs a row number and a fullName.',
+        code: 'VALIDATION_REQUIRED',
+      };
     }
     if (seenRows.has(item.row)) {
-      return { error: 'Row numbers must be unique.' };
+      return {
+        error: 'Row numbers must be unique.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      };
     }
     seenRows.add(item.row);
     cleaned.push({ row: item.row, fullName: item.fullName });

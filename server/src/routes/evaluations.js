@@ -33,14 +33,22 @@ router.get('/evaluations', async (req, res) => {
 
   if (studentId !== undefined) {
     if (!isUuid(studentId)) {
-      return res.status(400).json({ error: 'studentId must be a valid ID.' });
+      return res.status(400).json({
+        error: 'studentId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'studentId' },
+      });
     }
     values.push(studentId);
     conditions.push(`student_id = $${values.length}`);
   }
   if (parameterId !== undefined) {
     if (!isUuid(parameterId)) {
-      return res.status(400).json({ error: 'parameterId must be a valid ID.' });
+      return res.status(400).json({
+        error: 'parameterId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'parameterId' },
+      });
     }
     values.push(parameterId);
     conditions.push(`parameter_id = $${values.length}`);
@@ -51,6 +59,8 @@ router.get('/evaluations', async (req, res) => {
     if (!isDigits || !isValidPeriodNumber(Number(periodNumber))) {
       return res.status(400).json({
         error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
+        code: 'VALIDATION_INVALID_RANGE',
+        params: { min: 1, max: MAX_PERIOD },
       });
     }
     values.push(Number(periodNumber));
@@ -60,6 +70,7 @@ router.get('/evaluations', async (req, res) => {
   if (values.length === 0) {
     return res.status(400).json({
       error: 'Add at least one filter: studentId, parameterId or periodNumber.',
+      code: 'EVALUATIONS_FILTER_REQUIRED',
     });
   }
 
@@ -91,19 +102,30 @@ router.put('/evaluations/bulk', async (req, res) => {
   } = req.body ?? {};
 
   if (typeof dryRun !== 'boolean') {
-    return res.status(400).json({ error: 'dryRun must be true or false.' });
+    return res.status(400).json({
+      error: 'dryRun must be true or false.',
+      code: 'VALIDATION_INVALID_TYPE',
+    });
   }
   if (source !== undefined && source !== 'import') {
-    return res.status(400).json({ error: 'Unknown source.' });
+    return res.status(400).json({
+      error: 'Unknown source.',
+      code: 'VALIDATION_INVALID_CHOICE',
+    });
   }
   if (!isValidPeriodNumber(periodNumber)) {
     return res.status(400).json({
       error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
+      code: 'VALIDATION_INVALID_RANGE',
+      params: { min: 1, max: MAX_PERIOD },
     });
   }
   const shapeError = validateShape(entries);
   if (shapeError) {
-    return res.status(400).json({ error: shapeError });
+    return res.status(400).json({
+      error: shapeError,
+      code: 'EVALUATIONS_INVALID_SHAPE',
+    });
   }
   // Normalise any notes now so every later comparison uses the clean value.
   for (const entry of entries) {
@@ -116,16 +138,24 @@ router.put('/evaluations/bulk', async (req, res) => {
   );
   const anchorDate = anchorResult.rows[0]?.value;
   if (!anchorDate) {
-    return res.status(409).json({ error: 'Set the period anchor date first.' });
+    return res.status(409).json({
+      error: 'Set the period anchor date first.',
+      code: 'PERIODS_ANCHOR_NOT_SET',
+    });
   }
 
   const current = periodForDate(anchorDate, todayIso());
   if (current === null) {
-    return res.status(409).json({ error: 'Period 1 has not started yet.' });
+    return res.status(409).json({
+      error: 'Period 1 has not started yet.',
+      code: 'PERIODS_NOT_STARTED',
+    });
   }
   if (periodNumber > current) {
     return res.status(400).json({
       error: `Period ${periodNumber} has not started yet. The current period is ${current}.`,
+      code: 'PERIODS_NOT_STARTED',
+      params: { period: periodNumber, current },
     });
   }
 
@@ -215,6 +245,7 @@ router.put('/evaluations/bulk', async (req, res) => {
   if (problems.length > 0) {
     return res.status(400).json({
       error: 'Some entries are invalid. Nothing was saved.',
+      code: 'EVALUATIONS_INVALID_ENTRIES',
       problems,
     });
   }

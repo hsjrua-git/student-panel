@@ -38,7 +38,7 @@ const ASSIGNMENT_FROM = `
 `;
 
 // The teacher, interval and target an update touches (or an un-archived
-// assignment keeps) must still be active. Returns an error string or null.
+// assignment keeps) must still be active. Returns an error object or null.
 async function checkReferences(db, updates, { reactivating = false } = {}) {
   if (!reactivating && updates.teacherId === undefined &&
       updates.intervalId === undefined && updates.groupId === undefined &&
@@ -53,7 +53,10 @@ async function checkReferences(db, updates, { reactivating = false } = {}) {
       [teacherId]
     );
     if (result.rowCount === 0 || result.rows[0].archived_at !== null) {
-      return 'Choose an active teacher.';
+      return {
+        error: 'Choose an active teacher.',
+        code: 'ASSIGNMENTS_TEACHER_INACTIVE',
+      };
     }
   }
 
@@ -64,7 +67,10 @@ async function checkReferences(db, updates, { reactivating = false } = {}) {
       [intervalId]
     );
     if (result.rowCount === 0 || result.rows[0].archived_at !== null) {
-      return 'Choose an active interval.';
+      return {
+        error: 'Choose an active interval.',
+        code: 'ASSIGNMENTS_INTERVAL_INACTIVE',
+      };
     }
   }
 
@@ -75,7 +81,10 @@ async function checkReferences(db, updates, { reactivating = false } = {}) {
       [groupId]
     );
     if (result.rowCount === 0 || result.rows[0].archived_at !== null) {
-      return 'Choose an active group.';
+      return {
+        error: 'Choose an active group.',
+        code: 'ASSIGNMENTS_GROUP_INACTIVE',
+      };
     }
   }
 
@@ -98,7 +107,10 @@ async function checkReferences(db, updates, { reactivating = false } = {}) {
       row.deleted_at !== null ||
       row.archived_at !== null
     ) {
-      return 'Choose a student who is currently in a live group.';
+      return {
+        error: 'Choose a student who is currently in a live group.',
+        code: 'ASSIGNMENTS_MEMBERSHIP_INACTIVE',
+      };
     }
   }
 
@@ -107,7 +119,11 @@ async function checkReferences(db, updates, { reactivating = false } = {}) {
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Assignment not found.' });
+    return res.status(404).json({
+      error: 'Assignment not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'assignment' },
+    });
   }
   next();
 });
@@ -117,7 +133,11 @@ router.param('id', (req, res, next, value) => {
 router.get('/memberships', async (req, res) => {
   const { studentId } = req.query;
   if (!isUuid(studentId)) {
-    return res.status(400).json({ error: 'studentId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'studentId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'studentId' },
+    });
   }
   const result = await pool.query(
     `SELECT m.id AS "membershipId", m.group_id AS "groupId", g.name AS "groupName"
@@ -138,14 +158,22 @@ router.get('/', async (req, res) => {
   const values = [];
   if (teacherId !== undefined) {
     if (!isUuid(teacherId)) {
-      return res.status(400).json({ error: 'teacherId must be a valid ID.' });
+      return res.status(400).json({
+        error: 'teacherId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'teacherId' },
+      });
     }
     values.push(teacherId);
     conditions.push(`a.teacher_id = $${values.length}`);
   }
   if (groupId !== undefined) {
     if (!isUuid(groupId)) {
-      return res.status(400).json({ error: 'groupId must be a valid ID.' });
+      return res.status(400).json({
+        error: 'groupId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'groupId' },
+      });
     }
     values.push(groupId);
     conditions.push(`a.group_id = $${values.length}`);
@@ -165,13 +193,19 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const parsed = parseAssignmentBody(req.body ?? {});
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
   const assignment = parsed.value;
 
   const refError = await checkReferences(pool, assignment);
   if (refError) {
-    return res.status(400).json({ error: refError });
+    return res.status(400).json({
+      error: refError.error,
+      code: refError.code,
+      params: refError.params,
+    });
   }
 
   for (let attempt = 1; attempt <= 5; attempt++) {
@@ -204,17 +238,23 @@ router.post('/', async (req, res) => {
       return res.status(409).json({
         error:
           'This teacher already has a schedule with that interval for the same target.',
+        code: 'ASSIGNMENTS_DUPLICATE_SCHEDULE',
       });
     }
   }
 
-  res.status(500).json({ error: 'Could not create a unique assignment code.' });
+  res.status(500).json({
+    error: 'Could not create a unique assignment code.',
+    code: 'ASSIGNMENTS_CODE_GENERATION_FAILED',
+  });
 });
 
 router.patch('/:id', async (req, res) => {
   const parsed = parseAssignmentBody(req.body ?? {}, { partial: true });
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
   const updates = parsed.value;
 
@@ -225,7 +265,11 @@ router.patch('/:id', async (req, res) => {
     [req.params.id]
   );
   if (existing.rowCount === 0) {
-    return res.status(404).json({ error: 'Assignment not found.' });
+    return res.status(404).json({
+      error: 'Assignment not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'assignment' },
+    });
   }
 
   // Whatever combination of target keys the update carries, the row must end
@@ -239,13 +283,18 @@ router.patch('/:id', async (req, res) => {
   if ((finalGroupId !== null) === (finalMembershipId !== null)) {
     return res.status(400).json({
       error: 'Choose exactly one target: a group or a single student.',
+      code: 'ASSIGNMENTS_TARGET_REQUIRED',
     });
   }
 
   const reactivating = updates.archived === false && existing.rows[0].archivedAt !== null;
   const refError = await checkReferences(pool, updates, { reactivating });
   if (refError) {
-    return res.status(400).json({ error: refError });
+    return res.status(400).json({
+      error: refError.error,
+      code: refError.code,
+      params: refError.params,
+    });
   }
   // Re-validate the kept references when bringing an assignment back: pass
   // the stored values through the same checks.
@@ -258,7 +307,11 @@ router.patch('/:id', async (req, res) => {
     );
     const refError2 = await checkReferences(pool, kept.rows[0], { reactivating });
     if (refError2) {
-      return res.status(400).json({ error: refError2 });
+      return res.status(400).json({
+        error: refError2.error,
+        code: refError2.code,
+        params: refError2.params,
+      });
     }
   }
 
@@ -299,12 +352,17 @@ router.patch('/:id', async (req, res) => {
       return res.status(409).json({
         error:
           'This teacher already has a schedule with that interval for the same target.',
+        code: 'ASSIGNMENTS_DUPLICATE_SCHEDULE',
       });
     }
     throw err;
   }
   if (!updated) {
-    return res.status(404).json({ error: 'Assignment not found.' });
+    return res.status(404).json({
+      error: 'Assignment not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'assignment' },
+    });
   }
   const full = await pool.query(
     `SELECT ${ASSIGNMENT_COLUMNS} ${ASSIGNMENT_FROM} WHERE a.id = $1`,
@@ -322,7 +380,11 @@ router.delete('/:id', async (req, res) => {
     [req.params.id]
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Assignment not found.' });
+    return res.status(404).json({
+      error: 'Assignment not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'assignment' },
+    });
   }
   res.status(204).end();
 });

@@ -14,14 +14,22 @@ export function checkUserChange({ actorId, target, changes, guards = [] }) {
   const deactivating = target.isActive && newActive === false;
 
   if (target.id === actorId && (roleChanged || deactivating)) {
-    return 'You cannot change your own role or deactivate your own account. Ask another administrator.';
+    return {
+      error:
+        'You cannot change your own role or deactivate your own account. Ask another administrator.',
+      code: 'USERS_SELF_MODIFY',
+    };
   }
 
   for (const guard of guards) {
     const targetWillHold = newActive && guard.newRoleHasKey;
     const remaining = guard.othersActiveWithKey + (targetWillHold ? 1 : 0);
     if (remaining === 0) {
-      return `There must always be at least one active user who can ${guard.label}.`;
+      return {
+        error: `There must always be at least one active user who can ${guard.label}.`,
+        code: 'USERS_LAST_MANAGER',
+        params: { permission: guard.key },
+      };
     }
   }
 

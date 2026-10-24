@@ -16,9 +16,12 @@ export const TABS = ['overview', 'period', 'parameter'];
 export const CSV_DELIMITERS = [',', ';'];
 const MAX_HIDDEN = 200;
 
+export const LANGUAGES = ['fa', 'en'];
+
 export const DEFAULT_PREFERENCES = {
   theme: 'dark',
   palette: 'aurora',
+  language: 'fa',
   studentsPageSize: 25,
   studentsSort: 'newest',
   studentsShowCode: true,
@@ -32,6 +35,7 @@ export const DEFAULT_PREFERENCES = {
 const CHECKS = {
   theme: (value) => THEMES.includes(value),
   palette: (value) => PALETTES.includes(value),
+  language: (value) => LANGUAGES.includes(value),
   studentsPageSize: (value) => PAGE_SIZES.includes(value),
   studentsSort: (value) => SORTS.includes(value),
   studentsShowCode: (value) => typeof value === 'boolean',
@@ -49,15 +53,37 @@ const CHECKS = {
 export function parsePreferencesUpdate(body) {
   const isObject =
     body !== null && typeof body === 'object' && !Array.isArray(body);
-  if (!isObject) return { error: 'Send an object with the settings to change.' };
+  if (!isObject) {
+    return {
+      error: 'Send an object with the settings to change.',
+      code: 'VALIDATION_INVALID_TYPE',
+    };
+  }
 
   const values = {};
   for (const [key, value] of Object.entries(body)) {
-    if (!Object.hasOwn(CHECKS, key)) return { error: `Unknown setting: ${key}.` };
-    if (!CHECKS[key](value)) return { error: `Invalid value for ${key}.` };
+    if (!Object.hasOwn(CHECKS, key)) {
+      return {
+        error: `Unknown setting: ${key}.`,
+        code: 'VALIDATION_INVALID_CHOICE',
+        params: { key },
+      };
+    }
+    if (!CHECKS[key](value)) {
+      return {
+        error: `Invalid value for ${key}.`,
+        code: 'VALIDATION_INVALID_CHOICE',
+        params: { key },
+      };
+    }
     values[key] = value;
   }
-  if (Object.keys(values).length === 0) return { error: 'Nothing to change.' };
+  if (Object.keys(values).length === 0) {
+    return {
+      error: 'Nothing to change.',
+      code: 'VALIDATION_NOTHING_TO_CHANGE',
+    };
+  }
   return { values };
 }
 

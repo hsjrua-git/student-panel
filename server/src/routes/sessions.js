@@ -51,7 +51,11 @@ async function readPeriodAnchor(db) {
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Session not found.' });
+    return res.status(404).json({
+      error: 'Session not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'session' },
+    });
   }
   next();
 });
@@ -70,25 +74,41 @@ router.get('/', async (req, res) => {
 
   if (assignmentId !== undefined) {
     if (!isUuid(assignmentId)) {
-      return res.status(400).json({ error: 'assignmentId must be a valid ID.' });
+      return res.status(400).json({
+        error: 'assignmentId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'assignmentId' },
+      });
     }
     conditions.push(`s.assignment_id = ${push(assignmentId)}`);
   }
   if (teacherId !== undefined) {
     if (!isUuid(teacherId)) {
-      return res.status(400).json({ error: 'teacherId must be a valid ID.' });
+      return res.status(400).json({
+        error: 'teacherId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'teacherId' },
+      });
     }
     conditions.push(`a.teacher_id = ${push(teacherId)}`);
   }
   if (from !== undefined) {
     if (!isValidIsoDate(from)) {
-      return res.status(400).json({ error: 'from must be a date (YYYY-MM-DD).' });
+      return res.status(400).json({
+        error: 'from must be a date (YYYY-MM-DD).',
+        code: 'VALIDATION_INVALID_DATE',
+        params: { field: 'from' },
+      });
     }
     conditions.push(`s.session_date >= ${push(from)}::date`);
   }
   if (to !== undefined) {
     if (!isValidIsoDate(to)) {
-      return res.status(400).json({ error: 'to must be a date (YYYY-MM-DD).' });
+      return res.status(400).json({
+        error: 'to must be a date (YYYY-MM-DD).',
+        code: 'VALIDATION_INVALID_DATE',
+        params: { field: 'to' },
+      });
     }
     conditions.push(`s.session_date <= ${push(to)}::date`);
   }
@@ -119,13 +139,19 @@ router.get('/', async (req, res) => {
 router.post('/generate', async (req, res) => {
   const until = req.body?.until;
   if (!isValidIsoDate(until)) {
-    return res
-      .status(400)
-      .json({ error: 'until must be a real date written as YYYY-MM-DD.' });
+    return res.status(400).json({
+      error: 'until must be a real date written as YYYY-MM-DD.',
+      code: 'VALIDATION_INVALID_DATE',
+      params: { field: 'until' },
+    });
   }
   const assignmentId = req.body?.assignmentId ?? null;
   if (assignmentId !== null && !isUuid(assignmentId)) {
-    return res.status(400).json({ error: 'assignmentId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'assignmentId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'assignmentId' },
+    });
   }
 
   const client = await pool.connect();
@@ -161,39 +187,57 @@ router.patch('/:id', async (req, res) => {
   if ('movedTo' in body) {
     const movedTo = body.movedTo;
     if (movedTo !== null && !isValidIsoDate(movedTo)) {
-      return res
-        .status(400)
-        .json({ error: 'movedTo must be a date (YYYY-MM-DD) or null.' });
+      return res.status(400).json({
+        error: 'movedTo must be a date (YYYY-MM-DD) or null.',
+        code: 'VALIDATION_INVALID_DATE',
+        params: { field: 'movedTo' },
+      });
     }
     values.push(movedTo);
     sets.push(`moved_to = $${values.length}::date`);
   }
   if ('canceled' in body) {
     if (typeof body.canceled !== 'boolean') {
-      return res.status(400).json({ error: 'canceled must be true or false.' });
+      return res.status(400).json({
+        error: 'canceled must be true or false.',
+        code: 'VALIDATION_INVALID_TYPE',
+      });
     }
     sets.push(`canceled_at = ${body.canceled ? 'now()' : 'NULL'}`);
   }
   if ('note' in body) {
     const note = body.note;
     if (note !== null && typeof note !== 'string') {
-      return res.status(400).json({ error: 'note must be text.' });
+      return res.status(400).json({
+        error: 'note must be text.',
+        code: 'VALIDATION_INVALID_TYPE',
+      });
     }
     const trimmed = note?.trim() ?? '';
     if (trimmed.length > 500) {
-      return res.status(400).json({ error: 'note must be 500 characters or fewer.' });
+      return res.status(400).json({
+        error: 'note must be 500 characters or fewer.',
+        code: 'VALIDATION_TOO_LONG',
+        params: { max: 500 },
+      });
     }
     values.push(trimmed === '' ? null : trimmed);
     sets.push(`note = $${values.length}`);
   }
   if ('archived' in body) {
     if (typeof body.archived !== 'boolean') {
-      return res.status(400).json({ error: 'archived must be true or false.' });
+      return res.status(400).json({
+        error: 'archived must be true or false.',
+        code: 'VALIDATION_INVALID_TYPE',
+      });
     }
     sets.push(`archived_at = ${body.archived ? 'now()' : 'NULL'}`);
   }
   if (sets.length === 0) {
-    return res.status(400).json({ error: 'Nothing to change.' });
+    return res.status(400).json({
+      error: 'Nothing to change.',
+      code: 'VALIDATION_NOTHING_TO_CHANGE',
+    });
   }
 
   values.push(req.params.id);
@@ -205,7 +249,11 @@ router.patch('/:id', async (req, res) => {
     values
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Session not found.' });
+    return res.status(404).json({
+      error: 'Session not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'session' },
+    });
   }
   const full = await pool.query(
     `SELECT ${SESSION_COLUMNS} ${SESSION_FROM} WHERE s.id = $1`,

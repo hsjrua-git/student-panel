@@ -97,7 +97,9 @@ function escapeLike(text) {
 
 router.param('id', (req, res, next, value) => {
   if (!UUID_PATTERN.test(value)) {
-    return res.status(404).json({ error: 'Student not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Student not found.', code: 'NOT_FOUND', params: { entity: 'student' } });
   }
   next();
 });
@@ -105,18 +107,26 @@ router.param('id', (req, res, next, value) => {
 router.post('/', async (req, res) => {
   const parsed = normalizeFullName(req.body?.fullName);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const identity = parseIdentity(req.body);
   if (identity.error) {
-    return res.status(400).json({ error: identity.error });
+    return res.status(400).json({
+      error: identity.error,
+      code: identity.code,
+      params: identity.params,
+    });
   }
 
   const definitions = await loadDefinitions(pool);
   const extra = validateExtra(definitions, req.body?.extra ?? {});
   if (extra.error) {
-    return res.status(400).json({ error: extra.error });
+    return res
+      .status(400)
+      .json({ error: extra.error, code: extra.code, params: extra.params });
   }
 
   const canSeeRestricted = userCan(req, 'fields.view_restricted');
@@ -146,19 +156,27 @@ router.post('/', async (req, res) => {
       if (err.constraint === 'students_national_id_unique') {
         return res.status(409).json({
           error: 'That national ID already belongs to another student.',
+          code: 'VALIDATION_NOT_UNIQUE',
         });
       }
     }
   }
 
-  res.status(500).json({ error: 'Could not create a unique student code. Please try again.' });
+  res.status(500).json({
+    error: 'Could not create a unique student code. Please try again.',
+    code: 'STUDENTS_CODE_GENERATION_FAILED',
+  });
 });
 
 router.get('/', async (req, res) => {
   const search =
     typeof req.query.search === 'string' ? req.query.search.trim() : '';
   if (search.length > 100) {
-    return res.status(400).json({ error: 'Search text is too long.' });
+    return res.status(400).json({
+      error: 'Search text is too long.',
+      code: 'VALIDATION_TOO_LONG',
+      params: { max: 100 },
+    });
   }
 
   const page = Math.min(toPositiveInt(req.query.page, 1), 1_000_000);
@@ -168,12 +186,19 @@ router.get('/', async (req, res) => {
   );
   const sort = req.query.sort ?? 'newest';
   if (typeof sort !== 'string' || !Object.hasOwn(SORTS, sort)) {
-    return res.status(400).json({ error: 'Unknown sort order.' });
+    return res.status(400).json({
+      error: 'Unknown sort order.',
+      code: 'VALIDATION_INVALID_CHOICE',
+    });
   }
 
   const { groupId } = req.query;
   if (groupId !== undefined && !isUuid(groupId)) {
-    return res.status(400).json({ error: 'groupId must be a valid ID.' });
+    return res.status(400).json({
+      error: 'groupId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'groupId' },
+    });
   }
 
   const conditions = ['deleted_at IS NULL'];
@@ -237,7 +262,10 @@ router.get('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const body = req.body ?? {};
   if ('studentCode' in body) {
-    return res.status(400).json({ error: 'Student codes cannot be changed.' });
+    return res.status(400).json({
+      error: 'Student codes cannot be changed.',
+      code: 'STUDENTS_CODE_IMMUTABLE',
+    });
   }
 
   const hasName = 'fullName' in body;
@@ -245,7 +273,10 @@ router.patch('/:id', async (req, res) => {
   const IDENTITY_FIELDS = ['gender', 'birthDate', 'fatherName', 'nationalId'];
   const identityPresent = IDENTITY_FIELDS.filter((field) => field in body);
   if (!hasName && !hasExtra && identityPresent.length === 0) {
-    return res.status(400).json({ error: 'Nothing to change.' });
+    return res.status(400).json({
+      error: 'Nothing to change.',
+      code: 'VALIDATION_NOTHING_TO_CHANGE',
+    });
   }
 
   const sets = [];
@@ -254,7 +285,9 @@ router.patch('/:id', async (req, res) => {
   if (hasName) {
     const parsed = normalizeFullName(body.fullName);
     if (parsed.error) {
-      return res.status(400).json({ error: parsed.error });
+      return res
+        .status(400)
+        .json({ error: parsed.error, code: parsed.code, params: parsed.params });
     }
     values.push(parsed.value);
     sets.push(`full_name = $${values.length}`);
@@ -265,7 +298,11 @@ router.patch('/:id', async (req, res) => {
     // apply only the fields the request actually carries (partial update).
     const identity = parseIdentity(body);
     if (identity.error) {
-      return res.status(400).json({ error: identity.error });
+      return res.status(400).json({
+        error: identity.error,
+        code: identity.code,
+        params: identity.params,
+      });
     }
     const COLUMN_OF = {
       gender: ['gender', '$::gender_type'],
@@ -284,7 +321,9 @@ router.patch('/:id', async (req, res) => {
   if (hasExtra) {
     const extra = validateExtra(definitions, body.extra);
     if (extra.error) {
-      return res.status(400).json({ error: extra.error });
+      return res
+        .status(400)
+        .json({ error: extra.error, code: extra.code, params: extra.params });
     }
     // Keys sent as empty/null are cleared; the rest are merged in.
     const clearKeys = Object.keys(body.extra).filter(
@@ -309,7 +348,9 @@ router.patch('/:id', async (req, res) => {
   );
 
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Student not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Student not found.', code: 'NOT_FOUND', params: { entity: 'student' } });
   }
   const canSeeRestricted = userCan(req, 'fields.view_restricted');
   res.json(presentStudent(result.rows[0], definitions, canSeeRestricted));
@@ -324,7 +365,9 @@ router.delete('/:id', async (req, res) => {
   );
 
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Student not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Student not found.', code: 'NOT_FOUND', params: { entity: 'student' } });
   }
   res.status(204).end();
 });
@@ -337,7 +380,9 @@ router.get('/:id', async (req, res) => {
     [req.params.id]
   );
   if (result.rowCount === 0) {
-    return res.status(404).json({ error: 'Student not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Student not found.', code: 'NOT_FOUND', params: { entity: 'student' } });
   }
   const definitions = await loadDefinitions(pool);
   const canSeeRestricted = userCan(req, 'fields.view_restricted');
@@ -346,7 +391,11 @@ router.get('/:id', async (req, res) => {
 router.post('/import', async (req, res) => {
   const parsed = validateImportBody(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res.status(400).json({
+      error: parsed.error,
+      code: parsed.code,
+      params: parsed.params,
+    });
   }
   const { rows, allowDuplicateNames, dryRun } = parsed;
 
@@ -371,6 +420,7 @@ router.post('/import', async (req, res) => {
   if (counts.willImport === 0) {
     return res.status(400).json({
       error: 'There are no rows to import.',
+      code: 'STUDENTS_IMPORT_EMPTY',
       rows: classified,
       counts,
     });

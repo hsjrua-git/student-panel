@@ -8,17 +8,25 @@ const router = Router();
 const UNIQUE_VIOLATION = '23505';
 
 function parseName(input) {
-  if (typeof input !== 'string') return { error: 'Group name is required.' };
+  if (typeof input !== 'string') {
+    return { error: 'Group name is required.', code: 'VALIDATION_REQUIRED' };
+  }
   const value = input.trim().replace(/\s+/g, ' ');
   if (value.length < 1 || value.length > 60) {
-    return { error: 'Group name must be 1 to 60 characters.' };
+    return {
+      error: 'Group name must be 1 to 60 characters.',
+      code: 'VALIDATION_INVALID_LENGTH',
+      params: { min: 1, max: 60 },
+    };
   }
   return { value };
 }
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Group not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Group not found.', code: 'NOT_FOUND', params: { entity: 'group' } });
   }
   next();
 });
@@ -29,7 +37,11 @@ router.get('/', async (req, res) => {
 
   if (studentId !== undefined) {
     if (!isUuid(studentId)) {
-      return res.status(400).json({ error: 'studentId must be a valid ID.' });
+      return res.status(400).json({
+        error: 'studentId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'studentId' },
+      });
     }
     const result = await pool.query(
       `SELECT g.id, g.name, g.parent_id AS "parentId"
@@ -77,11 +89,18 @@ async function liveChildCount(db, id) {
 
 router.post('/', async (req, res) => {
   const name = parseName(req.body?.name);
-  if (name.error) return res.status(400).json({ error: name.error });
+  if (name.error) {
+    return res
+      .status(400)
+      .json({ error: name.error, code: name.code, params: name.params });
+  }
 
   const parentId = req.body?.parentId ?? null;
   if (parentId !== null && !isUuid(parentId)) {
-    return res.status(400).json({ error: 'Choose a valid parent group.' });
+    return res.status(400).json({
+      error: 'Choose a valid parent group.',
+      code: 'VALIDATION_INVALID_CHOICE',
+    });
   }
 
   const client = await pool.connect();
@@ -91,7 +110,11 @@ router.post('/', async (req, res) => {
       const parent = await loadGroup(client, parentId);
       if (!parent || parent.archivedAt) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'That parent group does not exist.' });
+        return res.status(400).json({
+          error: 'That parent group does not exist.',
+          code: 'NOT_FOUND',
+          params: { entity: 'group' },
+        });
       }
     }
     const inserted = await client.query(
@@ -114,9 +137,10 @@ router.post('/', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
-      return res
-        .status(409)
-        .json({ error: 'A group with that name already exists here.' });
+      return res.status(409).json({
+        error: 'A group with that name already exists here.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   } finally {
@@ -130,23 +154,36 @@ router.patch('/:id', async (req, res) => {
 
   if ('name' in body) {
     const name = parseName(body.name);
-    if (name.error) return res.status(400).json({ error: name.error });
+    if (name.error) {
+      return res
+        .status(400)
+        .json({ error: name.error, code: name.code, params: name.params });
+    }
     updates.name = name.value;
   }
   if ('parentId' in body) {
     if (body.parentId !== null && !isUuid(body.parentId)) {
-      return res.status(400).json({ error: 'Choose a valid parent group.' });
+      return res.status(400).json({
+        error: 'Choose a valid parent group.',
+        code: 'VALIDATION_INVALID_CHOICE',
+      });
     }
     updates.parentId = body.parentId;
   }
   if ('archived' in body) {
     if (typeof body.archived !== 'boolean') {
-      return res.status(400).json({ error: 'archived must be true or false.' });
+      return res.status(400).json({
+        error: 'archived must be true or false.',
+        code: 'VALIDATION_INVALID_TYPE',
+      });
     }
     updates.archived = body.archived;
   }
   if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ error: 'Nothing to change.' });
+    return res.status(400).json({
+      error: 'Nothing to change.',
+      code: 'VALIDATION_NOTHING_TO_CHANGE',
+    });
   }
 
   const client = await pool.connect();
@@ -155,7 +192,9 @@ router.patch('/:id', async (req, res) => {
     const group = await loadGroup(client, req.params.id);
     if (!group) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Group not found.' });
+      return res
+        .status(404)
+        .json({ error: 'Group not found.', code: 'NOT_FOUND', params: { entity: 'group' } });
     }
 
     if ('parentId' in updates && updates.parentId !== group.parentId) {
@@ -163,7 +202,11 @@ router.patch('/:id', async (req, res) => {
         const parent = await loadGroup(client, updates.parentId);
         if (!parent || parent.archivedAt) {
           await client.query('ROLLBACK');
-          return res.status(400).json({ error: 'That parent group does not exist.' });
+          return res.status(400).json({
+            error: 'That parent group does not exist.',
+            code: 'NOT_FOUND',
+            params: { entity: 'group' },
+          });
         }
         // A group cannot move under itself or any of its own descendants.
         const descendants = await descendantGroupIds(client, group.id);
@@ -171,6 +214,7 @@ router.patch('/:id', async (req, res) => {
           await client.query('ROLLBACK');
           return res.status(409).json({
             error: 'A group cannot be moved inside itself or one of its subgroups.',
+            code: 'GROUPS_CYCLE',
           });
         }
       }
@@ -181,6 +225,7 @@ router.patch('/:id', async (req, res) => {
         await client.query('ROLLBACK');
         return res.status(409).json({
           error: 'Archive or move its subgroups first.',
+          code: 'GROUPS_NOT_EMPTY',
         });
       }
     }
@@ -219,9 +264,10 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
-      return res
-        .status(409)
-        .json({ error: 'A group with that name already exists here.' });
+      return res.status(409).json({
+        error: 'A group with that name already exists here.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   } finally {
@@ -237,7 +283,9 @@ router.delete('/:id', async (req, res) => {
     const group = await loadGroup(client, req.params.id);
     if (!group) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Group not found.' });
+      return res
+        .status(404)
+        .json({ error: 'Group not found.', code: 'NOT_FOUND', params: { entity: 'group' } });
     }
     if (group.archivedAt) {
       await client.query('ROLLBACK');
@@ -245,7 +293,10 @@ router.delete('/:id', async (req, res) => {
     }
     if ((await liveChildCount(client, group.id)) > 0) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'Archive or move its subgroups first.' });
+      return res.status(409).json({
+        error: 'Archive or move its subgroups first.',
+        code: 'GROUPS_NOT_EMPTY',
+      });
     }
     await client.query(
       `UPDATE student_groups SET archived_at = now() WHERE id = $1`,
@@ -271,7 +322,11 @@ router.delete('/:id', async (req, res) => {
 
 router.get('/:id/members', async (req, res) => {
   const group = await loadGroup(pool, req.params.id);
-  if (!group) return res.status(404).json({ error: 'Group not found.' });
+  if (!group) {
+    return res
+      .status(404)
+      .json({ error: 'Group not found.', code: 'NOT_FOUND', params: { entity: 'group' } });
+  }
   const result = await pool.query(
     `SELECT s.id,
             s.full_name    AS "fullName",
@@ -292,7 +347,10 @@ router.put('/:id/members', async (req, res) => {
   const add = Array.isArray(req.body?.add) ? req.body.add : [];
   const remove = Array.isArray(req.body?.remove) ? req.body.remove : [];
   if (![...add, ...remove].every((id) => isUuid(id))) {
-    return res.status(400).json({ error: 'Student ids must be valid IDs.' });
+    return res.status(400).json({
+      error: 'Student ids must be valid IDs.',
+      code: 'VALIDATION_INVALID_FORMAT',
+    });
   }
 
   const client = await pool.connect();
@@ -301,11 +359,16 @@ router.put('/:id/members', async (req, res) => {
     const group = await loadGroup(client, req.params.id);
     if (!group) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Group not found.' });
+      return res
+        .status(404)
+        .json({ error: 'Group not found.', code: 'NOT_FOUND', params: { entity: 'group' } });
     }
     if (group.archivedAt) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'This group is archived.' });
+      return res.status(409).json({
+        error: 'This group is archived.',
+        code: 'GROUPS_ARCHIVED',
+      });
     }
 
     let added = 0;

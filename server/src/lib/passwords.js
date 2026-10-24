@@ -28,15 +28,28 @@ export function generatePassword(length = 16) {
 }
 
 export function validateNewPassword(password, { username } = {}) {
-  if (typeof password !== 'string') return 'A new password is required.';
+  if (typeof password !== 'string') {
+    return { error: 'A new password is required.', code: 'AUTH_PASSWORD_REQUIRED' };
+  }
   if (password.length < MIN_PASSWORD_LENGTH) {
-    return `The password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    return {
+      error: `The password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      code: 'AUTH_PASSWORD_TOO_SHORT',
+      params: { min: MIN_PASSWORD_LENGTH },
+    };
   }
   if (password.length > MAX_PASSWORD_LENGTH) {
-    return `The password must be at most ${MAX_PASSWORD_LENGTH} characters.`;
+    return {
+      error: `The password must be at most ${MAX_PASSWORD_LENGTH} characters.`,
+      code: 'AUTH_PASSWORD_TOO_LONG',
+      params: { max: MAX_PASSWORD_LENGTH },
+    };
   }
   if (username && password.toLowerCase() === username.toLowerCase()) {
-    return 'The password cannot be the same as the username.';
+    return {
+      error: 'The password cannot be the same as the username.',
+      code: 'AUTH_PASSWORD_SAME_AS_USERNAME',
+    };
   }
   return null;
 }

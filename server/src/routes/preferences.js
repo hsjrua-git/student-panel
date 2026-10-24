@@ -18,7 +18,9 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
   const parsed = parsePreferencesUpdate(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const result = await pool.query(

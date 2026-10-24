@@ -9,11 +9,15 @@ export function parseIntervalBody(body, { partial = false } = {}) {
 
   if (!partial || 'name' in body) {
     if (typeof body?.name !== 'string') {
-      return { error: 'Interval name is required.' };
+      return { error: 'Interval name is required.', code: 'VALIDATION_REQUIRED' };
     }
     const name = body.name.trim().replace(/\s+/g, ' ');
     if (name.length < 1 || name.length > 60) {
-      return { error: 'Interval name must be 1 to 60 characters.' };
+      return {
+        error: 'Interval name must be 1 to 60 characters.',
+        code: 'VALIDATION_INVALID_LENGTH',
+        params: { min: 1, max: 60 },
+      };
     }
     updates.name = name;
   }
@@ -28,6 +32,7 @@ export function parseIntervalBody(body, { partial = false } = {}) {
     } else {
       return {
         error: 'Interval length must be 1-365 days or 1-24 months.',
+        code: 'VALIDATION_INVALID_RANGE',
       };
     }
   }
@@ -35,20 +40,28 @@ export function parseIntervalBody(body, { partial = false } = {}) {
   if ('sortOrder' in body) {
     const sort = body.sortOrder;
     if (!Number.isInteger(sort) || sort < 0) {
-      return { error: 'Sort order must be a whole number from 0.' };
+      return {
+        error: 'Sort order must be a whole number from 0.',
+        code: 'VALIDATION_INVALID_TYPE',
+        params: { field: 'sortOrder' },
+      };
     }
     updates.sortOrder = sort;
   }
 
   if (Object.keys(updates).length === 0) {
-    return { error: 'Nothing to change.' };
+    return { error: 'Nothing to change.', code: 'VALIDATION_NOTHING_TO_CHANGE' };
   }
   return { value: updates };
 }
 
 function requiredIsoDate(input, label) {
   if (typeof input !== 'string' || !isValidIsoDate(input)) {
-    return { error: `${label} must be a valid date (YYYY-MM-DD).` };
+    return {
+      error: `${label} must be a valid date (YYYY-MM-DD).`,
+      code: 'VALIDATION_INVALID_DATE',
+      params: { field: 'anchorDate' },
+    };
   }
   return { value: input };
 }
@@ -59,11 +72,15 @@ export function parseTaskFields(body, { partial = false } = {}) {
 
   if (!partial || 'title' in body) {
     if (typeof body?.title !== 'string') {
-      return { error: 'Title is required.' };
+      return { error: 'Title is required.', code: 'VALIDATION_REQUIRED' };
     }
     const title = body.title.trim().replace(/\s+/g, ' ');
     if (title.length < 1 || title.length > 120) {
-      return { error: 'Title must be 1 to 120 characters.' };
+      return {
+        error: 'Title must be 1 to 120 characters.',
+        code: 'VALIDATION_INVALID_LENGTH',
+        params: { min: 1, max: 120 },
+      };
     }
     updates.title = title;
   }
@@ -72,7 +89,11 @@ export function parseTaskFields(body, { partial = false } = {}) {
     const description = body?.description;
     if (description !== undefined && description !== null && description !== '') {
       if (typeof description !== 'string' || description.length > 2000) {
-        return { error: 'Description must be 2000 characters or fewer.' };
+        return {
+          error: 'Description must be 2000 characters or fewer.',
+          code: 'VALIDATION_TOO_LONG',
+          params: { max: 2000 },
+        };
       }
       const trimmed = description.trim();
       updates.description = trimmed === '' ? null : trimmed;
@@ -83,7 +104,11 @@ export function parseTaskFields(body, { partial = false } = {}) {
 
   if ('sortOrder' in body) {
     if (!Number.isInteger(body.sortOrder) || body.sortOrder < 0) {
-      return { error: 'Sort order must be a whole number from 0.' };
+      return {
+        error: 'Sort order must be a whole number from 0.',
+        code: 'VALIDATION_INVALID_TYPE',
+        params: { field: 'sortOrder' },
+      };
     }
     updates.sortOrder = body.sortOrder;
   }
@@ -99,14 +124,14 @@ export function parseAssignmentBody(body, { partial = false } = {}) {
 
   if (!partial || 'teacherId' in body) {
     if (typeof body?.teacherId !== 'string') {
-      return { error: 'Choose a teacher.' };
+      return { error: 'Choose a teacher.', code: 'VALIDATION_REQUIRED' };
     }
     updates.teacherId = body.teacherId;
   }
 
   if (!partial || 'intervalId' in body) {
     if (typeof body?.intervalId !== 'string') {
-      return { error: 'Choose an interval.' };
+      return { error: 'Choose an interval.', code: 'VALIDATION_REQUIRED' };
     }
     updates.intervalId = body.intervalId;
   }
@@ -124,7 +149,11 @@ export function parseAssignmentBody(body, { partial = false } = {}) {
     } else {
       const name = normalizeFullName(raw);
       if (name.error) {
-        return { error: 'Assignment name must be 2 to 100 characters.' };
+        return {
+          error: 'Assignment name must be 2 to 100 characters.',
+          code: 'VALIDATION_INVALID_LENGTH',
+          params: { min: 2, max: 100 },
+        };
       }
       updates.name = name.value;
     }
@@ -136,7 +165,11 @@ export function parseAssignmentBody(body, { partial = false } = {}) {
     } else {
       const code = String(body.code).trim();
       if (code.length < 1 || code.length > 40) {
-        return { error: 'Assignment code must be 1 to 40 characters.' };
+        return {
+          error: 'Assignment code must be 1 to 40 characters.',
+          code: 'VALIDATION_INVALID_LENGTH',
+          params: { min: 1, max: 40 },
+        };
       }
       updates.code = code;
     }
@@ -150,6 +183,7 @@ export function parseAssignmentBody(body, { partial = false } = {}) {
     if (hasGroup === hasMember) {
       return {
         error: 'Choose exactly one target: a group or a single student.',
+        code: 'ASSIGNMENTS_TARGET_REQUIRED',
       };
     }
     if (hasGroup) updates.groupId = body.groupId;
@@ -163,6 +197,7 @@ export function parseAssignmentBody(body, { partial = false } = {}) {
       if (hasGroup === hasMember) {
         return {
           error: 'Choose exactly one target: a group or a single student.',
+          code: 'ASSIGNMENTS_TARGET_REQUIRED',
         };
       }
     }
@@ -170,13 +205,16 @@ export function parseAssignmentBody(body, { partial = false } = {}) {
 
   if ('archived' in body) {
     if (typeof body.archived !== 'boolean') {
-      return { error: 'archived must be true or false.' };
+      return {
+        error: 'archived must be true or false.',
+        code: 'VALIDATION_INVALID_TYPE',
+      };
     }
     updates.archived = body.archived;
   }
 
   if (Object.keys(updates).length === 0) {
-    return { error: 'Nothing to change.' };
+    return { error: 'Nothing to change.', code: 'VALIDATION_NOTHING_TO_CHANGE' };
   }
   return { value: updates };
 }

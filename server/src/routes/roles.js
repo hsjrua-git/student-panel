@@ -24,7 +24,9 @@ const canRead = requireAnyPermission('users.manage', 'roles.manage');
 
 router.param('id', (req, res, next, value) => {
   if (!isUuid(value)) {
-    return res.status(404).json({ error: 'Role not found.' });
+    return res
+      .status(404)
+      .json({ error: 'Role not found.', code: 'NOT_FOUND', params: { entity: 'role' } });
   }
   next();
 });
@@ -68,7 +70,11 @@ async function guardedInvariantViolation(db) {
       [guard.key]
     );
     if (result.rows[0].count === 0) {
-      return `There must always be at least one active user who can ${guard.label}.`;
+      return {
+        error: `There must always be at least one active user who can ${guard.label}.`,
+        code: 'ROLES_LAST_MANAGER',
+        params: { permission: guard.key },
+      };
     }
   }
   return null;
@@ -86,7 +92,9 @@ async function insertPermissions(db, roleId, keys) {
 router.post('/', async (req, res) => {
   const parsed = parseNewRole(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
   const permissions = withPrerequisites(parsed.values.permissions);
 
@@ -114,7 +122,10 @@ router.post('/', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: 'A role with that name already exists.' });
+      return res.status(409).json({
+        error: 'A role with that name already exists.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   } finally {
@@ -125,7 +136,9 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const parsed = parseRoleUpdate(req.body);
   if (parsed.error) {
-    return res.status(400).json({ error: parsed.error });
+    return res
+      .status(400)
+      .json({ error: parsed.error, code: parsed.code, params: parsed.params });
   }
 
   const client = await pool.connect();
@@ -144,7 +157,9 @@ router.patch('/:id', async (req, res) => {
     );
     if (locked.rowCount === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Role not found.' });
+      return res
+        .status(404)
+        .json({ error: 'Role not found.', code: 'NOT_FOUND', params: { entity: 'role' } });
     }
     const permsResult = await client.query(
       `SELECT COALESCE(
@@ -167,9 +182,10 @@ router.patch('/:id', async (req, res) => {
     // capability rather than by name (names of other roles can change).
     if (role.isSystem && role.permissions.includes('roles.manage')) {
       await client.query('ROLLBACK');
-      return res
-        .status(403)
-        .json({ error: 'The Administrator role cannot be modified.' });
+      return res.status(403).json({
+        error: 'The Administrator role cannot be modified.',
+        code: 'ROLES_SYSTEM_IMMUTABLE',
+      });
     }
 
     let newPermissions = role.permissions;
@@ -185,6 +201,8 @@ router.patch('/:id', async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(409).json({
               error: `The ${role.name} role must keep the ability to ${guard.label}.`,
+              code: 'ROLES_SYSTEM_MUST_KEEP',
+              params: { role: role.name, permission: guard.key },
             });
           }
         }
@@ -208,7 +226,11 @@ router.patch('/:id', async (req, res) => {
     const violation = await guardedInvariantViolation(client);
     if (violation) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: violation });
+      return res.status(409).json({
+        error: violation.error,
+        code: violation.code,
+        params: violation.params,
+      });
     }
 
     await recordAudit(client, {
@@ -241,7 +263,10 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === UNIQUE_VIOLATION) {
-      return res.status(409).json({ error: 'A role with that name already exists.' });
+      return res.status(409).json({
+        error: 'A role with that name already exists.',
+        code: 'VALIDATION_NOT_UNIQUE',
+      });
     }
     throw err;
   } finally {
@@ -262,17 +287,23 @@ router.delete('/:id', async (req, res) => {
     );
     if (existing.rowCount === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Role not found.' });
+      return res
+        .status(404)
+        .json({ error: 'Role not found.', code: 'NOT_FOUND', params: { entity: 'role' } });
     }
     const role = existing.rows[0];
     if (role.isSystem) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'System roles cannot be deleted.' });
+      return res.status(409).json({
+        error: 'System roles cannot be deleted.',
+        code: 'ROLES_SYSTEM_NOT_DELETABLE',
+      });
     }
     if (role.userCount > 0) {
       await client.query('ROLLBACK');
       return res.status(409).json({
         error: 'Move its users to another role before deleting it.',
+        code: 'ROLES_NOT_EMPTY',
       });
     }
     await client.query('DELETE FROM roles WHERE id = $1', [role.id]);
