@@ -1,7 +1,12 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { NAV_SECTIONS, ROUTE_PERMISSIONS } from '../lib/navigation.js';
+import {
+  NAV_SECTIONS,
+  ROUTE_PERMISSIONS,
+  extraTitleForPath,
+} from '../lib/navigation.js';
 import {
   ChevronsLeftIcon,
   LockIcon,
@@ -10,14 +15,12 @@ import {
 } from './icons.jsx';
 import PageLoader from './PageLoader.jsx';
 
-// Titles shown in the header for routes that aren't in the sidebar.
-const EXTRA_TITLES = {
-  '/preferences': 'Preferences',
-  '/change-password': 'Change password',
-};
-
 function Layout() {
   const { user, can, logout } = useAuth();
+  // Nav chrome labels come from the `nav` namespace (sections/items/titles);
+  // shared strings like the app name come from `common`. `nav` is listed
+  // first, so bare keys below resolve there.
+  const { t } = useTranslation(['nav', 'common']);
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -114,7 +117,8 @@ function Layout() {
       })).filter((section) => section.items.length > 0)
     : [];
 
-  const currentTitle = titleForPath(location.pathname, sections);
+  const titleKey = titleKeyForPath(location.pathname, sections);
+  const currentTitle = titleKey ? t(titleKey) : t('common:appName');
 
   // The icon-only rail is a desktop affordance; on mobile the sidebar is a
   // full-width overlay drawer, so collapsing never applies there. It also only
@@ -130,13 +134,13 @@ function Layout() {
       }`}
     >
       <a href="#main-content" className="skip-link">
-        Skip to content
+        {t('skipToContent')}
       </a>
 
       <aside
         className="sidebar"
         id="primary-navigation"
-        aria-label="Primary"
+        aria-label={t('aria.primaryNav')}
         ref={sidebarRef}
         inert={isMobile && !drawerOpen}
       >
@@ -145,7 +149,9 @@ function Layout() {
             <button
               type="button"
               className="rail-toggle"
-              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={t(
+                navCollapsed ? 'aria.expandSidebar' : 'aria.collapseSidebar'
+              )}
               aria-pressed={navCollapsed}
               aria-controls="primary-navigation"
               onClick={() => setNavCollapsed((collapsed) => !collapsed)}
@@ -153,14 +159,14 @@ function Layout() {
               <ChevronsLeftIcon className="rail-toggle-icon" size={18} />
             </button>
           )}
-          <span className="brand-name">Student Panel</span>
+          <span className="brand-name">{t('common:appName')}</span>
         </div>
         {showNav && (
           <nav className="sidebar-nav">
             {sections.map((section) => (
               <details
                 className="nav-group"
-                open={railCollapsed || Boolean(openGroups[section.title])}
+                open={railCollapsed || Boolean(openGroups[section.key])}
                 onToggle={(event) => {
                   // While collapsed the rail forces every group open so all
                   // icons show; don't record that transient state — the user's
@@ -175,14 +181,14 @@ function Layout() {
                   // 'open')". Capture the boolean first, then use that.
                   const isOpen = event.currentTarget.open;
                   setOpenGroups((current) => {
-                    if (Boolean(current[section.title]) === isOpen) return current;
-                    return { ...current, [section.title]: isOpen };
+                    if (Boolean(current[section.key]) === isOpen) return current;
+                    return { ...current, [section.key]: isOpen };
                   });
                 }}
-                key={section.title}
+                key={section.key}
               >
                 <summary className="nav-group-head">
-                  <span>{section.title}</span>
+                  <span>{t(`sections.${section.key}`)}</span>
                   <svg className="chevron" viewBox="0 0 12 12" aria-hidden="true">
                     <path
                       d="M2.5 4.5 6 8l3.5-3.5"
@@ -197,19 +203,20 @@ function Layout() {
                 <div className="nav-group-items">
                   {section.items.map((item) => {
                     const Icon = item.icon;
+                    const label = t(`items.${item.key}`);
                     return (
                       <NavLink
                         key={item.to}
                         to={item.to}
                         className="nav-link"
-                        title={railCollapsed ? item.label : undefined}
+                        title={railCollapsed ? label : undefined}
                       >
                         {Icon && (
                           <span className="nav-icon" aria-hidden="true">
                             <Icon size={18} />
                           </span>
                         )}
-                        <span className="nav-label">{item.label}</span>
+                        <span className="nav-label">{label}</span>
                       </NavLink>
                     );
                   })}
@@ -242,31 +249,37 @@ function Layout() {
             <NavLink
               to="/preferences"
               className="nav-link"
-              title={railCollapsed ? 'Preferences' : undefined}
+              title={railCollapsed ? t('items.preferences') : undefined}
             >
               <span className="nav-icon" aria-hidden="true">
                 <PreferencesIcon size={18} />
               </span>
-              <span className="nav-label">Preferences</span>
+              <span className="nav-label">{t('items.preferences')}</span>
             </NavLink>
-            <NavLink to="/change-password" className="nav-link account-collapsed-hide">
+            <NavLink
+              to="/change-password"
+              className="nav-link account-collapsed-hide"
+              title={railCollapsed ? t('items.changePassword') : undefined}
+            >
               <span className="nav-icon" aria-hidden="true">
                 <LockIcon size={18} />
               </span>
-              <span className="nav-label">Change password</span>
+              <span className="nav-label">{t('items.changePassword')}</span>
             </NavLink>
             <button
               type="button"
               className="nav-link account-signout"
               onClick={() => logout.mutate()}
               disabled={logout.isPending}
-              title={railCollapsed ? 'Sign out' : undefined}
+              title={railCollapsed ? t('account.signout') : undefined}
             >
               <span className="nav-icon" aria-hidden="true">
                 <SignOutIcon size={18} />
               </span>
               <span className="nav-label">
-                {logout.isPending ? 'Signing out…' : 'Sign out'}
+                {logout.isPending
+                  ? t('account.signingOut')
+                  : t('account.signout')}
               </span>
             </button>
           </div>
@@ -278,7 +291,7 @@ function Layout() {
       <button
         type="button"
         className="drawer-backdrop"
-        aria-label="Close menu"
+        aria-label={t('aria.closeMenu')}
         tabIndex={drawerOpen ? 0 : -1}
         onClick={() => {
           setDrawerOpen(false);
@@ -295,7 +308,7 @@ function Layout() {
               type="button"
               className="nav-toggle"
               ref={toggleRef}
-              aria-label="Toggle menu"
+              aria-label={t('aria.toggleMenu')}
               aria-expanded={drawerOpen}
               aria-controls="primary-navigation"
               onClick={() => setDrawerOpen((open) => !open)}
@@ -341,22 +354,29 @@ function initialsOf(fullName) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function titleForPath(pathname, sections) {
+// The topbar title as a nav-namespace translation KEY (not display text):
+// `items.<key>` for sidebar routes, `titles.<key>` for the EXTRA_TITLES/
+// dynamic routes, falling back to the nearest top-level item so the header
+// still reads sensibly on nested routes. Null means "no key" — the caller
+// falls back to the app name.
+function titleKeyForPath(pathname, sections) {
   for (const section of sections) {
     for (const item of section.items) {
-      if (item.to === pathname) return item.label;
+      if (item.to === pathname) return `items.${item.key}`;
     }
   }
-  if (EXTRA_TITLES[pathname]) return EXTRA_TITLES[pathname];
-  // Nested routes like /students/:id or /students/import: fall back to the
-  // nearest top-level label so the header still reads sensibly.
+  const extra = extraTitleForPath(pathname);
+  if (extra) return `titles.${extra}`;
+  // Nested routes not covered above (e.g. a path whose section is hidden by
+  // permissions): fall back to the nearest top-level item so the header still
+  // reads sensibly.
   const top = '/' + pathname.split('/').filter(Boolean)[0];
   for (const section of sections) {
     for (const item of section.items) {
-      if (item.to === top) return item.label;
+      if (item.to === top) return `items.${item.key}`;
     }
   }
-  return 'Student Panel';
+  return null;
 }
 
 export default Layout;

@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../components/EmptyState.jsx';
 
 function CompassIcon() {
@@ -15,15 +16,16 @@ function CompassIcon() {
 }
 
 function NotFoundPage() {
+  const { t } = useTranslation(['nav', 'common']);
   return (
     <main>
       <EmptyState
         icon={<CompassIcon />}
-        title="Page not found"
-        description="That page doesn't exist or may have moved."
+        title={t('notFound.title')}
+        description={t('notFound.hint')}
       >
         <Link className="btn primary" to="/students">
-          Go to the students list
+          {t('notFound.home')}
         </Link>
       </EmptyState>
     </main>

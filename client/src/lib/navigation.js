@@ -9,6 +9,12 @@
 // password). The server still enforces every permission on the API; this map
 // only decides what the client shows and lets you navigate to — the API remains
 // the real gate.
+//
+// Sections and items carry stable translation `key`s, not display text: the
+// labels live in i18n/{fa,en}/nav.json under `sections.<key>` / `items.<key>`
+// (and `titles.<key>` for EXTRA_TITLES) and Layout renders them with t(). The
+// keys are language-independent, so anything keyed by them (React keys, the
+// open-groups state) stays stable across a language switch.
 
 import {
   DashboardIcon,
@@ -55,41 +61,64 @@ export const ROUTE_PERMISSIONS = {
 // can never drift apart.
 export const NAV_SECTIONS = [
   {
-    title: 'Overview',
+    key: 'overview',
     items: [
-      { to: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
-      { to: '/results', label: 'Results', icon: ResultsIcon },
-      { to: '/export', label: 'Export', icon: DownloadIcon },
+      { to: '/dashboard', key: 'dashboard', icon: DashboardIcon },
+      { to: '/results', key: 'results', icon: ResultsIcon },
+      { to: '/export', key: 'export', icon: DownloadIcon },
     ],
   },
   {
-    title: 'Teaching',
+    key: 'teaching',
     items: [
-      { to: '/students', label: 'Students', icon: StudentsIcon },
-      { to: '/evaluate', label: 'Evaluate', icon: EvaluateIcon },
-      { to: '/teachers', label: 'Teachers', icon: TeacherIcon },
-      { to: '/schedule', label: 'Schedule', icon: CalendarIcon },
-      { to: '/sessions', label: 'Sessions', icon: SessionIcon },
+      { to: '/students', key: 'students', icon: StudentsIcon },
+      { to: '/evaluate', key: 'evaluate', icon: EvaluateIcon },
+      { to: '/teachers', key: 'teachers', icon: TeacherIcon },
+      { to: '/schedule', key: 'schedule', icon: CalendarIcon },
+      { to: '/sessions', key: 'sessions', icon: SessionIcon },
     ],
   },
   {
-    title: 'Setup',
+    key: 'setup',
     items: [
-      { to: '/parameters', label: 'Parameters', icon: ParametersIcon },
-      { to: '/groups', label: 'Groups', icon: GroupsIcon },
-      { to: '/fields', label: 'Fields', icon: FieldsIcon },
-      { to: '/settings', label: 'Settings', icon: SettingsIcon },
+      { to: '/parameters', key: 'parameters', icon: ParametersIcon },
+      { to: '/groups', key: 'groups', icon: GroupsIcon },
+      { to: '/fields', key: 'fields', icon: FieldsIcon },
+      { to: '/settings', key: 'settings', icon: SettingsIcon },
     ],
   },
   {
-    title: 'Administration',
+    key: 'administration',
     items: [
-      { to: '/users', label: 'Users', icon: UsersIcon },
-      { to: '/roles', label: 'Roles', icon: RolesIcon },
-      { to: '/audit', label: 'Audit log', icon: AuditIcon },
+      { to: '/users', key: 'users', icon: UsersIcon },
+      { to: '/roles', key: 'roles', icon: RolesIcon },
+      { to: '/audit', key: 'audit', icon: AuditIcon },
     ],
   },
 ];
+
+// Topbar titles for routes that aren't in the sidebar. Values are keys into
+// the nav namespace's `titles.*` group (i18n/{fa,en}/nav.json); Layout renders
+// them with t().
+export const EXTRA_TITLES = {
+  '/preferences': 'preferences',
+  '/change-password': 'changePassword',
+  '/students/import': 'importStudents',
+  '/evaluate/import': 'importScores',
+};
+
+// Dynamic (parameterised) routes handled the same way: pattern → titles key.
+// Checked after EXTRA_TITLES, so /students/import keeps its specific title.
+const DYNAMIC_TITLES = [[/^\/students\/[^/]+$/, 'studentDetail']];
+
+// The `titles.*` key for a non-sidebar route, or null when there is none.
+export function extraTitleForPath(pathname) {
+  if (pathname in EXTRA_TITLES) return EXTRA_TITLES[pathname];
+  for (const [pattern, key] of DYNAMIC_TITLES) {
+    if (pattern.test(pathname)) return key;
+  }
+  return null;
+}
 
 // The permission a path needs, or `null` for "any signed-in user". Nested paths
 // that aren't listed explicitly (e.g. the student detail page /students/:id)

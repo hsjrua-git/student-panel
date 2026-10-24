@@ -1,28 +1,25 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from './EmptyState.jsx';
+import PageLoader from './PageLoader.jsx';
+import { errorMessage } from '../i18n/errors.js';
 
 function RequireAuth() {
   const { user, isLoading, loadError } = useAuth();
+  const { t } = useTranslation(['nav', 'common']);
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <main aria-busy="true">
-        <div className="page-loading" role="status" aria-live="polite">
-          <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
-        </div>
-      </main>
-    );
+    return <PageLoader />;
   }
   if (loadError) {
     return (
       <main>
         <EmptyState
           tone="danger"
-          title="Couldn't load your session"
-          description={loadError.message}
+          title={t('auth.sessionErrorTitle')}
+          description={errorMessage(loadError)}
         />
       </main>
     );

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 function ConnectionBanner() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation('nav');
   const [broken, setBroken] = useState(false);
 
   useEffect(() => {
@@ -23,8 +25,7 @@ function ConnectionBanner() {
   if (!broken) return null;
   return (
     <div className="connection-banner" role="alert">
-      Cannot reach the server. Check that it is running, then this will
-      recover automatically.
+      {t('connection.offline')}
     </div>
   );
 }
