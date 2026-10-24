@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Papa from 'papaparse';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { listPeriodParameters, saveEvaluations } from '../api/evaluations.js';
 import { listParameters } from '../api/parameters.js';
 import { fetchAllStudents } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import EmptyState from '../components/EmptyState.jsx';
 import ExportButton from '../components/ExportButton.jsx';
 import ImportSteps from '../components/ImportSteps.jsx';
@@ -29,15 +31,18 @@ import { usePeriods } from '../lib/usePeriods.js';
 const EMPTY = [];
 const MAX_FILE_BYTES = 2_000_000;
 
-function columnLabel(index, headerCells) {
+function columnLabel(t, index, headerCells) {
   const header = headerCells ? String(headerCells[index] ?? '').trim() : '';
-  return header ? `Column ${index + 1}: ${header}` : `Column ${index + 1}`;
+  return header
+    ? t('imports.columnWithHeader', { index: index + 1, header })
+    : t('imports.columnN', { index: index + 1 });
 }
 
 function CellView({ cell, info, canOverride }) {
+  const { t } = useTranslation(['students', 'common']);
   if (cell.blank) {
     return (
-      <div className="muted" title="Empty cells are ignored">
+      <div className="muted" title={t('imports.scores.cellEmptyTitle')}>
         —
       </div>
     );
@@ -61,12 +66,13 @@ function CellView({ cell, info, canOverride }) {
     );
   }
   if (info.status === 'unchanged') {
-    return <div className="muted">{info.to} (same)</div>;
+    return <div className="muted">{t('imports.scores.cellSame', { value: info.to })}</div>;
   }
   if (info.status === 'new') {
     return (
       <div>
-        <strong>{info.to}</strong> <span className="chg">new</span>
+        <strong>{info.to}</strong>{' '}
+        <span className="chg">{t('imports.scores.cellNew')}</span>
       </div>
     );
   }
@@ -82,7 +88,8 @@ function CellView({ cell, info, canOverride }) {
   if (info.status === 'save') {
     return (
       <div>
-        <strong>{info.to}</strong> <span className="chg">save</span>
+        <strong>{info.to}</strong>{' '}
+        <span className="chg">{t('imports.scores.cellSave')}</span>
       </div>
     );
   }
@@ -94,22 +101,24 @@ function CellView({ cell, info, canOverride }) {
       {info.from ?? '—'} → <strong>{info.to}</strong>
       <div className="small">
         {canOverride
-          ? 'Locked. Needs a reason.'
-          : 'Locked. Only an administrator can change it.'}
+          ? t('imports.scores.cellLockedReason')
+          : t('imports.scores.cellLockedAdmin')}
       </div>
     </div>
   );
 }
 
 function ColumnOptions({ columnCount, headerCells }) {
+  const { t } = useTranslation(['students', 'common']);
   return Array.from({ length: columnCount }, (_, index) => (
     <option key={index} value={index}>
-      {columnLabel(index, headerCells)}
+      {columnLabel(t, index, headerCells)}
     </option>
   ));
 }
 
 function ImportScoresPage() {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const periodsQuery = usePeriods();
@@ -234,7 +243,7 @@ function ImportScoresPage() {
     resetAll();
     setFileName(file.name);
     if (file.size > MAX_FILE_BYTES) {
-      setParseError('This file is larger than 2 MB. Split it into smaller files.');
+      setParseError(t('imports.fileTooLarge', { size: '2 MB' }));
       input.value = '';
       return;
     }
@@ -243,7 +252,7 @@ function ImportScoresPage() {
     const prepared = prepareRows(Papa.parse(text, { skipEmptyLines: false }).data);
     input.value = '';
     if (prepared.length === 0) {
-      setParseError('The file has no rows.');
+      setParseError(t('imports.noRows'));
       return;
     }
     setRows(prepared);
@@ -310,8 +319,8 @@ function ImportScoresPage() {
     return (
       <main>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to import scores."
+          title={t('shared.readOnlyTitle')}
+          description={t('imports.scores.readOnlyDescription')}
         />
       </main>
     );
@@ -321,7 +330,7 @@ function ImportScoresPage() {
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );
@@ -331,8 +340,8 @@ function ImportScoresPage() {
       <main>
         <EmptyState
           tone="danger"
-          title="Couldn't load the period calendar"
-          description={periodsQuery.error.message}
+          title={t('imports.scores.loadErrorTitle')}
+          description={errorMessage(periodsQuery.error)}
         />
       </main>
     );
@@ -341,8 +350,8 @@ function ImportScoresPage() {
     return (
       <main>
         <EmptyState
-          title="No period calendar yet"
-          description="An administrator needs to set the period start date first."
+          title={t('imports.scores.noCalendarTitle')}
+          description={t('imports.scores.noCalendarDescription')}
         />
       </main>
     );
@@ -351,8 +360,8 @@ function ImportScoresPage() {
     return (
       <main>
         <EmptyState
-          title="No active period"
-          description="Period 1 has not started yet."
+          title={t('imports.scores.noActiveTitle')}
+          description={t('shared.period1NotStarted')}
         />
       </main>
     );
@@ -388,22 +397,21 @@ function ImportScoresPage() {
   return (
     <main className="wide">
       <p>
-        <Link to="/evaluate">← Back to Evaluate</Link>
+        <Link to="/evaluate">{t('imports.scores.back')}</Link>
       </p>
-      <h1>Import scores</h1>
+      <h1>{t('imports.scores.title')}</h1>
       <ImportSteps
-        steps={['Choose a file', 'Review', 'Done']}
+        steps={[
+          t('imports.stepChoose'),
+          t('imports.stepReview'),
+          t('common:actions.done'),
+        ]}
         current={stage === 'choose' ? 0 : stage === 'preview' ? 1 : 2}
       />
 
       {stage === 'choose' && (
         <>
-          <p className="hint">
-            Choose the period, then a CSV file with one row per student. Each
-            student is found by their code, and each score column by its
-            parameter name. Empty cells are ignored (they never clear an
-            existing score).
-          </p>
+          <p className="hint">{t('imports.scores.hint')}</p>
           <PeriodPicker
             periods={periods}
             value={periodNumber}
@@ -412,7 +420,7 @@ function ImportScoresPage() {
 
           <p>
             <ExportButton
-              label={`Download a template for Period ${periodNumber}`}
+              label={t('imports.scores.templateLabel', { period: periodNumber })}
               filename={`score-template-period-${periodNumber}.csv`}
               disabled={periodParameters.length === 0}
               buildRows={async () =>
@@ -425,8 +433,7 @@ function ImportScoresPage() {
           </p>
           {paramsQuery.isSuccess && periodParameters.length === 0 && (
             <p className="error">
-              No parameters are used in Period {periodNumber}, so there is
-              nothing to import.
+              {t('imports.scores.noParamsInPeriod', { period: periodNumber })}
             </p>
           )}
 
@@ -437,7 +444,7 @@ function ImportScoresPage() {
             <input
               type="file"
               accept=".csv,.txt,text/csv"
-              aria-label="Choose a CSV file of scores to import"
+              aria-label={t('imports.scores.fileAria')}
               onChange={handleFile}
             />
           </div>
@@ -447,11 +454,11 @@ function ImportScoresPage() {
             </p>
           )}
           {rows.length > 0 && studentsQuery.isPending && (
-            <p className="hint">Loading students…</p>
+            <p className="hint">{t('list.loading')}</p>
           )}
           {studentsQuery.isError && (
             <p className="error" role="alert">
-              {studentsQuery.error.message}
+              {errorMessage(studentsQuery.error)}
             </p>
           )}
 
@@ -462,9 +469,9 @@ function ImportScoresPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Row</th>
+                      <th>{t('imports.row')}</th>
                       {Array.from({ length: columnCount }, (_, index) => (
-                        <th key={index}>Column {index + 1}</th>
+                        <th key={index}>{columnLabel(t, index, null)}</th>
                       ))}
                     </tr>
                   </thead>
@@ -481,7 +488,9 @@ function ImportScoresPage() {
                 </table>
               </div>
               {rows.length > 5 && (
-                <p className="hint">Showing the first 5 of {rows.length} rows.</p>
+                <p className="hint">
+                  {t('imports.showingFirst', { count: rows.length })}
+                </p>
               )}
 
               <div className="pref-group">
@@ -491,10 +500,10 @@ function ImportScoresPage() {
                     checked={hasHeader}
                     onChange={(event) => setHasHeader(event.target.checked)}
                   />
-                  The first row is a header, not a student
+                  {t('imports.firstRowHeader')}
                 </label>
                 <label className="inline">
-                  Student code is in
+                  {t('imports.scores.codeIn')}
                   <select
                     value={codeColumn}
                     onChange={(event) => setCodeChoice(Number(event.target.value))}
@@ -503,7 +512,7 @@ function ImportScoresPage() {
                   </select>
                 </label>
                 <label className="inline">
-                  Name (only to double-check the code)
+                  {t('imports.scores.nameCheck')}
                   <select
                     value={nameColumn ?? ''}
                     onChange={(event) =>
@@ -512,17 +521,15 @@ function ImportScoresPage() {
                       )
                     }
                   >
-                    <option value="">No name column</option>
+                    <option value="">{t('imports.scores.noNameColumn')}</option>
                     <ColumnOptions columnCount={columnCount} headerCells={headerCells} />
                   </select>
                 </label>
               </div>
 
-              <h3>Which column holds each score?</h3>
+              <h3>{t('imports.scores.whichColumns')}</h3>
               {!hasHeader && (
-                <p className="hint">
-                  Without a header row, choose the columns yourself.
-                </p>
+                <p className="hint">{t('imports.scores.noHeaderHint')}</p>
               )}
               <div className="pref-group">
                 {periodParameters.map((parameter) => (
@@ -540,7 +547,7 @@ function ImportScoresPage() {
                         }))
                       }
                     >
-                      <option value="">Not in the file</option>
+                      <option value="">{t('imports.scores.notInFile')}</option>
                       <ColumnOptions
                         columnCount={columnCount}
                         headerCells={headerCells}
@@ -551,39 +558,43 @@ function ImportScoresPage() {
               </div>
               {ignoredHeaders.length > 0 && (
                 <p className="hint">
-                  Ignored columns: {ignoredHeaders.join(', ')}.
+                  {t('imports.scores.ignoredColumns', {
+                    names: ignoredHeaders.join(', '),
+                  })}
                 </p>
               )}
               {notUsedHere.length > 0 && (
                 <p className="hint">
-                  {notUsedHere.join(', ')}{' '}
-                  {notUsedHere.length === 1 ? 'is a parameter' : 'are parameters'}{' '}
-                  that {notUsedHere.length === 1 ? 'is' : 'are'} not used in
-                  Period {periodNumber}, so{' '}
-                  {notUsedHere.length === 1 ? 'it is' : 'they are'} ignored.
+                  {t('imports.scores.notUsedHere', {
+                    period: periodNumber,
+                    names: notUsedHere.join(', '),
+                  })}
                 </p>
               )}
 
               {built && (
                 <p className="summary-line">
-                  {built.rows.length} rows read ·{' '}
-                  {built.rows.filter((item) => !item.rowProblem).length} matched
-                  to a student · {built.entries.length} scores to check
-                  {built.localProblemCount > 0 && (
-                    <> · {built.localProblemCount} problems (shown after checking)</>
-                  )}
+                  {t('imports.scores.summaryLine', {
+                    rows: built.rows.length,
+                    matched: built.rows.filter((item) => !item.rowProblem).length,
+                    scores: built.entries.length,
+                  })}
+                  {built.localProblemCount > 0 &&
+                    t('imports.scores.problemsNote', {
+                      count: built.localProblemCount,
+                    })}
                 </p>
               )}
               {tooMany && (
                 <p className="error">
-                  This file has {built.entries.length} scores. Import at most{' '}
-                  {MAX_SCORE_CELLS} at a time.
+                  {t('imports.scores.tooMany', {
+                    count: built.entries.length,
+                    max: MAX_SCORE_CELLS,
+                  })}
                 </p>
               )}
               {built && built.entries.length === 0 && (
-                <p className="error">
-                  No scores were found. Check the columns above.
-                </p>
+                <p className="error">{t('imports.scores.noScores')}</p>
               )}
               <button
                 type="button"
@@ -595,11 +606,13 @@ function ImportScoresPage() {
                   check.isPending
                 }
               >
-                {check.isPending ? 'Checking...' : 'Check file'}
+                {check.isPending
+                  ? t('imports.checking')
+                  : t('imports.checkFile')}
               </button>
               {check.isError && (
                 <p className="error" role="alert">
-                  {check.error.message}
+                  {errorMessage(check.error)}
                 </p>
               )}
             </section>
@@ -610,7 +623,10 @@ function ImportScoresPage() {
       {stage === 'preview' && preview && plan && (
         <section className="section-card">
           <h2>
-            {fileName}, Period {periodNumber}
+            {t('imports.scores.previewTitle', {
+              name: fileName,
+              period: periodNumber,
+            })}
             {period && (
               <span className="hint">
                 {' '}
@@ -619,17 +635,25 @@ function ImportScoresPage() {
             )}
           </h2>
           <p className="summary-line">
-            <strong>{plan.send.length} will be saved</strong>
+            <strong>
+              {t('imports.scores.willBeSaved', { count: plan.send.length })}
+            </strong>
             {server.redacted ? (
-              plan.lockedOverride > 0 ? ` (${plan.lockedOverride} locked)` : ''
+              plan.lockedOverride > 0
+                ? t('imports.scores.lockedSuffix', { count: plan.lockedOverride })
+                : ''
             ) : (
               <>
-                {' '}({server.counts.new} new, {server.counts.change} changed
-                {plan.lockedOverride > 0 && `, ${plan.lockedOverride} locked`})
-                {' '}· {plan.unchanged} already the same
+                {t('imports.scores.countsOpen', {
+                  new: server.counts.new,
+                  changed: server.counts.change,
+                })}
+                {plan.lockedOverride > 0 &&
+                  t('imports.scores.countsLocked', { count: plan.lockedOverride })}
+                {t('imports.scores.countsClose', { count: plan.unchanged })}
               </>
             )}
-            {' '}· {plan.problemCount} problems
+            {t('imports.scores.problemsTail', { count: plan.problemCount })}
           </p>
 
           {plan.problemCount > 0 && (
@@ -639,15 +663,15 @@ function ImportScoresPage() {
                 checked={skipProblems}
                 onChange={(event) => setSkipProblems(event.target.checked)}
               />
-              Skip the cells and rows with problems, and import the rest
+              {t('imports.scores.skipProblems')}
             </label>
           )}
           {needsReason && (
             <div className="pref-group">
               <label>
-                Reason for changing {plan.lockedOverride} locked score
-                {plan.lockedOverride === 1 ? '' : 's'} (5 to 300 characters,
-                recorded in the audit log)
+                {t('imports.scores.reasonLabel', {
+                  count: plan.lockedOverride,
+                })}
                 <input
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
@@ -657,21 +681,18 @@ function ImportScoresPage() {
             </div>
           )}
           {plan.send.length === 0 && plan.problemCount === 0 && (
-            <p>Nothing to import: every score in the file is already saved.</p>
+            <p>{t('imports.scores.nothingToImport')}</p>
           )}
           {plan.problemCount > 0 && !skipProblems && plan.send.length > 0 && (
-            <p className="hint">
-              Fix the file and choose it again, or tick the box above to import
-              only what is valid.
-            </p>
+            <p className="hint">{t('imports.scores.fixOrSkip')}</p>
           )}
 
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Row</th>
-                  <th>Student</th>
+                  <th>{t('imports.row')}</th>
+                  <th>{t('imports.scores.colStudent')}</th>
                   {preview.built.mappedParameters.map((parameter) => (
                     <th key={parameter.id}>{parameter.name}</th>
                   ))}
@@ -712,25 +733,22 @@ function ImportScoresPage() {
           <div className="row">
             <button type="button" onClick={handleImport} disabled={!canRun}>
               {run.isPending
-                ? 'Importing...'
-                : `Import ${plan.send.length} score${plan.send.length === 1 ? '' : 's'}`}
+                ? t('imports.importing')
+                : t('imports.scores.importButton', { count: plan.send.length })}
             </button>
             <button type="button" onClick={backToSettings} disabled={run.isPending}>
-              Back to the column settings
+              {t('imports.scores.backToColumns')}
             </button>
             <button type="button" onClick={resetAll} disabled={run.isPending}>
-              Choose another file
+              {t('imports.chooseAnotherFile')}
             </button>
           </div>
           {run.isError && (
             <>
               <p className="error" role="alert">
-                {run.error.message}
+                {errorMessage(run.error)}
               </p>
-              <p className="hint">
-                Something changed since the check. Go back and check the file
-                again to see the current state.
-              </p>
+              <p className="hint">{t('imports.scores.staleHint')}</p>
             </>
           )}
         </section>
@@ -739,17 +757,18 @@ function ImportScoresPage() {
       {stage === 'done' && done && (
         <section className="section-card">
           <p className="success" role="status">
-            Saved. {done.changed} score{done.changed === 1 ? '' : 's'} changed
-            {done.unchanged > 0 && `, ${done.unchanged} already the same`}
+            {t('imports.scores.savedPrefix', { count: done.changed })}
+            {done.unchanged > 0 &&
+              t('imports.scores.sameSuffix', { count: done.unchanged })}
             {done.skipped > 0 &&
-              `, ${done.skipped} problem${done.skipped === 1 ? '' : 's'} skipped`}
-            .
+              t('imports.scores.skippedProblems', { count: done.skipped })}
+            {'.'}
           </p>
           <div className="row">
-            <Link to="/results">See the Results page</Link>
-            <Link to="/evaluate">Back to Evaluate</Link>
+            <Link to="/results">{t('imports.scores.seeResults')}</Link>
+            <Link to="/evaluate">{t('imports.scores.backToEvaluate')}</Link>
             <button type="button" onClick={resetAll}>
-              Import another file
+              {t('imports.importAnotherFile')}
             </button>
           </div>
         </section>

@@ -3,8 +3,10 @@
 // `onChange(id, value)` reports edits. Numbers and dates are kept as strings
 // while editing; yes/no is kept as a real boolean. The value <-> `extra`
 // conversion helpers live in ../lib/studentFields.js.
+import { useTranslation } from 'react-i18next';
 
 function Control({ definition, controlId, value, onChange, disabled }) {
+  const { t } = useTranslation(['students', 'common']);
   const common = { id: controlId, disabled, autoComplete: 'off' };
 
   switch (definition.fieldType) {
@@ -47,8 +49,8 @@ function Control({ definition, controlId, value, onChange, disabled }) {
           }}
         >
           <option value="">—</option>
-          <option value="yes">Yes</option>
-          <option value="no">No</option>
+          <option value="yes">{t('fields.yes')}</option>
+          <option value="no">{t('fields.no')}</option>
         </select>
       );
     case 'choice':
@@ -86,6 +88,7 @@ function StudentFieldInputs({
   disabled = false,
   idPrefix = 'field',
 }) {
+  const { t } = useTranslation(['students', 'common']);
   if (!definitions || definitions.length === 0) return null;
 
   return (
@@ -97,8 +100,11 @@ function StudentFieldInputs({
             <label htmlFor={controlId}>
               {definition.label}
               {definition.isRestricted && (
-                <span className="badge" title="Only shown to those allowed to see restricted fields">
-                  restricted
+                <span
+                  className="badge"
+                  title={t('fields.restrictedTitle')}
+                >
+                  {t('fields.restricted')}
                 </span>
               )}
             </label>

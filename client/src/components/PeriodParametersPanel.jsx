@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listPeriodParameters } from '../api/evaluations.js';
+import { errorMessage } from '../i18n/errors.js';
 import {
   createParameterChange,
   getChangeImpact,
@@ -8,6 +10,7 @@ import {
 } from '../api/parameters.js';
 
 function ParameterChoice({ parameter, used, periodNumber, disabled }) {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const action = used ? 'remove' : 'add';
   const [isOpen, setIsOpen] = useState(false);
@@ -34,15 +37,16 @@ function ParameterChoice({ parameter, used, periodNumber, disabled }) {
         const impact = await getChangeImpact(request);
         if (impact.affectedScores > 0) {
           const ok = window.confirm(
-            `${impact.affectedScores} saved score(s) for ${parameter.name} ` +
-              `(period ${impact.periods.join(', ')}) will no longer appear in ` +
-              'the entry grid. They are kept, not deleted, and come back if ' +
-              'you undo this change. Continue?'
+            t('parameters.impactConfirm', {
+              count: impact.affectedScores,
+              name: parameter.name,
+              periods: impact.periods.join(', '),
+            })
           );
           if (!ok) return;
         }
       } catch (err) {
-        setProblem(err.message);
+        setProblem(errorMessage(err));
         return;
       } finally {
         setChecking(false);
@@ -57,7 +61,7 @@ function ParameterChoice({ parameter, used, periodNumber, disabled }) {
         <span className="chip-row">
           <strong>{parameter.name}</strong>
           <span className={used ? 'chip ok' : 'chip'}>
-            {used ? 'Used' : 'Not used'}
+            {used ? t('parameters.usedChip') : t('parameters.notUsedChip')}
           </span>
         </span>
         {!isOpen && (
@@ -66,7 +70,9 @@ function ParameterChoice({ parameter, used, periodNumber, disabled }) {
             onClick={() => setIsOpen(true)}
             disabled={disabled}
           >
-            {used ? 'Remove…' : 'Add…'}
+            {used
+              ? t('parameters.removeDots')
+              : t('parameters.addDots')}
           </button>
         )}
       </div>
@@ -80,7 +86,7 @@ function ParameterChoice({ parameter, used, periodNumber, disabled }) {
               checked={scope === 'this_period_only'}
               onChange={() => setScope('this_period_only')}
             />
-            This period only (Period {periodNumber})
+            {t('parameters.scopeThisPeriod', { period: periodNumber })}
           </label>
           <label>
             <input
@@ -89,7 +95,7 @@ function ParameterChoice({ parameter, used, periodNumber, disabled }) {
               checked={scope === 'from_here_on'}
               onChange={() => setScope('from_here_on')}
             />
-            Period {periodNumber} and all following periods
+            {t('parameters.scopeFromHere', { period: periodNumber })}
           </label>
           <div className="row">
             <button
@@ -97,22 +103,25 @@ function ParameterChoice({ parameter, used, periodNumber, disabled }) {
               onClick={handleConfirm}
               disabled={checking || change.isPending}
             >
-              {used ? 'Remove' : 'Add'}
+              {used ? t('parameters.removeBtn') : t('common:actions.add')}
             </button>
             <button type="button" onClick={() => setIsOpen(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </button>
           </div>
         </div>
       )}
 
       {problem && <p className="error">{problem}</p>}
-      {change.isError && <p className="error">{change.error.message}</p>}
+      {change.isError && (
+        <p className="error">{errorMessage(change.error)}</p>
+      )}
     </li>
   );
 }
 
 function PeriodParametersPanel({ periodNumber, disabled }) {
+  const { t } = useTranslation(['students', 'common']);
   const catalog = useQuery({
     queryKey: ['parameters'],
     queryFn: listParameters,
@@ -122,26 +131,25 @@ function PeriodParametersPanel({ periodNumber, disabled }) {
     queryFn: () => listPeriodParameters(periodNumber),
   });
 
-  if (catalog.isPending || inUse.isPending) return <p>Loading parameters...</p>;
+  if (catalog.isPending || inUse.isPending) {
+    return <p>{t('parameters.loading')}</p>;
+  }
   const failure = catalog.error ?? inUse.error;
-  if (failure) return <p className="error">{failure.message}</p>;
+  if (failure) return <p className="error">{errorMessage(failure)}</p>;
 
   const usedIds = new Set(inUse.data.map((parameter) => parameter.id));
 
   return (
     <details className="panel">
       <summary>
-        Parameters for Period {periodNumber} ({inUse.data.length} used)
+        {t('parameters.panelSummary', {
+          period: periodNumber,
+          count: inUse.data.length,
+        })}
       </summary>
-      <p className="hint">
-        "This period only" affects just this period. "All following periods"
-        applies from here until the next change to that parameter. Saved scores
-        are never deleted.
-      </p>
+      <p className="hint">{t('parameters.scopeHint')}</p>
       {disabled && (
-        <p className="hint">
-          Save or discard your unsaved changes before changing parameters.
-        </p>
+        <p className="hint">{t('parameters.saveOrDiscardFirst')}</p>
       )}
       <ul className="plain-list">
         {catalog.data.map((parameter) => (

@@ -1,18 +1,23 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listFieldDefinitions } from '../api/fields.js';
 import { updateStudent } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import StudentFieldInputs from './StudentFieldInputs.jsx';
 import { buildExtraPatch, extraToValues } from '../lib/studentFields.js';
 
-function displayValue(definition, raw) {
+function displayValue(t, definition, raw) {
   if (raw === undefined || raw === null || raw === '') return '—';
-  if (definition.fieldType === 'yes_no') return raw ? 'Yes' : 'No';
+  if (definition.fieldType === 'yes_no') {
+    return raw ? t('fields.yes') : t('fields.no');
+  }
   return String(raw);
 }
 
 function StudentFieldsSection({ student }) {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -51,7 +56,7 @@ function StudentFieldsSection({ student }) {
 
   return (
     <section className="section-card">
-      <h2>Details</h2>
+      <h2>{t('detail.fieldsTitle')}</h2>
       {isEditing ? (
         <form onSubmit={handleSubmit}>
           <StudentFieldInputs
@@ -63,17 +68,19 @@ function StudentFieldsSection({ student }) {
           />
           <div className="row">
             <button type="submit" disabled={save.isPending}>
-              {save.isPending ? 'Saving...' : 'Save details'}
+              {save.isPending ? t('common:actions.saving') : t('detail.saveDetails')}
             </button>
             <button
               type="button"
               onClick={() => setIsEditing(false)}
               disabled={save.isPending}
             >
-              Cancel
+              {t('common:actions.cancel')}
             </button>
           </div>
-          {save.isError && <p className="error">{save.error.message}</p>}
+          {save.isError && (
+            <p className="error">{errorMessage(save.error)}</p>
+          )}
         </form>
       ) : (
         <>
@@ -81,13 +88,15 @@ function StudentFieldsSection({ student }) {
             {definitions.map((definition) => (
               <div className="field-list-row" key={definition.id}>
                 <dt>{definition.label}</dt>
-                <dd>{displayValue(definition, student.extra?.[definition.id])}</dd>
+                <dd>
+                  {displayValue(t, definition, student.extra?.[definition.id])}
+                </dd>
               </div>
             ))}
           </dl>
           {can('students.edit') && (
             <button type="button" onClick={startEditing}>
-              Edit details
+              {t('detail.editDetails')}
             </button>
           )}
         </>

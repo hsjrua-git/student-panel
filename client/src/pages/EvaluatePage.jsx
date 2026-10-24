@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import {
   listEvaluations,
   listPeriodParameters,
   saveEvaluations,
 } from '../api/evaluations.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import EmptyState from '../components/EmptyState.jsx';
 import EvaluationGrid from '../components/EvaluationGrid.jsx';
 import GroupFilter from '../components/GroupFilter.jsx';
@@ -23,6 +25,7 @@ import { usePeriods } from '../lib/usePeriods.js';
 
 function EvaluatePage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation(['students', 'common']);
   const { can } = useAuth();
   const periodsQuery = usePeriods();
   const periods = periodsQuery.data;
@@ -159,7 +162,7 @@ function EvaluatePage() {
   function handlePeriodChange(next) {
     if (
       draftCount > 0 &&
-      !window.confirm('You have unsaved changes. Discard them and switch period?')
+      !window.confirm(t('evaluate.unsavedConfirm'))
     ) {
       return;
     }
@@ -181,9 +184,7 @@ function EvaluatePage() {
     let overrideReason;
     if (lockedCount > 0) {
       const answer = window.prompt(
-        `${lockedCount} of your changes are to locked scores. ` +
-          'Enter the reason for changing them (5 to 300 characters). ' +
-          'It is recorded in the audit log.'
+        t('evaluate.overridePrompt', { count: lockedCount })
       );
       if (answer === null) return;
       overrideReason = answer;
@@ -210,10 +211,10 @@ function EvaluatePage() {
   if (!can('scores.enter')) {
     return (
       <main>
-        <h1>Evaluate</h1>
+        <h1>{t('evaluate.title')}</h1>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to enter scores. You can see scores on each student's page."
+          title={t('shared.readOnlyTitle')}
+          description={t('evaluate.readOnlyDescription')}
         />
       </main>
     );
@@ -223,7 +224,7 @@ function EvaluatePage() {
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );
@@ -233,8 +234,8 @@ function EvaluatePage() {
       <main>
         <EmptyState
           tone="danger"
-          title="Couldn't load the evaluation page"
-          description={periodsQuery.error.message}
+          title={t('evaluate.loadErrorTitle')}
+          description={errorMessage(periodsQuery.error)}
         />
       </main>
     );
@@ -242,13 +243,13 @@ function EvaluatePage() {
   if (!periods.anchorDate) {
     return (
       <main>
-        <h1>Evaluate</h1>
+        <h1>{t('evaluate.title')}</h1>
         <EmptyState
-          title="Set up the calendar"
-          description="Set the period start date first, then you can start entering scores."
+          title={t('evaluate.calendarTitle')}
+          description={t('evaluate.calendarDescription')}
         >
           <p>
-            <Link to="/settings">Go to Settings</Link>
+            <Link to="/settings">{t('evaluate.goToSettings')}</Link>
           </p>
         </EmptyState>
       </main>
@@ -257,10 +258,10 @@ function EvaluatePage() {
   if (periods.current === null) {
     return (
       <main>
-        <h1>Evaluate</h1>
+        <h1>{t('evaluate.title')}</h1>
         <EmptyState
-          title="Period 1 hasn't started"
-          description="Once the first period begins, you can enter scores here."
+          title={t('evaluate.notStartedTitle')}
+          description={t('evaluate.notStartedDescription')}
         />
       </main>
     );
@@ -269,23 +270,25 @@ function EvaluatePage() {
   const isLoading = parametersQuery.isPending || savedQuery.isPending;
   const loadError = parametersQuery.error ?? savedQuery.error;
 
-  let saveLabel = 'Save';
+  let saveLabel = t('common:actions.save');
   if (mutation.isPending) {
-    saveLabel = 'Saving...';
+    saveLabel = t('common:actions.saving');
   } else if (draftCount > 0) {
     saveLabel =
-      `Save ${draftCount} change${draftCount === 1 ? '' : 's'}` +
-      (lockedCount > 0 ? ` (${lockedCount} locked)` : '');
+      t('evaluate.saveCount', { count: draftCount }) +
+      (lockedCount > 0
+        ? t('evaluate.saveLockedSuffix', { count: lockedCount })
+        : '');
   }
 
   return (
     <main className="wide">
       <div className="page-head">
-        <h1>Evaluate</h1>
+        <h1>{t('evaluate.title')}</h1>
         {can('data.import') && (
           <div className="page-head-actions">
             <Link className="btn" to="/evaluate/import">
-              Import scores
+              {t('evaluate.importScores')}
             </Link>
           </div>
         )}
@@ -310,8 +313,8 @@ function EvaluatePage() {
           className="search"
           value={searchText}
           onChange={handleSearchChange}
-          placeholder="Search students by name or code"
-          aria-label="Search students"
+          placeholder={t('evaluate.searchPlaceholder')}
+          aria-label={t('list.searchLabel')}
         />
         <GroupFilter value={groupId} onChange={handleGroupChange} />
         <span className="spacer" />
@@ -328,37 +331,37 @@ function EvaluatePage() {
           onClick={handleDiscard}
           disabled={draftCount === 0 || mutation.isPending}
         >
-          Discard
+          {t('evaluate.discard')}
         </button>
       </div>
 
       <p className="hint">
-        A score can be changed for 7 days after it is first saved (1 day if it
-        was entered late). After that it is locked
+        {t('evaluate.lockHint')}
         {can('scores.override')
-          ? '. You can still change it, with a written reason.'
-          : ' and only someone who can override locks can change it.'}
+          ? t('evaluate.lockHintOverride')
+          : t('evaluate.lockHintNoOverride')}
       </p>
 
       {hasLiveErrors && (
         <p className="error" role="alert">
-          Fix the red cells before saving.
+          {t('evaluate.fixCells')}
         </p>
       )}
       {mutation.isError && (
         <p className="error" role="alert">
-          {mutation.error.message}
+          {errorMessage(mutation.error)}
         </p>
       )}
       {mutation.isSuccess && (
         <p className="success" role="status">
-          Saved. {mutation.data.changed} value
-          {mutation.data.changed === 1 ? '' : 's'} changed.
+          {t('evaluate.saved', { count: mutation.data.changed })}
         </p>
       )}
 
-      {loadError && <p className="error">{loadError.message}</p>}
-      {isLoading && !loadError && <p className="hint">Loading…</p>}
+      {loadError && <p className="error">{errorMessage(loadError)}</p>}
+      {isLoading && !loadError && (
+        <p className="hint">{t('common:status.loading')}</p>
+      )}
       {!isLoading && !loadError && (
         <EvaluationGrid
           parameters={parametersQuery.data}

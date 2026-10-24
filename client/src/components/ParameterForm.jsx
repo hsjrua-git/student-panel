@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { createParameter } from '../api/parameters.js';
+import { errorMessage } from '../i18n/errors.js';
 import { parseOptionalNumber } from '../lib/numbers.js';
 import { usePeriods } from '../lib/usePeriods.js';
 
 function ParameterForm() {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { data: periods } = usePeriods();
 
@@ -42,15 +45,15 @@ function ParameterForm() {
     const max = parseOptionalNumber(maxText);
     const startPeriod = Number(shownStart);
 
-    if (name.trim() === '') return fail('Please enter a name.');
+    if (name.trim() === '') return fail(t('parameters.problemName'));
     if (min.error || max.error) {
-      return fail('Minimum and maximum must be numbers, or left empty.');
+      return fail(t('parameters.problemNumbers'));
     }
     if (min.value !== null && max.value !== null && min.value > max.value) {
-      return fail('The minimum cannot be larger than the maximum.');
+      return fail(t('parameters.problemRange'));
     }
     if (!Number.isInteger(startPeriod) || startPeriod < 1) {
-      return fail('The starting period must be a whole number from 1.');
+      return fail(t('parameters.problemStart'));
     }
 
     setProblem(null);
@@ -67,27 +70,27 @@ function ParameterForm() {
     <form onSubmit={handleSubmit}>
       <div className="form-grid">
         <label>
-          Name
+          {t('common:table.name')}
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Speed"
+            placeholder={t('parameters.namePlaceholder')}
             maxLength={60}
             autoComplete="off"
           />
         </label>
         <label>
-          Unit (optional)
+          {t('parameters.unitLabel')}
           <input
             value={unit}
             onChange={(event) => setUnit(event.target.value)}
-            placeholder="e.g. km/h"
+            placeholder={t('parameters.unitPlaceholder')}
             maxLength={20}
             autoComplete="off"
           />
         </label>
         <label>
-          Minimum (optional)
+          {t('parameters.minLabel')}
           <input
             type="number"
             step="any"
@@ -96,7 +99,7 @@ function ParameterForm() {
           />
         </label>
         <label>
-          Maximum (optional)
+          {t('parameters.maxLabel')}
           <input
             type="number"
             step="any"
@@ -105,7 +108,7 @@ function ParameterForm() {
           />
         </label>
         <label>
-          Used from period
+          {t('parameters.usedFrom')}
           <input
             type="number"
             min="1"
@@ -117,7 +120,7 @@ function ParameterForm() {
       </div>
 
       <button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Adding...' : 'Add parameter'}
+        {mutation.isPending ? t('forms.adding') : t('parameters.addBtn')}
       </button>
 
       {problem && (
@@ -127,13 +130,15 @@ function ParameterForm() {
       )}
       {mutation.isError && (
         <p className="error" role="alert">
-          {mutation.error.message}
+          {errorMessage(mutation.error)}
         </p>
       )}
       {mutation.isSuccess && (
         <p className="success" role="status">
-          Added {mutation.data.name}, used from Period{' '}
-          {mutation.variables.startPeriod} on.
+          {t('parameters.addedFromPeriod', {
+            name: mutation.data.name,
+            period: mutation.variables.startPeriod,
+          })}
         </p>
       )}
     </form>

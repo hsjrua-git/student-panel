@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { updateParameter } from '../api/parameters.js';
+import { errorMessage } from '../i18n/errors.js';
 import { formatRange } from '../lib/format.js';
 import { numberToText, parseOptionalNumber } from '../lib/numbers.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 function ParameterRow({ parameter }) {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -40,15 +43,15 @@ function ParameterRow({ parameter }) {
     const max = parseOptionalNumber(maxText);
 
     if (name.trim() === '') {
-      setProblem('Please enter a name.');
+      setProblem(t('parameters.problemName'));
       return;
     }
     if (min.error || max.error) {
-      setProblem('Minimum and maximum must be numbers, or left empty.');
+      setProblem(t('parameters.problemNumbers'));
       return;
     }
     if (min.value !== null && max.value !== null && min.value > max.value) {
-      setProblem('The minimum cannot be larger than the maximum.');
+      setProblem(t('parameters.problemRange'));
       return;
     }
 
@@ -66,7 +69,7 @@ function ParameterRow({ parameter }) {
       <div className="param-card">
         <form onSubmit={handleSave} className="edit-form">
             <label>
-              Name
+              {t('common:table.name')}
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -75,7 +78,7 @@ function ParameterRow({ parameter }) {
               />
             </label>
             <label>
-              Unit (optional)
+              {t('parameters.unitLabel')}
               <input
                 value={unit}
                 onChange={(event) => setUnit(event.target.value)}
@@ -84,7 +87,7 @@ function ParameterRow({ parameter }) {
               />
             </label>
             <label>
-              Minimum (optional)
+              {t('parameters.minLabel')}
               <input
                 type="number"
                 step="any"
@@ -93,7 +96,7 @@ function ParameterRow({ parameter }) {
               />
             </label>
             <label>
-              Maximum (optional)
+              {t('parameters.maxLabel')}
               <input
                 type="number"
                 step="any"
@@ -103,14 +106,16 @@ function ParameterRow({ parameter }) {
             </label>
             <div className="row">
               <button type="submit" disabled={update.isPending}>
-                Save
+                {t('common:actions.save')}
               </button>
               <button type="button" onClick={() => setIsEditing(false)}>
-                Cancel
+                {t('common:actions.cancel')}
               </button>
             </div>
             {problem && <p className="error">{problem}</p>}
-            {update.isError && <p className="error">{update.error.message}</p>}
+            {update.isError && (
+              <p className="error">{errorMessage(update.error)}</p>
+            )}
           </form>
       </div>
     );
@@ -123,15 +128,17 @@ function ParameterRow({ parameter }) {
         <h3>{parameter.name}</h3>
         {can('parameters.manage') && (
           <button type="button" className="quiet" onClick={startEditing}>
-            Edit
+            {t('common:actions.edit')}
           </button>
         )}
       </div>
       <span className="chip-row">
-        {range !== '—' && <span className="chip">Range {range}</span>}
+        {range !== '—' && (
+          <span className="chip">{t('parameters.rangeChip', { range })}</span>
+        )}
         {parameter.unit && <span className="chip">{parameter.unit}</span>}
         {range === '—' && !parameter.unit && (
-          <span className="hint">No range or unit set</span>
+          <span className="hint">{t('parameters.noRangeOrUnit')}</span>
         )}
       </span>
     </div>

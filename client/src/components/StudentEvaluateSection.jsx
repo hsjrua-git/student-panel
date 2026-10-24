@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   listPeriodParameters,
   listStudentEvaluations,
   saveEvaluations,
 } from '../api/evaluations.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import PeriodPicker from './PeriodPicker.jsx';
 import { LockIcon, NoteFilledIcon, NoteIcon } from './icons.jsx';
 import {
@@ -24,14 +26,14 @@ function rangeHint(parameter) {
   return [range === '—' ? null : range, parameter.unit].filter(Boolean).join(' · ');
 }
 
-function lockTitle(lock, access) {
+function lockTitle(t, lock, access) {
   if (!lock) return undefined;
   if (lock.isLocked) {
     return access === 'override'
-      ? `Locked since ${formatDateTime(lock.lockedAt)}. Changing it needs a written reason.`
-      : `Locked since ${formatDateTime(lock.lockedAt)}. Only an administrator can change it.`;
+      ? t('evaluate.lockedSinceOverride', { date: formatDateTime(lock.lockedAt) })
+      : t('evaluate.lockedSinceAdmin', { date: formatDateTime(lock.lockedAt) });
   }
-  return `Can be changed until ${formatDateTime(lock.lockedAt)}`;
+  return t('evaluate.changeableUntil', { date: formatDateTime(lock.lockedAt) });
 }
 
 // In-page evaluation for a single student. It mirrors the Evaluate page's save
@@ -39,6 +41,7 @@ function lockTitle(lock, access) {
 // handling) but scoped to one student and one period, so a teacher can enter
 // scores straight from the student's own page. Only rendered for scores.enter.
 function StudentEvaluateSection({ student }) {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const periodsQuery = usePeriods();
@@ -158,7 +161,7 @@ function StudentEvaluateSection({ student }) {
   function handlePeriodChange(next) {
     if (
       draftCount > 0 &&
-      !window.confirm('You have unsaved changes. Discard them and switch period?')
+      !window.confirm(t('evaluate.unsavedConfirm'))
     ) {
       return;
     }
@@ -181,9 +184,7 @@ function StudentEvaluateSection({ student }) {
     let overrideReason;
     if (lockedCount > 0) {
       const answer = window.prompt(
-        `${lockedCount} of your changes are to locked scores. ` +
-          'Enter the reason for changing them (5 to 300 characters). ' +
-          'It is recorded in the audit log.'
+        t('evaluate.overridePrompt', { count: lockedCount })
       );
       if (answer === null) return;
       overrideReason = answer;
@@ -197,29 +198,31 @@ function StudentEvaluateSection({ student }) {
     mutation.reset();
   }
 
-  let saveLabel = 'Save';
+  let saveLabel = t('common:actions.save');
   if (mutation.isPending) {
-    saveLabel = 'Saving...';
+    saveLabel = t('common:actions.saving');
   } else if (draftCount > 0) {
     saveLabel =
-      `Save ${draftCount} change${draftCount === 1 ? '' : 's'}` +
-      (lockedCount > 0 ? ` (${lockedCount} locked)` : '');
+      t('evaluate.saveCount', { count: draftCount }) +
+      (lockedCount > 0
+        ? t('evaluate.saveLockedSuffix', { count: lockedCount })
+        : '');
   }
 
   return (
     <section className="section-card">
-      <h2>Evaluate</h2>
+      <h2>{t('evaluate.title')}</h2>
 
-      {periodsQuery.isPending && <p>Loading...</p>}
+      {periodsQuery.isPending && <p>{t('common:status.loading')}</p>}
       {periodsQuery.isError && (
-        <p className="error">{periodsQuery.error.message}</p>
+        <p className="error">{errorMessage(periodsQuery.error)}</p>
       )}
 
       {periods && !periods.anchorDate && (
-        <p className="hint">Set the period start date first, on the Settings page.</p>
+        <p className="hint">{t('evaluate.setPeriodFirst')}</p>
       )}
       {periods && periods.anchorDate && periods.current === null && (
-        <p className="hint">Period 1 has not started yet.</p>
+        <p className="hint">{t('shared.period1NotStarted')}</p>
       )}
 
       {periods && periods.anchorDate && periods.current !== null && (
@@ -243,46 +246,46 @@ function StudentEvaluateSection({ student }) {
               onClick={handleDiscard}
               disabled={draftCount === 0 || mutation.isPending}
             >
-              Discard
+              {t('evaluate.discard')}
             </button>
           </div>
 
           <p className="hint">
-            A score can be changed for 7 days after it is first saved (1 day if
-            it was entered late). After that it is locked
+            {t('evaluate.lockHint')}
             {canOverride
-              ? '. You can still change it, with a written reason.'
-              : ' and only someone who can override locks can change it.'}
+              ? t('evaluate.lockHintOverride')
+              : t('evaluate.lockHintNoOverride')}
           </p>
 
           {hasLiveErrors && (
             <p className="error" role="alert">
-              Fix the red cells before saving.
+              {t('evaluate.fixCells')}
             </p>
           )}
           {mutation.isError && (
             <p className="error" role="alert">
-              {mutation.error.message}
+              {errorMessage(mutation.error)}
             </p>
           )}
           {mutation.isSuccess && (
             <p className="success" role="status">
-              Saved. {mutation.data.changed} value
-              {mutation.data.changed === 1 ? '' : 's'} changed.
+              {t('evaluate.saved', { count: mutation.data.changed })}
             </p>
           )}
 
-          {(parametersQuery.isPending || savedQuery.isPending) && <p>Loading...</p>}
+          {(parametersQuery.isPending || savedQuery.isPending) && (
+            <p>{t('common:status.loading')}</p>
+          )}
           {parametersQuery.isError && (
-            <p className="error">{parametersQuery.error.message}</p>
+            <p className="error">{errorMessage(parametersQuery.error)}</p>
           )}
           {savedQuery.isError && (
-            <p className="error">{savedQuery.error.message}</p>
+            <p className="error">{errorMessage(savedQuery.error)}</p>
           )}
 
           {parametersQuery.data && savedQuery.data && (
             parametersQuery.data.length === 0 ? (
-              <p>No parameters are used in this period.</p>
+              <p>{t('evaluate.noPeriodParameters')}</p>
             ) : (
               <EvaluateTable
                 parameters={parametersQuery.data}
@@ -322,14 +325,15 @@ function EvaluateTable({
   onCellChange,
   onNoteChange,
 }) {
+  const { t } = useTranslation(['students', 'common']);
   return (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Parameter</th>
-            <th>Score</th>
-            <th>Note</th>
+            <th>{t('evaluate.colParameter')}</th>
+            <th>{t('evaluate.colScore')}</th>
+            <th>{t('common:table.note')}</th>
           </tr>
         </thead>
         <tbody>
@@ -367,11 +371,14 @@ function EvaluateTable({
                       inputMode="decimal"
                       value={shown}
                       disabled={access === 'locked'}
-                      title={lockTitle(lock, access)}
+                      title={lockTitle(t, lock, access)}
                       onChange={(event) =>
                         onCellChange(key, event.target.value, original)
                       }
-                      aria-label={`${parameter.name}${lock?.isLocked ? ' (locked)' : ''}`}
+                      aria-label={
+                        parameter.name +
+                        (lock?.isLocked ? t('evaluate.lockedTag') : '')
+                      }
                       autoComplete="off"
                     />
                     {access !== 'open' && (
@@ -388,9 +395,15 @@ function EvaluateTable({
                     className={`note-toggle${hasNote ? ' has-note' : ''}${
                       key in noteDrafts ? ' changed' : ''
                     }`}
-                    aria-label={`${hasNote ? 'Edit' : 'Add'} note for ${parameter.name}`}
+                    aria-label={
+                      (hasNote
+                        ? t('common:actions.edit')
+                        : t('common:actions.add')) +
+                      ' ' +
+                      t('evaluate.noteForSingle', { parameter: parameter.name })
+                    }
                     aria-expanded={isNoteOpen}
-                    title={hasNote ? shownNote : 'Add a note'}
+                    title={hasNote ? shownNote : t('evaluate.addNoteTitle')}
                     onClick={() => onOpenNoteChange(isNoteOpen ? null : key)}
                   >
                     {hasNote ? <NoteFilledIcon /> : <NoteIcon />}
@@ -402,8 +415,10 @@ function EvaluateTable({
                       maxLength={500}
                       value={shownNote}
                       disabled={access === 'locked'}
-                      placeholder="Note (e.g. absent, injured)…"
-                      aria-label={`Note for ${parameter.name}`}
+                      placeholder={t('evaluate.notePlaceholder')}
+                      aria-label={t('evaluate.noteAriaSingle', {
+                        parameter: parameter.name,
+                      })}
                       onChange={(event) =>
                         onNoteChange(key, event.target.value, originalNote)
                       }

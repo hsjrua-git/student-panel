@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Trans, useTranslation } from 'react-i18next';
 import { createStudent } from '../api/students.js';
 import { listFieldDefinitions } from '../api/fields.js';
+import { errorMessage } from '../i18n/errors.js';
 import { formatStudentCode } from '../lib/format.js';
 import StudentFieldInputs from './StudentFieldInputs.jsx';
 import { cleanExtra } from '../lib/studentFields.js';
 
 function StudentForm() {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState('');
   const [fieldValues, setFieldValues] = useState({});
@@ -37,7 +40,7 @@ function StudentForm() {
     const name = fullName.trim().replace(/\s+/g, ' ');
     if (name.length < 2 || name.length > 100) {
       mutation.reset();
-      setProblem('Full name must be between 2 and 100 characters.');
+      setProblem(t('forms.nameProblem'));
       return;
     }
     setProblem(null);
@@ -47,18 +50,18 @@ function StudentForm() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <label htmlFor="fullName">Full name</label>
+      <label htmlFor="fullName">{t('list.fullName')}</label>
       <div className="row">
         <input
           id="fullName"
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
-          placeholder="e.g. Maria Lopez"
+          placeholder={t('forms.namePlaceholder')}
           maxLength={200}
           autoComplete="off"
         />
         <button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Adding...' : 'Add student'}
+          {mutation.isPending ? t('forms.adding') : t('forms.addBtn')}
         </button>
       </div>
 
@@ -77,13 +80,20 @@ function StudentForm() {
       )}
       {mutation.isError && (
         <p className="error" role="alert">
-          {mutation.error.message}
+          {errorMessage(mutation.error)}
         </p>
       )}
       {mutation.isSuccess && (
         <p className="success" role="status">
-          Added {mutation.data.fullName} with code{' '}
-          <strong>{formatStudentCode(mutation.data.studentCode)}</strong>
+          <Trans
+            t={t}
+            i18nKey="forms.addedWithCode"
+            values={{
+              name: mutation.data.fullName,
+              code: formatStudentCode(mutation.data.studentCode),
+            }}
+            components={{ strong: <strong /> }}
+          />
         </p>
       )}
     </form>

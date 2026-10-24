@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 function TemporaryPasswordNotice({ notice, onDismiss }) {
+  const { t } = useTranslation(['students', 'common']);
   const [copyState, setCopyState] = useState(null);
 
   async function copy() {
@@ -16,28 +18,33 @@ function TemporaryPasswordNotice({ notice, onDismiss }) {
     <div className="notice" role="status">
       <p>
         <strong>
-          {notice.kind === 'created' ? 'Account created.' : 'Password reset.'}
+          {notice.kind === 'created'
+            ? t('notice.created')
+            : t('notice.reset')}
         </strong>{' '}
-        Give this temporary password to <strong>{notice.username}</strong>. It
-        is shown only once, and they must choose a new password at their next
-        sign-in.
+        <Trans
+          t={t}
+          i18nKey="notice.intro"
+          values={{ username: notice.username }}
+          components={{ strong: <strong /> }}
+        />
       </p>
       <p>
         <code className="secret">{notice.temporaryPassword}</code>
       </p>
       <div className="row">
         <button type="button" onClick={copy}>
-          Copy
+          {t('notice.copy')}
         </button>
         <button type="button" onClick={onDismiss}>
-          I have saved it
+          {t('notice.savedBtn')}
         </button>
       </div>
-      {copyState === 'copied' && <p className="success">Copied.</p>}
+      {copyState === 'copied' && (
+        <p className="success">{t('notice.copied')}</p>
+      )}
       {copyState === 'failed' && (
-        <p className="hint">
-          Could not copy automatically. Select the text and copy it yourself.
-        </p>
+        <p className="hint">{t('notice.copyFailed')}</p>
       )}
     </div>
   );

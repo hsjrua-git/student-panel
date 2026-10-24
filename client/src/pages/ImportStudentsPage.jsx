@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Papa from 'papaparse';
 import { Link } from 'react-router';
+import { Trans, useTranslation } from 'react-i18next';
 import { importStudents } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import EmptyState from '../components/EmptyState.jsx';
 import ExportButton from '../components/ExportButton.jsx';
 import ImportSteps from '../components/ImportSteps.jsx';
@@ -20,22 +22,33 @@ import {
 const MAX_ROWS = 500;
 const MAX_FILE_BYTES = 1_000_000;
 
-function columnLabel(index, headerCells) {
+function columnLabel(t, index, headerCells) {
   const header = headerCells ? String(headerCells[index] ?? '').trim() : '';
-  return header ? `Column ${index + 1}: ${header}` : `Column ${index + 1}`;
+  return header
+    ? t('imports.columnWithHeader', { index: index + 1, header })
+    : t('imports.columnN', { index: index + 1 });
 }
 
-function describeRow(item) {
-  if (item.status === 'invalid') return `Skipped: ${item.message}`;
-  if (item.status === 'ok') return 'Will be added';
-  if (item.willImport) return `Will be added (${item.message})`;
+function describeRow(t, item) {
+  if (item.status === 'invalid') {
+    return t('imports.students.skippedMessage', { message: item.message });
+  }
+  if (item.status === 'ok') return t('imports.students.willBeAdded');
+  if (item.willImport) {
+    return t('imports.students.willBeAddedNote', { note: item.message });
+  }
   const code = item.existingCode
-    ? ` Existing code: ${formatStudentCode(item.existingCode)}.`
+    ? t('imports.students.existingCode', {
+        code: formatStudentCode(item.existingCode),
+      })
     : '';
-  return `Skipped: ${item.message}${code}`;
+  return (
+    t('imports.students.skippedMessage', { message: item.message }) + code
+  );
 }
 
 function ColumnSelect({ label, value, onChange, columnCount, headerCells }) {
+  const { t } = useTranslation(['students', 'common']);
   return (
     <label className="inline">
       {label}
@@ -45,7 +58,7 @@ function ColumnSelect({ label, value, onChange, columnCount, headerCells }) {
       >
         {Array.from({ length: columnCount }, (_, index) => (
           <option key={index} value={index}>
-            {columnLabel(index, headerCells)}
+            {columnLabel(t, index, headerCells)}
           </option>
         ))}
       </select>
@@ -54,6 +67,7 @@ function ColumnSelect({ label, value, onChange, columnCount, headerCells }) {
 }
 
 function ImportStudentsPage() {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
 
@@ -111,7 +125,7 @@ function ImportStudentsPage() {
     startOver();
     setFileName(file.name);
     if (file.size > MAX_FILE_BYTES) {
-      setParseError('This file is larger than 1 MB. Split it into smaller files.');
+      setParseError(t('imports.fileTooLarge', { size: '1 MB' }));
       input.value = '';
       return;
     }
@@ -120,7 +134,7 @@ function ImportStudentsPage() {
     const prepared = prepareRows(Papa.parse(text, { skipEmptyLines: false }).data);
     input.value = '';
     if (prepared.length === 0) {
-      setParseError('The file has no rows.');
+      setParseError(t('imports.noRows'));
       return;
     }
 
@@ -165,8 +179,8 @@ function ImportStudentsPage() {
     return (
       <main>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to import students."
+          title={t('shared.readOnlyTitle')}
+          description={t('imports.students.readOnlyDescription')}
         />
       </main>
     );
@@ -178,21 +192,21 @@ function ImportStudentsPage() {
   return (
     <main className="wide">
       <p>
-        <Link to="/students">← Back to students</Link>
+        <Link to="/students">{t('detail.back')}</Link>
       </p>
-      <h1>Import students</h1>
+      <h1>{t('imports.students.title')}</h1>
       <ImportSteps
-        steps={['Choose a file', 'Review', 'Done']}
+        steps={[
+          t('imports.stepChoose'),
+          t('imports.stepReview'),
+          t('common:actions.done'),
+        ]}
         current={stage === 'choose' ? 0 : stage === 'preview' ? 1 : 2}
       />
 
       {stage === 'choose' && (
         <>
-          <p className="hint">
-            Choose a CSV file with one student per row. If your list is in
-            Excel or LibreOffice, use "Save as" and pick CSV (UTF-8). Students
-            get a random code when they are added.
-          </p>
+          <p className="hint">{t('imports.students.hint')}</p>
           <div className="drop-zone">
             <span className="drop-zone-mark">
               <UploadIcon />
@@ -200,7 +214,7 @@ function ImportStudentsPage() {
             <input
               type="file"
               accept=".csv,.txt,text/csv"
-              aria-label="Choose a CSV file of student names to import"
+              aria-label={t('imports.students.fileAria')}
               onChange={handleFile}
             />
           </div>
@@ -217,9 +231,11 @@ function ImportStudentsPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Row</th>
+                      <th>{t('imports.row')}</th>
                       {Array.from({ length: columnCount }, (_, index) => (
-                        <th key={index}>Column {index + 1}</th>
+                        <th key={index}>
+                          {columnLabel(t, index, null)}
+                        </th>
                       ))}
                     </tr>
                   </thead>
@@ -236,7 +252,9 @@ function ImportStudentsPage() {
                 </table>
               </div>
               {rows.length > 5 && (
-                <p className="hint">Showing the first 5 of {rows.length} rows.</p>
+                <p className="hint">
+                  {t('imports.showingFirst', { count: rows.length })}
+                </p>
               )}
 
               <div className="pref-group">
@@ -246,17 +264,23 @@ function ImportStudentsPage() {
                     checked={hasHeader}
                     onChange={(event) => setHasHeader(event.target.checked)}
                   />
-                  The first row is a header, not a student
+                  {t('imports.firstRowHeader')}
                 </label>
                 <label className="inline">
-                  Names are in
+                  {t('imports.students.namesIn')}
                   <select value={mode} onChange={(event) => setMode(event.target.value)}>
-                    <option value="single">One column (full name)</option>
-                    <option value="two">Two columns (first name and last name)</option>
+                    <option value="single">
+                      {t('imports.students.modeSingle')}
+                    </option>
+                    <option value="two">{t('imports.students.modeTwo')}</option>
                   </select>
                 </label>
                 <ColumnSelect
-                  label={mode === 'two' ? 'First name' : 'Full name'}
+                  label={
+                    mode === 'two'
+                      ? t('imports.students.firstName')
+                      : t('list.fullName')
+                  }
                   value={firstColumn}
                   onChange={setFirstColumn}
                   columnCount={columnCount}
@@ -264,7 +288,7 @@ function ImportStudentsPage() {
                 />
                 {mode === 'two' && (
                   <ColumnSelect
-                    label="Last name"
+                    label={t('imports.students.lastName')}
                     value={secondColumn}
                     onChange={setSecondColumn}
                     columnCount={columnCount}
@@ -275,8 +299,10 @@ function ImportStudentsPage() {
 
               {tooMany && (
                 <p className="error">
-                  This file has {names.length} students. Import at most{' '}
-                  {MAX_ROWS} at a time.
+                  {t('imports.students.tooMany', {
+                    count: names.length,
+                    max: MAX_ROWS,
+                  })}
                 </p>
               )}
               <button
@@ -284,11 +310,13 @@ function ImportStudentsPage() {
                 onClick={handleCheck}
                 disabled={names.length === 0 || tooMany || check.isPending}
               >
-                {check.isPending ? 'Checking...' : 'Check file'}
+                {check.isPending
+                  ? t('imports.checking')
+                  : t('imports.checkFile')}
               </button>
               {check.isError && (
                 <p className="error" role="alert">
-                  {check.error.message}
+                  {errorMessage(check.error)}
                 </p>
               )}
             </section>
@@ -300,10 +328,18 @@ function ImportStudentsPage() {
         <section className="section-card">
           <h2>{fileName}</h2>
           <p className="summary-line">
-            {result.counts.total} rows checked:{' '}
-            <strong>{result.counts.willImport} will be added</strong>,{' '}
-            {result.counts.skipped} skipped ({result.counts.invalid} invalid,{' '}
-            {result.counts.duplicates} with a repeated name).
+            <Trans
+              t={t}
+              i18nKey="imports.students.checkedSummary"
+              values={{
+                total: result.counts.total,
+                willImport: result.counts.willImport,
+                skipped: result.counts.skipped,
+                invalid: result.counts.invalid,
+                duplicates: result.counts.duplicates,
+              }}
+              components={{ strong: <strong /> }}
+            />
           </p>
           <label className="inline">
             <input
@@ -312,17 +348,16 @@ function ImportStudentsPage() {
               onChange={(event) => handleAllowChange(event.target.checked)}
               disabled={check.isPending}
             />
-            Also add rows whose name already appears (two students can share a
-            name)
+            {t('imports.students.allowDuplicates')}
           </label>
 
           <div className="table-wrap">
             <table className={check.isPending ? 'stale' : undefined}>
               <thead>
                 <tr>
-                  <th>Row</th>
-                  <th>Full name</th>
-                  <th>What will happen</th>
+                  <th>{t('imports.row')}</th>
+                  <th>{t('list.fullName')}</th>
+                  <th>{t('imports.students.whatWillHappen')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -333,7 +368,7 @@ function ImportStudentsPage() {
                   >
                     <td>{item.row}</td>
                     <td>{item.fullName}</td>
-                    <td>{describeRow(item)}</td>
+                    <td>{describeRow(t, item)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -349,23 +384,23 @@ function ImportStudentsPage() {
               }
             >
               {run.isPending
-                ? 'Importing...'
-                : `Import ${result.counts.willImport} student${
-                    result.counts.willImport === 1 ? '' : 's'
-                  }`}
+                ? t('imports.importing')
+                : t('imports.students.importButton', {
+                    count: result.counts.willImport,
+                  })}
             </button>
             <button type="button" onClick={startOver} disabled={run.isPending}>
-              Choose another file
+              {t('imports.chooseAnotherFile')}
             </button>
           </div>
           {check.isError && (
             <p className="error" role="alert">
-              {check.error.message}
+              {errorMessage(check.error)}
             </p>
           )}
           {run.isError && (
             <p className="error" role="alert">
-              {run.error.message}
+              {errorMessage(run.error)}
             </p>
           )}
         </section>
@@ -374,28 +409,21 @@ function ImportStudentsPage() {
       {stage === 'done' && done && (
         <section className="section-card">
           <p className="success" role="status">
-            Added {done.created.length} student
-            {done.created.length === 1 ? '' : 's'}
+            {t('imports.students.added', { count: done.created.length })}
             {done.counts.skipped > 0 &&
-              `, skipped ${done.counts.skipped} row${
-                done.counts.skipped === 1 ? '' : 's'
-              }`}
-            .
+              t('imports.students.skippedRows', { count: done.counts.skipped })}
+            {'.'}
           </p>
-          <p className="hint">
-            Each student got a random code. Download this list to keep the
-            codes with the names. You can also find them later on the Students
-            page.
-          </p>
+          <p className="hint">{t('imports.students.doneHint')}</p>
           <div className="row">
             <ExportButton
-              label="Download the list with codes (CSV)"
+              label={t('imports.students.downloadList')}
               filename={`imported-students-${toIsoDate(new Date())}.csv`}
               buildRows={() => createdStudentsCsvRows(done.created)}
             />
-            <Link to="/students">Go to students</Link>
+            <Link to="/students">{t('imports.students.goToStudents')}</Link>
             <button type="button" onClick={startOver}>
-              Import another file
+              {t('imports.importAnotherFile')}
             </button>
           </div>
 
@@ -403,9 +431,9 @@ function ImportStudentsPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Row</th>
-                  <th>Code</th>
-                  <th>Full name</th>
+                  <th>{t('imports.row')}</th>
+                  <th>{t('common:table.code')}</th>
+                  <th>{t('list.fullName')}</th>
                 </tr>
               </thead>
               <tbody>

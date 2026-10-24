@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { listStudents } from '../api/students.js';
 import { listFieldDefinitions } from '../api/fields.js';
 import { useAuth } from '../auth/AuthContext.jsx';
@@ -29,6 +30,7 @@ async function fetchFilteredStudents(groupId) {
 }
 
 function StudentsPage() {
+  const { t } = useTranslation(['students', 'common']);
   const { can } = useAuth();
   const [searchText, setSearchText] = useState('');
   const [page, setPage] = useState(1);
@@ -48,36 +50,36 @@ function StudentsPage() {
   return (
     <main>
       <div className="page-head">
-        <h1>Students</h1>
+        <h1>{t('list.title')}</h1>
         {can('data.import') && (
           <div className="page-head-actions">
             <Link className="btn" to="/students/import">
-              Import from CSV
+              {t('list.importFromCsv')}
             </Link>
           </div>
         )}
       </div>
       {can('students.create') && (
         <section className="section-card">
-          <h2>Add a student</h2>
+          <h2>{t('list.addTitle')}</h2>
           <StudentForm />
         </section>
       )}
       <section className="section-card">
-        <h2>All students</h2>
+        <h2>{t('list.allTitle')}</h2>
         <div className="toolbar">
           <input
             type="search"
             className="search"
             value={searchText}
             onChange={handleSearchChange}
-            placeholder="Search by name or code"
-            aria-label="Search students"
+            placeholder={t('list.searchPlaceholder')}
+            aria-label={t('list.searchLabel')}
           />
           <GroupFilter value={groupId} onChange={handleGroupChange} />
           {can('data.export') && (
             <ExportButton
-              label="Export students (CSV)"
+              label={t('list.exportCsv')}
               filename={`students-${toIsoDate(new Date())}.csv`}
               buildRows={async () => {
                 const [students, fields] = await Promise.all([

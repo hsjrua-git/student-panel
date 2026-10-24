@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
+import { Trans, useTranslation } from 'react-i18next';
 import { listStudentEvaluations } from '../api/evaluations.js';
 import { listParameters } from '../api/parameters.js';
 import { getStudent } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import ByParameterView from '../components/ByParameterView.jsx';
 import ByPeriodView from '../components/ByPeriodView.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -21,13 +23,16 @@ import StudentIdentitySection from '../components/StudentIdentitySection.jsx';
 import StudentEvaluateSection from '../components/StudentEvaluateSection.jsx';
 import { historyCsvRows } from '../lib/exports.js';
 
+// Tab ids double as the stored preference value ('overview' / 'period' /
+// 'parameter' in lib/preferences defaults) — translate only the label.
 const TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'period', label: 'By period' },
-  { id: 'parameter', label: 'By parameter' },
+  { id: 'overview', labelKey: 'detail.tabOverview' },
+  { id: 'period', labelKey: 'detail.tabByPeriod' },
+  { id: 'parameter', labelKey: 'detail.tabByParameter' },
 ];
 
 function StudentDetailPage() {
+  const { t } = useTranslation(['students', 'common']);
   const { id } = useParams();
   const { can } = useAuth();
   const { preferences } = usePreferences();
@@ -62,7 +67,7 @@ function StudentDetailPage() {
 
   const backLink = (
     <p>
-      <Link to="/students">← Back to students</Link>
+      <Link to="/students">{t('detail.back')}</Link>
     </p>
   );
 
@@ -72,8 +77,8 @@ function StudentDetailPage() {
         {backLink}
         <EmptyState
           tone="warn"
-          title="Student not found"
-          description="This student does not exist or was deleted."
+          title={t('detail.notFoundTitle')}
+          description={t('detail.notFoundDescription')}
         />
       </main>
     );
@@ -93,8 +98,8 @@ function StudentDetailPage() {
         {backLink}
         <EmptyState
           tone="danger"
-          title="Couldn't load this student"
-          description={failed.error.message}
+          title={t('detail.loadErrorTitle')}
+          description={errorMessage(failed.error)}
         />
       </main>
     );
@@ -105,7 +110,7 @@ function StudentDetailPage() {
         {backLink}
         <div className="page-loading" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );
@@ -121,12 +126,15 @@ function StudentDetailPage() {
     if (!periods.anchorDate) {
       content = (
         <p>
-          Set the period start date first, on the{' '}
-          <Link to="/settings">Settings</Link> page.
+          <Trans
+            t={t}
+            i18nKey="detail.setPeriodStart"
+            components={{ link: <Link to="/settings" /> }}
+          />
         </p>
       );
     } else if (periods.current === null) {
-      content = <p>Period 1 has not started yet.</p>;
+      content = <p>{t('shared.period1NotStarted')}</p>;
     } else if (tab === 'period') {
       content = (
         <ByPeriodView
@@ -155,8 +163,11 @@ function StudentDetailPage() {
           />
           {shown.length < parameters.length && (
             <p className="hint">
-              Some parameters are hidden in this overview. Change this in{' '}
-              <Link to="/preferences">Preferences</Link>.
+              <Trans
+                t={t}
+                i18nKey="detail.hiddenParameters"
+                components={{ link: <Link to="/preferences" /> }}
+              />
             </p>
           )}
         </>
@@ -171,14 +182,14 @@ function StudentDetailPage() {
         <div>
           <h1>{student.fullName}</h1>
           <p className="hint code">
-            Code {formatStudentCode(student.studentCode)}
+            {t('detail.code', { code: formatStudentCode(student.studentCode) })}
           </p>
         </div>
         {can('data.export') && (
           <div className="page-head-actions">
             {canViewHistory && (
               <ExportButton
-                label="Export history (CSV)"
+                label={t('detail.exportHistory')}
                 filename={`history-${student.studentCode}.csv`}
                 disabled={!periods.anchorDate || periods.current === null}
                 buildRows={() =>
@@ -204,8 +215,8 @@ function StudentDetailPage() {
 
       {canViewHistory && (
         <section className="section-card">
-          <h2>History</h2>
-          <div className="tabs" role="tablist" aria-label="History views">
+          <h2>{t('detail.history')}</h2>
+          <div className="tabs" role="tablist" aria-label={t('detail.historyViews')}>
             {TABS.map((item) => (
               <button
                 key={item.id}
@@ -215,7 +226,7 @@ function StudentDetailPage() {
                 className={tab === item.id ? 'tab active' : 'tab'}
                 onClick={() => setTab(item.id)}
               >
-                {item.label}
+                {t(item.labelKey)}
               </button>
             ))}
           </div>

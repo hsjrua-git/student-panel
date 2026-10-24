@@ -1,6 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import StudentFieldInputs from './StudentFieldInputs.jsx';
+import i18n from '../i18n/index.js';
+
+// The component translates its chrome (restricted badge, Yes/No options) via
+// i18next, whose default language is Persian. Pin the instance to English so
+// the assertions below keep matching the rendered strings.
+beforeAll(() => {
+  i18n.changeLanguage('en');
+});
 
 const definitions = [
   { id: 'nickname', label: 'Nickname', fieldType: 'short_text' },

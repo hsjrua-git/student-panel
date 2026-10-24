@@ -1,6 +1,8 @@
 import { memo, useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listStudents } from '../api/students.js';
+import { errorMessage } from '../i18n/errors.js';
 import { cellAccess, cellKey, savedText } from '../lib/cells.js';
 import {
   formatDateTime,
@@ -19,19 +21,21 @@ function rangeHint(parameter) {
     .join(' · ');
 }
 
-function lockTitle(lock, access) {
+function lockTitle(t, lock, access) {
   if (!lock) return undefined;
   if (lock.isLocked) {
     return access === 'override'
-      ? `Locked since ${formatDateTime(lock.lockedAt)}. Changing it needs a written reason.`
-      : `Locked since ${formatDateTime(lock.lockedAt)}. Only an administrator can change it.`;
+      ? t('evaluate.lockedSinceOverride', { date: formatDateTime(lock.lockedAt) })
+      : t('evaluate.lockedSinceAdmin', { date: formatDateTime(lock.lockedAt) });
   }
-  return `Can be changed until ${formatDateTime(lock.lockedAt)}`;
+  return t('evaluate.changeableUntil', { date: formatDateTime(lock.lockedAt) });
 }
 
 // One student's row. It is wrapped in React.memo (see rowsEqual) so that typing
 // in a cell only re-renders the row that changed, not the whole 50×N grid — the
 // difference between one input updating and hundreds re-rendering per keystroke.
+// It pulls its own `t` from useTranslation (rather than a prop, which rowsEqual
+// would ignore) so a language switch still re-renders every row.
 const EvaluationRow = memo(function EvaluationRow({
   student,
   parameters,
@@ -47,6 +51,7 @@ const EvaluationRow = memo(function EvaluationRow({
   openNote,
   onOpenNoteChange,
 }) {
+  const { t } = useTranslation(['students', 'common']);
   return (
     <tr>
       <td>
@@ -85,13 +90,16 @@ const EvaluationRow = memo(function EvaluationRow({
                 inputMode="decimal"
                 value={shown}
                 disabled={access === 'locked'}
-                title={lockTitle(lock, access)}
+                title={lockTitle(t, lock, access)}
                 onChange={(event) =>
                   onCellChange(key, event.target.value, original)
                 }
-                aria-label={`${parameter.name} for ${student.fullName}${
-                  lock?.isLocked ? ' (locked)' : ''
-                }`}
+                aria-label={
+                  t('evaluate.cellAriaLabel', {
+                    parameter: parameter.name,
+                    student: student.fullName,
+                  }) + (lock?.isLocked ? t('evaluate.lockedTag') : '')
+                }
                 autoComplete="off"
               />
               {access !== 'open' && (
@@ -105,11 +113,18 @@ const EvaluationRow = memo(function EvaluationRow({
                   className={`note-toggle${hasNote ? ' has-note' : ''}${
                     noteChanged ? ' changed' : ''
                   }`}
-                  aria-label={`${hasNote ? 'Edit' : 'Add'} note for ${
-                    parameter.name
-                  }, ${student.fullName}`}
+                  aria-label={
+                    (hasNote
+                      ? t('common:actions.edit')
+                      : t('common:actions.add')) +
+                    ' ' +
+                    t('evaluate.noteFor', {
+                      parameter: parameter.name,
+                      student: student.fullName,
+                    })
+                  }
                   aria-expanded={isNoteOpen}
-                  title={hasNote ? shownNote : 'Add a note'}
+                  title={hasNote ? shownNote : t('evaluate.addNoteTitle')}
                   onClick={() => onOpenNoteChange(isNoteOpen ? null : key)}
                 >
                   {hasNote ? <NoteFilledIcon /> : <NoteIcon />}
@@ -123,8 +138,11 @@ const EvaluationRow = memo(function EvaluationRow({
                 maxLength={500}
                 value={shownNote}
                 disabled={access === 'locked'}
-                placeholder="Note (e.g. absent, injured)…"
-                aria-label={`Note for ${parameter.name}, ${student.fullName}`}
+                placeholder={t('evaluate.notePlaceholder')}
+                aria-label={t('evaluate.noteAriaLabel', {
+                  parameter: parameter.name,
+                  student: student.fullName,
+                })}
                 onChange={(event) =>
                   onNoteChange(key, event.target.value, originalNote)
                 }
@@ -192,6 +210,7 @@ function EvaluationGrid({
   onPageChange,
   groupId = null,
 }) {
+  const { t } = useTranslation(['students', 'common']);
   const { preferences } = usePreferences();
   const sort = preferences.studentsSort;
   const [openNote, setOpenNote] = useState(null);
@@ -211,24 +230,19 @@ function EvaluationGrid({
     if (data && page > totalPages) onPageChange(totalPages);
   }, [data, page, totalPages, onPageChange]);
 
-  if (isPending) return <p className="hint">Loading students…</p>;
-  if (isError) return <p className="error">{error.message}</p>;
+  if (isPending) return <p className="hint">{t('list.loading')}</p>;
+  if (isError) return <p className="error">{errorMessage(error)}</p>;
   if (data.total === 0) {
     return (
       <p>
         {search
-          ? `No students match "${search}".`
-          : 'No students yet. Add some on the Students page.'}
+          ? t('list.noMatch', { search })
+          : t('list.gridEmpty')}
       </p>
     );
   }
   if (parameters.length === 0) {
-    return (
-      <p>
-        No parameters are used in this period. Check the change history on the
-        Parameters page.
-      </p>
-    );
+    return <p>{t('evaluate.gridNoParameters')}</p>;
   }
 
   return (
@@ -237,7 +251,7 @@ function EvaluationGrid({
         <table className={`grid${isPlaceholderData ? ' stale' : ''}`}>
           <thead>
             <tr>
-              <th>Student</th>
+              <th>{t('evaluate.colStudent')}</th>
               {parameters.map((parameter) => (
                 <th key={parameter.id}>
                   {parameter.name}
@@ -275,17 +289,17 @@ function EvaluationGrid({
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
         >
-          Previous
+          {t('list.previous')}
         </button>
         <span>
-          Page {page} of {totalPages} ({data.total} students)
+          {t('list.pageStatus', { page, totalPages, total: data.total })}
         </span>
         <button
           type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
         >
-          Next
+          {t('list.next')}
         </button>
       </div>
     </>

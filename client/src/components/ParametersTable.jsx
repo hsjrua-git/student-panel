@@ -1,8 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listParameters } from '../api/parameters.js';
+import { errorMessage } from '../i18n/errors.js';
 import ParameterRow from './ParameterRow.jsx';
 
 function ParametersTable() {
+  const { t } = useTranslation(['students', 'common']);
   const {
     data: parameters,
     isPending,
@@ -10,10 +13,10 @@ function ParametersTable() {
     error,
   } = useQuery({ queryKey: ['parameters'], queryFn: listParameters });
 
-  if (isPending) return <p className="hint">Loading parameters…</p>;
-  if (isError) return <p className="error">{error.message}</p>;
+  if (isPending) return <p className="hint">{t('parameters.loading')}</p>;
+  if (isError) return <p className="error">{errorMessage(error)}</p>;
   if (parameters.length === 0) {
-    return <p className="hint">No parameters yet. Add the first one above.</p>;
+    return <p className="hint">{t('parameters.empty')}</p>;
   }
 
   return (

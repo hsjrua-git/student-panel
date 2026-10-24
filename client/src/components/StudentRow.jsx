@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { deleteStudent, renameStudent } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import { formatDateTime, formatStudentCode } from '../lib/format.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
 function StudentRow({ student }) {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const { preferences } = usePreferences();
@@ -43,7 +46,9 @@ function StudentRow({ student }) {
 
   function handleDelete() {
     const code = formatStudentCode(student.studentCode);
-    if (window.confirm(`Delete ${student.fullName} (${code})?`)) {
+    if (
+      window.confirm(t('list.deleteConfirm', { name: student.fullName, code }))
+    ) {
       remove.mutate();
     }
   }
@@ -59,23 +64,23 @@ function StudentRow({ student }) {
             <input
               value={draftName}
               onChange={(event) => setDraftName(event.target.value)}
-              aria-label={`New name for ${student.fullName}`}
+              aria-label={t('list.renameLabel', { name: student.fullName })}
               autoFocus
             />
             <button type="submit" disabled={rename.isPending}>
-              Save
+              {t('common:actions.save')}
             </button>
             <button type="button" onClick={() => setIsEditing(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </button>
           </form>
         ) : (
           <Link to={`/students/${student.id}`}>{student.fullName}</Link>
         )}
         {isEditing && rename.isError && (
-          <p className="error">{rename.error.message}</p>
+          <p className="error">{errorMessage(rename.error)}</p>
         )}
-        {remove.isError && <p className="error">{remove.error.message}</p>}
+        {remove.isError && <p className="error">{errorMessage(remove.error)}</p>}
       </td>
       {preferences.studentsShowAdded && (
         <td>{formatDateTime(student.createdAt)}</td>
@@ -84,7 +89,7 @@ function StudentRow({ student }) {
         <td className="actions">
           {can('students.edit') && (
             <button type="button" onClick={startEditing} disabled={isEditing}>
-              Rename
+              {t('list.rename')}
             </button>
           )}
           {can('students.delete') && (
@@ -94,7 +99,7 @@ function StudentRow({ student }) {
               onClick={handleDelete}
               disabled={remove.isPending}
             >
-              {remove.isPending ? 'Deleting...' : 'Delete'}
+              {remove.isPending ? t('list.deleting') : t('common:actions.delete')}
             </button>
           )}
         </td>

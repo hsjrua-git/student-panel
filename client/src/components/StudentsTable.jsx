@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listStudents } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 import StudentRow from './StudentRow.jsx';
 
 function StudentsTable({ search, page, onPageChange, groupId = null }) {
+  const { t } = useTranslation(['students', 'common']);
   const { can } = useAuth();
   const { preferences } = usePreferences();
   const pageSize = preferences.studentsPageSize;
@@ -25,16 +28,16 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
     if (data && page > totalPages) onPageChange(totalPages);
   }, [data, page, totalPages, onPageChange]);
 
-  if (isPending) return <p>Loading students...</p>;
-  if (isError) return <p className="error">{error.message}</p>;
+  if (isPending) return <p>{t('list.loading')}</p>;
+  if (isError) return <p className="error">{errorMessage(error)}</p>;
   if (data.total === 0) {
     return (
       <p>
         {search
-          ? `No students match "${search}".`
+          ? t('list.noMatch', { search })
           : can('students.create')
-            ? 'No students yet. Add the first one above.'
-            : 'No students yet.'}
+            ? t('list.emptyCanCreate')
+            : t('list.empty')}
       </p>
     );
   }
@@ -45,11 +48,13 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
         <table>
           <thead>
             <tr>
-              {preferences.studentsShowCode && <th>Code</th>}
-              <th>Full name</th>
-              {preferences.studentsShowAdded && <th>Added</th>}
+              {preferences.studentsShowCode && (
+                <th>{t('common:table.code')}</th>
+              )}
+              <th>{t('list.fullName')}</th>
+              {preferences.studentsShowAdded && <th>{t('list.addedCol')}</th>}
               {(can('students.edit') || can('students.delete')) && (
-                <th>Actions</th>
+                <th>{t('common:table.actions')}</th>
               )}
             </tr>
           </thead>
@@ -67,17 +72,17 @@ function StudentsTable({ search, page, onPageChange, groupId = null }) {
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
         >
-          Previous
+          {t('list.previous')}
         </button>
         <span>
-          Page {page} of {totalPages} ({data.total} students)
+          {t('list.pageStatus', { page, totalPages, total: data.total })}
         </span>
         <button
           type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
         >
-          Next
+          {t('list.next')}
         </button>
       </div>
     </>

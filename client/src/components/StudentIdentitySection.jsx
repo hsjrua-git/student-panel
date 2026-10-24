@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { updateStudent } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 import { formatIsoDate } from '../lib/format.js';
 
 // The built-in identity fields (gender, birth date, father name, national ID)
 // live on the students table itself, unlike the admin-defined custom fields
 // below them. Display + edit mirror StudentFieldsSection.
 function StudentIdentitySection({ student }) {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -39,7 +42,7 @@ function StudentIdentitySection({ student }) {
   function handleSubmit(event) {
     event.preventDefault();
     if (nationalId !== '' && !/^[0-9]{10}$/.test(nationalId)) {
-      setProblem('National ID must be exactly 10 digits.');
+      setProblem(t('detail.nationalIdProblem'));
       return;
     }
     setProblem(null);
@@ -48,22 +51,22 @@ function StudentIdentitySection({ student }) {
 
   return (
     <section className="section-card">
-      <h2>Identity</h2>
+      <h2>{t('detail.identityTitle')}</h2>
       {isEditing ? (
         <form onSubmit={handleSubmit}>
-          <label htmlFor="student-gender">Gender</label>
+          <label htmlFor="student-gender">{t('detail.gender')}</label>
           <select
             id="student-gender"
             value={gender}
             onChange={(event) => setGender(event.target.value)}
             disabled={save.isPending}
           >
-            <option value="">Not set</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
+            <option value="">{t('detail.notSet')}</option>
+            <option value="male">{t('detail.male')}</option>
+            <option value="female">{t('detail.female')}</option>
           </select>
 
-          <label htmlFor="student-birth-date">Birth date</label>
+          <label htmlFor="student-birth-date">{t('detail.birthDate')}</label>
           <input
             id="student-birth-date"
             type="date"
@@ -72,7 +75,7 @@ function StudentIdentitySection({ student }) {
             disabled={save.isPending}
           />
 
-          <label htmlFor="student-father-name">Father name</label>
+          <label htmlFor="student-father-name">{t('detail.fatherName')}</label>
           <input
             id="student-father-name"
             value={fatherName}
@@ -82,7 +85,7 @@ function StudentIdentitySection({ student }) {
             disabled={save.isPending}
           />
 
-          <label htmlFor="student-national-id">National ID</label>
+          <label htmlFor="student-national-id">{t('detail.nationalId')}</label>
           <input
             id="student-national-id"
             value={nationalId}
@@ -96,14 +99,14 @@ function StudentIdentitySection({ student }) {
 
           <div className="row">
             <button type="submit" disabled={save.isPending}>
-              {save.isPending ? 'Saving...' : 'Save identity'}
+              {save.isPending ? t('common:actions.saving') : t('detail.saveIdentity')}
             </button>
             <button
               type="button"
               onClick={() => setIsEditing(false)}
               disabled={save.isPending}
             >
-              Cancel
+              {t('common:actions.cancel')}
             </button>
           </div>
           {problem && (
@@ -111,39 +114,41 @@ function StudentIdentitySection({ student }) {
               {problem}
             </p>
           )}
-          {save.isError && <p className="error">{save.error.message}</p>}
+          {save.isError && (
+            <p className="error">{errorMessage(save.error)}</p>
+          )}
         </form>
       ) : (
         <>
           <dl className="field-list">
             <div className="field-list-row">
-              <dt>Gender</dt>
+              <dt>{t('detail.gender')}</dt>
               <dd>
                 {student.gender
                   ? student.gender === 'male'
-                    ? 'Male'
-                    : 'Female'
+                    ? t('detail.male')
+                    : t('detail.female')
                   : '—'}
               </dd>
             </div>
             <div className="field-list-row">
-              <dt>Birth date</dt>
+              <dt>{t('detail.birthDate')}</dt>
               <dd>
                 {student.birthDate ? formatIsoDate(student.birthDate) : '—'}
               </dd>
             </div>
             <div className="field-list-row">
-              <dt>Father name</dt>
+              <dt>{t('detail.fatherName')}</dt>
               <dd>{student.fatherName ?? '—'}</dd>
             </div>
             <div className="field-list-row">
-              <dt>National ID</dt>
+              <dt>{t('detail.nationalId')}</dt>
               <dd>{student.nationalId ?? '—'}</dd>
             </div>
           </dl>
           {can('students.edit') && (
             <button type="button" onClick={startEditing}>
-              Edit identity
+              {t('detail.editIdentity')}
             </button>
           )}
         </>

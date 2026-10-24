@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   listGroups,
   listStudentGroups,
   updateGroupMembers,
 } from '../api/groups.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 
 function StudentGroupsSection({ student }) {
+  const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
   const canAssign = can('groups.assign');
@@ -49,8 +52,8 @@ function StudentGroupsSection({ student }) {
   if (memberOfQuery.isError) {
     return (
       <section className="section-card">
-        <h2>Groups</h2>
-        <p className="error">{memberOfQuery.error.message}</p>
+        <h2>{t('detail.groupsTitle')}</h2>
+        <p className="error">{errorMessage(memberOfQuery.error)}</p>
       </section>
     );
   }
@@ -59,9 +62,9 @@ function StudentGroupsSection({ student }) {
 
   return (
     <section className="section-card">
-      <h2>Groups</h2>
+      <h2>{t('detail.groupsTitle')}</h2>
       {memberOf.length === 0 ? (
-        <p className="hint">Not in any group.</p>
+        <p className="hint">{t('detail.notInGroup')}</p>
       ) : (
         <span className="chip-row">
           {memberOf.map((group) => (
@@ -73,7 +76,7 @@ function StudentGroupsSection({ student }) {
                   className="chip-remove"
                   onClick={() => remove.mutate(group.id)}
                   disabled={busy}
-                  aria-label={`Remove from ${group.name}`}
+                  aria-label={t('detail.removeFromGroup', { name: group.name })}
                 >
                   ×
                 </button>
@@ -86,7 +89,7 @@ function StudentGroupsSection({ student }) {
       {canAssign && available.length > 0 && (
         <div className="row">
           <label htmlFor={`add-group-${student.id}`} className="sr-only">
-            Add to group
+            {t('detail.addToGroupLabel')}
           </label>
           <select
             id={`add-group-${student.id}`}
@@ -94,7 +97,7 @@ function StudentGroupsSection({ student }) {
             onChange={(event) => setChoice(event.target.value)}
             disabled={busy}
           >
-            <option value="">Add to a group…</option>
+            <option value="">{t('detail.addToGroupPlaceholder')}</option>
             {available.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -106,13 +109,13 @@ function StudentGroupsSection({ student }) {
             onClick={() => choice && add.mutate(choice)}
             disabled={!choice || busy}
           >
-            Add
+            {t('common:actions.add')}
           </button>
         </div>
       )}
 
-      {add.isError && <p className="error">{add.error.message}</p>}
-      {remove.isError && <p className="error">{remove.error.message}</p>}
+      {add.isError && <p className="error">{errorMessage(add.error)}</p>}
+      {remove.isError && <p className="error">{errorMessage(remove.error)}</p>}
     </section>
   );
 }
