@@ -11,6 +11,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import ExportLink from '../components/ExportLink.jsx';
 import ParameterDrawer from '../components/ParameterDrawer.jsx';
 import PeriodPicker from '../components/PeriodPicker.jsx';
+import SessionAlertsCard from '../components/SessionAlertsCard.jsx';
 import StudentDrawer from '../components/StudentDrawer.jsx';
 import UnmeasuredList from '../components/UnmeasuredList.jsx';
 import {
@@ -82,6 +83,7 @@ function DashboardPage() {
     return (
       <main>
         <h1>Dashboard</h1>
+        <SessionAlertsCard />
         {can('settings.manage') ? (
           <EmptyState
             title="Set up the calendar"
@@ -104,6 +106,7 @@ function DashboardPage() {
     return (
       <main>
         <h1>Dashboard</h1>
+        <SessionAlertsCard />
         <EmptyState
           title="Period 1 hasn't started"
           description="Once the first period begins, results will show up here."
@@ -152,6 +155,8 @@ function DashboardPage() {
           </div>
         )}
       </div>
+
+      <SessionAlertsCard />
 
       <div className="toolbar">
         <PeriodPicker

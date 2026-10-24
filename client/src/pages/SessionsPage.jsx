@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { listAlerts, resolveAlert, scanAlerts } from '../api/alerts.js';
 import {
   generateSessions,
   listSessions,
@@ -400,6 +401,21 @@ function SessionsPage() {
     queryFn: () => listTaskTemplates({ includeArchived: true }),
     enabled: canManage,
   });
+  const alertsQuery = useQuery({
+    queryKey: ['alerts', 'open'],
+    queryFn: () => listAlerts({ status: 'open' }),
+    enabled: can('schedule.view'),
+  });
+  const openAlertsBySessionId = useMemo(
+    () =>
+      new Map(
+        (alertsQuery.data?.alerts ?? []).map((alert) => [
+          alert.sessionId,
+          alert,
+        ])
+      ),
+    [alertsQuery.data]
+  );
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['sessions'] });
@@ -407,6 +423,16 @@ function SessionsPage() {
   const generate = useMutation({
     mutationFn: () => generateSessions({ until: generateUntil }),
     onSuccess: invalidate,
+  });
+  const scan = useMutation({
+    mutationFn: scanAlerts,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+  });
+  const resolve = useMutation({
+    mutationFn: (alert) => resolveAlert(alert.id, true),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['alerts'] }),
   });
   const quickCancel = useMutation({
     mutationFn: ({ session, canceled }) =>
@@ -468,6 +494,35 @@ function SessionsPage() {
                 ? 'Everything in that range already exists.'
                 : `Created ${generate.data.created} session${
                     generate.data.created === 1 ? '' : 's'
+                  }.`}
+            </p>
+          )}
+          <div className="row">
+            <button
+              type="button"
+              onClick={() => scan.mutate()}
+              disabled={scan.isPending}
+            >
+              {scan.isPending ? 'Scanning...' : 'Scan for unconfirmed sessions'}
+            </button>
+            <span className="hint">
+              Flag past sessions that have no record — not canceled, no note, no
+              tasks.
+            </span>
+          </div>
+          {scan.isError && (
+            <p className="error" role="alert">
+              {scan.error.message}
+            </p>
+          )}
+          {scan.isSuccess && (
+            <p className="success" role="status">
+              {scan.data.raised === 0 && scan.data.resolved === 0
+                ? 'Nothing to report — every past session has a record.'
+                : `Raised ${scan.data.raised} new alert${
+                    scan.data.raised === 1 ? '' : 's'
+                  }, resolved ${scan.data.resolved} alert${
+                    scan.data.resolved === 1 ? '' : 's'
                   }.`}
             </p>
           )}
@@ -562,6 +617,7 @@ function SessionsPage() {
                 const target = session.groupId
                   ? `Group ${session.groupName}`
                   : session.studentName ?? '—';
+                const openAlert = openAlertsBySessionId.get(session.id) ?? null;
                 if (editingId === session.id) {
                   return (
                     <tr key={session.id}>
@@ -592,6 +648,9 @@ function SessionsPage() {
                         </span>
                       )}
                       {session.canceledAt && <span className="hint"> — canceled</span>}
+                      {openAlert && (
+                        <span className="badge warn">Unconfirmed</span>
+                      )}
                     </td>
                     <td>
                       <code>{session.code}</code>
@@ -661,6 +720,16 @@ function SessionsPage() {
                             disabled={busy}
                           >
                             Archive
+                          </button>
+                        )}{' '}
+                        {openAlert && (
+                          <button
+                            type="button"
+                            className="quiet"
+                            onClick={() => resolve.mutate(openAlert)}
+                            disabled={busy || resolve.isPending}
+                          >
+                            Resolve alert
                           </button>
                         )}
                       </td>

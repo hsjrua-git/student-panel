@@ -26,6 +26,7 @@ import assignmentsRouter from './routes/assignments.js';
 import sessionsRouter from './routes/sessions.js';
 import tasksRouter from './routes/tasks.js';
 import taskTemplatesRouter from './routes/taskTemplates.js';
+import alertsRouter from './routes/alerts.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -297,6 +298,15 @@ app.use(
     DELETE: 'schedule.manage',
   }),
   taskTemplatesRouter
+);
+app.use(
+  '/api/alerts',
+  authorize({
+    GET: 'schedule.view',
+    POST: 'schedule.manage',
+    PATCH: 'schedule.manage',
+  }),
+  alertsRouter
 );
 app.use(
   '/api/preferences',
