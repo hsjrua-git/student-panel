@@ -20,6 +20,7 @@ import exportRouter from './routes/export.js';
 import rolesRouter from './routes/roles.js';
 import groupsRouter from './routes/groups.js';
 import fieldDefinitionsRouter from './routes/fieldDefinitions.js';
+import teachersRouter from './routes/teachers.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -232,6 +233,16 @@ app.use(
     DELETE: 'fields.manage',
   }),
   fieldDefinitionsRouter
+);
+app.use(
+  '/api/teachers',
+  authorize({
+    GET: 'teachers.view',
+    POST: 'teachers.manage',
+    PATCH: 'teachers.manage',
+    DELETE: 'teachers.manage',
+  }),
+  teachersRouter
 );
 app.use(
   '/api/preferences',

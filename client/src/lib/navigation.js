@@ -23,6 +23,7 @@ import {
   RolesIcon,
   AuditIcon,
   DownloadIcon,
+  TeacherIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
@@ -36,6 +37,7 @@ export const ROUTE_PERMISSIONS = {
   '/parameters': 'parameters.manage',
   '/groups': 'groups.manage',
   '/fields': 'fields.manage',
+  '/teachers': 'teachers.view',
   '/settings': 'settings.manage',
   '/users': 'users.manage',
   '/roles': 'roles.manage',
@@ -61,6 +63,7 @@ export const NAV_SECTIONS = [
     items: [
       { to: '/students', label: 'Students', icon: StudentsIcon },
       { to: '/evaluate', label: 'Evaluate', icon: EvaluateIcon },
+      { to: '/teachers', label: 'Teachers', icon: TeacherIcon },
     ],
   },
   {

@@ -13,6 +13,10 @@ export const PERMISSIONS = [
   { key: 'groups.manage', group: 'Groups', label: 'Create and organise groups' },
   { key: 'groups.assign', group: 'Groups', label: 'Put students in groups' },
 
+  // Teachers
+  { key: 'teachers.view', group: 'Teachers', label: 'View teachers' },
+  { key: 'teachers.manage', group: 'Teachers', label: 'Manage teachers' },
+
   // Scores
   { key: 'scores.view', group: 'Scores', label: 'See scores' },
   { key: 'scores.enter', group: 'Scores', label: 'Enter and change scores' },
@@ -60,6 +64,7 @@ export const PREREQUISITES = {
   'students.delete': ['students.view'],
   'groups.assign': ['students.view'],
   'groups.manage': ['students.view'],
+  'teachers.manage': ['teachers.view'],
   // NOTE: scores.enter does NOT require scores.view — a "blind entry" role is
   // allowed (it can type scores but the server refuses to read them back).
   'scores.enter': ['students.view', 'parameters.view'],

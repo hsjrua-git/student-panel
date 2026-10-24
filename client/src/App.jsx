@@ -45,6 +45,7 @@ const UsersPage = lazyWithReload(() => import('./pages/UsersPage.jsx'));
 const RolesPage = lazyWithReload(() => import('./pages/RolesPage.jsx'));
 const GroupsPage = lazyWithReload(() => import('./pages/GroupsPage.jsx'));
 const FieldsPage = lazyWithReload(() => import('./pages/FieldsPage.jsx'));
+const TeachersPage = lazyWithReload(() => import('./pages/TeachersPage.jsx'));
 const PreferencesPage = lazyWithReload(() => import('./pages/PreferencesPage.jsx'));
 const SettingsPage = lazyWithReload(() => import('./pages/SettingsPage.jsx'));
 const ChangePasswordPage = lazyWithReload(() => import('./pages/ChangePasswordPage.jsx'));
@@ -70,6 +71,7 @@ const ROUTE_PRELOADS = [
   ['/roles', RolesPage],
   ['/groups', GroupsPage],
   ['/fields', FieldsPage],
+  ['/teachers', TeachersPage],
   ['/preferences', PreferencesPage],
   ['/settings', SettingsPage],
   ['/change-password', ChangePasswordPage],
@@ -596,6 +598,7 @@ function AnimatedRoutes() {
             <Route path="/roles" element={<RolesPage />} />
             <Route path="/groups" element={<GroupsPage />} />
             <Route path="/fields" element={<FieldsPage />} />
+            <Route path="/teachers" element={<TeachersPage />} />
             <Route path="/preferences" element={<PreferencesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />

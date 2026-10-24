@@ -194,6 +194,18 @@ export function UsersIcon(props) {
   );
 }
 
+// A figure at a board: teachers.
+export function TeacherIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="4" width="17" height="9.5" rx="1.5" />
+      <path d="M12 13.5v1.8" />
+      <circle cx="12" cy="17.6" r="2.2" />
+      <path d="M8.8 21.5a3.4 3.4 0 0 1 6.4 0" />
+    </Svg>
+  );
+}
+
 // A shield with a check: roles/permissions.
 export function RolesIcon(props) {
   return (
