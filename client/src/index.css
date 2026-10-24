@@ -135,6 +135,14 @@
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+
+  /* Mobile/webview hardening: keep the browser from rescaling our text after an
+     orientation change, kill the grey tap flash on touch, and stop the whole
+     app from rubber-band scrolling behind fixed chrome (topbar/drawer). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
 /* Dark theme: applied when the user picks Dark, or picks System and the OS is
@@ -1224,6 +1232,11 @@ tr.inactive,
   flex-direction: column;
   gap: 0.25rem;
   padding: 1rem 0.75rem 1.5rem;
+  /* Keep the brand + nav clear of the notch/home-indicator when the sidebar is
+     a full-height drawer or the fixed rail runs edge to edge. */
+  padding-top: calc(1rem + env(safe-area-inset-top));
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  padding-left: calc(0.75rem + env(safe-area-inset-left));
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-edge);
   color: var(--sidebar-ink);
@@ -1543,6 +1556,12 @@ tr.inactive,
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 1rem;
+  /* Clear the status bar / notch when running full-bleed (Capacitor, installed
+     PWA). env() is 0 on desktop and non-notched devices, so this is a no-op
+     there. */
+  padding-top: calc(0.6rem + env(safe-area-inset-top));
+  padding-left: calc(1rem + env(safe-area-inset-left));
+  padding-right: calc(1rem + env(safe-area-inset-right));
   min-height: 3.5rem;
   /* The "glass strip": a translucent bar with a blurred backdrop so page content
      softly frosts as it scrolls underneath. On desktop the sidebar is sticky

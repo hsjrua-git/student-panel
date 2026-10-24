@@ -10,6 +10,7 @@ import {
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import { applyRememberedTheme } from './lib/theme.js';
 import { PreferencesProvider } from './preferences/PreferencesProvider.jsx';
+import { initLocalDb } from './db/bootstrap.js';
 import './index.css';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';

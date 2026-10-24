@@ -1,15 +1,28 @@
-import { request } from './http.js';
+// Evaluations api — on-device adapter over the evaluations service (was fetch
+// to /api/evaluations and /api/periods/:n/parameters). listPeriodParameters,
+// listEvaluations and listStudentEvaluations unwrap their key as before;
+// saveEvaluations returns the raw service result (dry-run preview or save
+// summary).
+
+import { callService } from './local.js';
+import {
+  getEvaluations,
+  saveEvaluationsBulk,
+} from '@server/core/services/evaluations.js';
+import { parametersForPeriod } from '@server/core/services/parameters.js';
 
 export async function listPeriodParameters(periodNumber) {
-  const data = await request(`/api/periods/${periodNumber}/parameters`);
-  return data.parameters;
+  const { parameters } = await callService(() =>
+    parametersForPeriod(periodNumber),
+  );
+  return parameters;
 }
 
 export async function listEvaluations({ periodNumber }) {
-  const data = await request(
-    `/api/evaluations?periodNumber=${periodNumber}&includeCleared=1`
+  const { evaluations } = await callService(() =>
+    getEvaluations({ periodNumber, includeCleared: true }),
   );
-  return data.evaluations;
+  return evaluations;
 }
 
 export function saveEvaluations({
@@ -19,19 +32,18 @@ export function saveEvaluations({
   dryRun,
   source,
 }) {
-  return request('/api/evaluations/bulk', {
-    method: 'PUT',
-    body: JSON.stringify({
+  return callService(() =>
+    saveEvaluationsBulk({
       periodNumber,
       entries,
       ...(overrideReason ? { overrideReason } : {}),
       ...(dryRun ? { dryRun: true } : {}),
       ...(source ? { source } : {}),
     }),
-  });
+  );
 }
 
 export async function listStudentEvaluations(studentId) {
-  const data = await request(`/api/evaluations?studentId=${studentId}`);
-  return data.evaluations;
+  const { evaluations } = await callService(() => getEvaluations({ studentId }));
+  return evaluations;
 }

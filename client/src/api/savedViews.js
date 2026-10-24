@@ -1,26 +1,30 @@
-import { request } from './http.js';
+// Saved views api — on-device adapter over the savedViews service (was fetch to
+// /api/saved-views). listSavedViews unwraps .views; create/update unwrap .view;
+// delete returns void — all matching the previous shapes.
+
+import { callService } from './local.js';
+import {
+  listViews,
+  createView,
+  updateView,
+  deleteView,
+} from '@server/core/services/savedViews.js';
 
 export async function listSavedViews() {
-  const data = await request('/api/saved-views');
-  return data.views;
+  const { views } = await callService(() => listViews());
+  return views;
 }
 
 export async function createSavedView({ name, config }) {
-  const data = await request('/api/saved-views', {
-    method: 'POST',
-    body: JSON.stringify({ name, config }),
-  });
-  return data.view;
+  const { view } = await callService(() => createView({ name, config }));
+  return view;
 }
 
 export async function updateSavedView(id, fields) {
-  const data = await request(`/api/saved-views/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(fields),
-  });
-  return data.view;
+  const { view } = await callService(() => updateView(id, fields));
+  return view;
 }
 
 export function deleteSavedView(id) {
-  return request(`/api/saved-views/${id}`, { method: 'DELETE' });
+  return callService(() => deleteView(id));
 }

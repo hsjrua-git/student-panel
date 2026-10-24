@@ -1,6 +1,13 @@
 import react from '@vitejs/plugin-react'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
+
+// The on-device build imports the framework-free service layer and the SQL
+// migrations straight from the sibling server/ package instead of duplicating
+// them. `@server` points at server/src so client code can do
+// `import { getMe } from '@server/core/services/auth.js'`.
+const serverSrc = fileURLToPath(new URL('../server/src', import.meta.url))
 
 // https://vite.dev/config/
 // Config is async so we can pull in the bundle-size visualiser only when asked
@@ -23,7 +30,23 @@ export default defineConfig(async () => {
 
    return {
       plugins,
+      resolve: {
+         alias: {
+            '@server': serverSrc,
+         },
+      },
+      // PGlite ships WebAssembly and uses top-level await; Vite's dependency
+      // pre-bundler (esbuild) mishandles it, so it must be excluded and loaded
+      // as-is. This is the documented PGlite + Vite integration step.
+      optimizeDeps: {
+         exclude: ['@electric-sql/pglite'],
+      },
       server: {
+         // Allow importing files from the sibling server/ package (the shared
+         // service layer + SQL migrations), which live outside client/.
+         fs: {
+            allow: ['..'],
+         },
          proxy: {
             '/api': 'http://localhost:3000',
          },
