@@ -1,47 +1,46 @@
-// Parameters api — on-device adapter over the parameters service (was fetch to
-// /api/parameters and /api/parameter-changes). listParameters and
-// listParameterChanges unwrap their key as before; the rest return the raw
-// service result.
-
-import { callService } from './local.js';
-import {
-  listParameters as listParametersService,
-  createParameter as createParameterService,
-  updateParameter as updateParameterService,
-  listParameterChanges as listParameterChangesService,
-  deleteParameterChange as deleteParameterChangeService,
-  upsertParameterChange,
-  parameterChangeImpact,
-} from '@server/core/services/parameters.js';
+import { request } from './http.js';
 
 export async function listParameters() {
-  const { parameters } = await callService(() => listParametersService());
-  return parameters;
+  const data = await request('/api/parameters');
+  return data.parameters;
 }
 
 export function createParameter(input) {
-  return callService(() => createParameterService(input));
+  return request('/api/parameters', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export function updateParameter(id, fields) {
-  return callService(() => updateParameterService(id, fields));
+  return request(`/api/parameters/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
+  });
 }
 
 export async function listParameterChanges() {
-  const { changes } = await callService(() => listParameterChangesService());
-  return changes;
+  const data = await request('/api/parameter-changes');
+  return data.changes;
 }
 
 export function deleteParameterChange(id) {
-  return callService(() => deleteParameterChangeService(id));
+  return request(`/api/parameter-changes/${id}`, { method: 'DELETE' });
 }
 
 export function createParameterChange(change) {
-  return callService(() => upsertParameterChange(change));
+  return request('/api/parameter-changes', {
+    method: 'POST',
+    body: JSON.stringify(change),
+  });
 }
 
 export function getChangeImpact({ parameterId, periodNumber, scope, action }) {
-  return callService(() =>
-    parameterChangeImpact({ parameterId, periodNumber, scope, action }),
-  );
+  const params = new URLSearchParams({
+    parameterId,
+    periodNumber: String(periodNumber),
+    scope,
+    action,
+  });
+  return request(`/api/parameter-changes/impact?${params}`);
 }

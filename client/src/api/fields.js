@@ -1,28 +1,25 @@
-// Field definitions api — on-device adapter over the fields service (was fetch
-// to /api/field-definitions). Return shapes unchanged: listFieldDefinitions
-// returns the bare fields array, the rest return the raw service result.
-
-import { callService } from './local.js';
-import {
-  listFields,
-  createField,
-  updateField,
-  archiveField,
-} from '@server/core/services/fields.js';
+import { request } from './http.js';
 
 export async function listFieldDefinitions({ includeArchived = false } = {}) {
-  const { fields } = await callService(() => listFields({ includeArchived }));
-  return fields;
+  const query = includeArchived ? '?includeArchived=1' : '';
+  const data = await request(`/api/field-definitions${query}`);
+  return data.fields;
 }
 
 export function createFieldDefinition(input) {
-  return callService(() => createField(input));
+  return request('/api/field-definitions', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export function updateFieldDefinition(id, fields) {
-  return callService(() => updateField(id, fields));
+  return request(`/api/field-definitions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
+  });
 }
 
 export function archiveFieldDefinition(id) {
-  return callService(() => archiveField(id));
+  return request(`/api/field-definitions/${id}`, { method: 'DELETE' });
 }

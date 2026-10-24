@@ -13,6 +13,7 @@ import PageLoader from './PageLoader.jsx';
 // Titles shown in the header for routes that aren't in the sidebar.
 const EXTRA_TITLES = {
   '/preferences': 'Preferences',
+  '/change-password': 'Change password',
 };
 
 function Layout() {

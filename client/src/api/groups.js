@@ -1,46 +1,42 @@
-// Groups api — on-device adapter over the groups service (was fetch to
-// /api/groups). listGroups / listStudentGroups / listGroupMembers unwrap their
-// key as before; the mutations return the raw service result.
-
-import { callService } from './local.js';
-import {
-  listGroups as listGroupsService,
-  getGroupMembers,
-  createGroup as createGroupService,
-  updateGroup as updateGroupService,
-  archiveGroup as archiveGroupService,
-  setGroupMembers,
-} from '@server/core/services/groups.js';
+import { request } from './http.js';
 
 export async function listGroups({ includeArchived = false } = {}) {
-  const { groups } = await callService(() =>
-    listGroupsService({ includeArchived }),
-  );
-  return groups;
+  const query = includeArchived ? '?includeArchived=1' : '';
+  const data = await request(`/api/groups${query}`);
+  return data.groups;
 }
 
 export async function listStudentGroups(studentId) {
-  const { groups } = await callService(() => listGroupsService({ studentId }));
-  return groups;
+  const data = await request(`/api/groups?studentId=${studentId}`);
+  return data.groups;
 }
 
 export function createGroup(input) {
-  return callService(() => createGroupService(input));
+  return request('/api/groups', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export function updateGroup(id, fields) {
-  return callService(() => updateGroupService(id, fields));
+  return request(`/api/groups/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
+  });
 }
 
 export function archiveGroup(id) {
-  return callService(() => archiveGroupService(id));
+  return request(`/api/groups/${id}`, { method: 'DELETE' });
 }
 
 export async function listGroupMembers(id) {
-  const { students } = await callService(() => getGroupMembers(id));
-  return students;
+  const data = await request(`/api/groups/${id}/members`);
+  return data.students;
 }
 
 export function updateGroupMembers(id, { add = [], remove = [] }) {
-  return callService(() => setGroupMembers(id, { add, remove }));
+  return request(`/api/groups/${id}/members`, {
+    method: 'PUT',
+    body: JSON.stringify({ add, remove }),
+  });
 }
