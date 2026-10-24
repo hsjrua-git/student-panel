@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
       `SELECT g.id, g.name, g.parent_id AS "parentId"
        FROM student_groups g
        JOIN student_group_members m ON m.group_id = g.id
-       WHERE m.student_id = $1 AND g.archived_at IS NULL
+       WHERE m.student_id = $1 AND m.left_on IS NULL AND g.archived_at IS NULL
        ORDER BY lower(g.name)`,
       [studentId]
     );
@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
             g.parent_id  AS "parentId",
             g.archived_at AS "archivedAt",
             (SELECT count(*)::int FROM student_group_members m
-             WHERE m.group_id = g.id) AS "memberCount"
+             WHERE m.group_id = g.id AND m.left_on IS NULL) AS "memberCount"
      FROM student_groups g
      WHERE $1 OR g.archived_at IS NULL
      ORDER BY lower(g.name)`,
@@ -275,11 +275,13 @@ router.get('/:id/members', async (req, res) => {
   const result = await pool.query(
     `SELECT s.id,
             s.full_name    AS "fullName",
-            s.student_code AS "studentCode"
+            s.student_code AS "studentCode",
+            m.added_at::date   AS "joinedOn",
+            m.left_on          AS "leftOn"
      FROM student_group_members m
      JOIN students s ON s.id = m.student_id AND s.deleted_at IS NULL
      WHERE m.group_id = $1
-     ORDER BY lower(s.full_name)`,
+     ORDER BY m.left_on IS NOT NULL, lower(s.full_name)`,
     [req.params.id]
   );
   res.json({ students: result.rows });
@@ -320,9 +322,13 @@ router.put('/:id/members', async (req, res) => {
       added = result.rowCount;
     }
     if (remove.length > 0) {
+      // Leaving is recorded, not deleted: the row keeps the membership's
+      // history and only stops counting once left_on is set.
       const result = await client.query(
-        `DELETE FROM student_group_members
-         WHERE group_id = $1 AND student_id = ANY($2::uuid[])`,
+        `UPDATE student_group_members
+         SET left_on = current_date
+         WHERE group_id = $1 AND student_id = ANY($2::uuid[])
+           AND left_on IS NULL`,
         [group.id, remove]
       );
       removed = result.rowCount;

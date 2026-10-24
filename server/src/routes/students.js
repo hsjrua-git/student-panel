@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { generateStudentCode } from '../lib/studentCode.js';
-import { normalizeFullName } from '../validation/student.js';
+import {
+  normalizeBirthDate,
+  normalizeFatherName,
+  normalizeFullName,
+  normalizeGender,
+  normalizeNationalId,
+} from '../validation/student.js';
 import { recordAudit } from '../lib/audit.js';
 import { descendantGroupIds } from '../lib/groups.js';
 import { stripRestricted, validateExtra } from '../lib/fields.js';
@@ -51,9 +57,34 @@ const STUDENT_COLUMNS = `
   id,
   student_code AS "studentCode",
   full_name    AS "fullName",
+  gender,
+  birth_date   AS "birthDate",
+  father_name  AS "fatherName",
+  national_id  AS "nationalId",
   extra,
   created_at   AS "createdAt"
 `;
+
+// Parse the optional identity fields from a request body. Returns
+// { values: { gender, birthDate, fatherName, nationalId } } or { error }.
+function parseIdentity(body) {
+  const gender = normalizeGender(body?.gender);
+  if (gender.error) return gender;
+  const birthDate = normalizeBirthDate(body?.birthDate);
+  if (birthDate.error) return birthDate;
+  const fatherName = normalizeFatherName(body?.fatherName);
+  if (fatherName.error) return fatherName;
+  const nationalId = normalizeNationalId(body?.nationalId);
+  if (nationalId.error) return nationalId;
+  return {
+    values: {
+      gender: gender.value,
+      birthDate: birthDate.value,
+      fatherName: fatherName.value,
+      nationalId: nationalId.value,
+    },
+  };
+}
 
 function toPositiveInt(value, fallback) {
   const number = Number.parseInt(value, 10);
@@ -77,6 +108,11 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: parsed.error });
   }
 
+  const identity = parseIdentity(req.body);
+  if (identity.error) {
+    return res.status(400).json({ error: identity.error });
+  }
+
   const definitions = await loadDefinitions(pool);
   const extra = validateExtra(definitions, req.body?.extra ?? {});
   if (extra.error) {
@@ -84,19 +120,34 @@ router.post('/', async (req, res) => {
   }
 
   const canSeeRestricted = userCan(req, 'fields.view_restricted');
+  const { gender, birthDate, fatherName, nationalId } = identity.values;
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       const result = await pool.query(
-        `INSERT INTO students (student_code, full_name, extra)
-         VALUES ($1, $2, $3::jsonb)
+        `INSERT INTO students
+           (student_code, full_name, gender, birth_date, father_name, national_id, extra)
+         VALUES ($1, $2, $3::gender_type, $4::date, $5, $6, $7::jsonb)
          RETURNING ${STUDENT_COLUMNS}`,
-        [generateStudentCode(), parsed.value, JSON.stringify(extra.value)]
+        [
+          generateStudentCode(),
+          parsed.value,
+          gender,
+          birthDate,
+          fatherName,
+          nationalId,
+          JSON.stringify(extra.value),
+        ]
       );
       return res
         .status(201)
         .json(presentStudent(result.rows[0], definitions, canSeeRestricted));
     } catch (err) {
       if (err.code !== UNIQUE_VIOLATION) throw err;
+      if (err.constraint === 'students_national_id_unique') {
+        return res.status(409).json({
+          error: 'That national ID already belongs to another student.',
+        });
+      }
     }
   }
 
@@ -134,7 +185,7 @@ router.get('/', async (req, res) => {
     values.push(groupIds);
     conditions.push(
       `id IN (SELECT student_id FROM student_group_members
-              WHERE group_id = ANY($${values.length}::uuid[]))`
+              WHERE group_id = ANY($${values.length}::uuid[]) AND left_on IS NULL)`
     );
   }
 
@@ -146,6 +197,10 @@ router.get('/', async (req, res) => {
     if (codeText) {
       values.push(`%${escapeLike(codeText)}%`);
       condition += ` OR student_code ILIKE $${values.length}`;
+      // A bare 10-digit search also matches a national ID exactly.
+      if (/^[0-9]{10}$/.test(codeText)) {
+        condition += ` OR national_id = $${values.length - 1}`;
+      }
     }
     conditions.push(`(${condition})`);
   }
@@ -187,7 +242,9 @@ router.patch('/:id', async (req, res) => {
 
   const hasName = 'fullName' in body;
   const hasExtra = 'extra' in body;
-  if (!hasName && !hasExtra) {
+  const IDENTITY_FIELDS = ['gender', 'birthDate', 'fatherName', 'nationalId'];
+  const identityPresent = IDENTITY_FIELDS.filter((field) => field in body);
+  if (!hasName && !hasExtra && identityPresent.length === 0) {
     return res.status(400).json({ error: 'Nothing to change.' });
   }
 
@@ -201,6 +258,26 @@ router.patch('/:id', async (req, res) => {
     }
     values.push(parsed.value);
     sets.push(`full_name = $${values.length}`);
+  }
+
+  if (identityPresent.length > 0) {
+    // Validate the whole identity set so one bad field reports first, then
+    // apply only the fields the request actually carries (partial update).
+    const identity = parseIdentity(body);
+    if (identity.error) {
+      return res.status(400).json({ error: identity.error });
+    }
+    const COLUMN_OF = {
+      gender: ['gender', '$::gender_type'],
+      birthDate: ['birth_date', '$::date'],
+      fatherName: ['father_name', '$'],
+      nationalId: ['national_id', '$'],
+    };
+    for (const field of identityPresent) {
+      const [column, placeholder] = COLUMN_OF[field];
+      values.push(identity.values[field]);
+      sets.push(`${column} = ${placeholder.replace('$', `$${values.length}`)}`);
+    }
   }
 
   const definitions = await loadDefinitions(pool);

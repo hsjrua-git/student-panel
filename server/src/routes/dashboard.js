@@ -17,7 +17,8 @@ router.get('/trends', async (req, res) => {
     const groupIds = await descendantGroupIds(pool, groupId);
     values.push(groupIds);
     groupJoin = `JOIN student_group_members m
-                   ON m.student_id = s.id AND m.group_id = ANY($1::uuid[])`;
+                   ON m.student_id = s.id AND m.group_id = ANY($1::uuid[])
+                  AND m.left_on IS NULL`;
   }
 
   const result = await pool.query(

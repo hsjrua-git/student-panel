@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
     const groupIds = await descendantGroupIds(pool, groupId);
     groupValues.push(groupIds);
     groupFilter = ` AND id IN (SELECT student_id FROM student_group_members
-                    WHERE group_id = ANY($1::uuid[]))`;
+                    WHERE group_id = ANY($1::uuid[]) AND left_on IS NULL)`;
   }
 
   const anchorResult = await pool.query(

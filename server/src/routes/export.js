@@ -108,7 +108,7 @@ async function handleCube(req, res) {
     values.push(groupIds);
     filters.push(
       `id IN (SELECT student_id FROM student_group_members
-              WHERE group_id = ANY($${values.length}::uuid[]))`
+              WHERE group_id = ANY($${values.length}::uuid[]) AND left_on IS NULL)`
     );
   }
   const where = ['deleted_at IS NULL', ...filters].join(' AND ');

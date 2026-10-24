@@ -17,6 +17,7 @@ import ExportButton from '../components/ExportButton.jsx';
 import ExportLink from '../components/ExportLink.jsx';
 import StudentFieldsSection from '../components/StudentFieldsSection.jsx';
 import StudentGroupsSection from '../components/StudentGroupsSection.jsx';
+import StudentIdentitySection from '../components/StudentIdentitySection.jsx';
 import StudentEvaluateSection from '../components/StudentEvaluateSection.jsx';
 import { historyCsvRows } from '../lib/exports.js';
 
@@ -196,6 +197,7 @@ function StudentDetailPage() {
         )}
       </div>
 
+      <StudentIdentitySection student={student} />
       <StudentFieldsSection student={student} />
       <StudentGroupsSection student={student} />
       <StudentEvaluateSection student={student} />

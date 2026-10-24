@@ -11,6 +11,7 @@ import {
   updateGroupMembers,
 } from '../api/groups.js';
 import { listStudents } from '../api/students.js';
+import { formatIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 
 function buildTree(groups) {
@@ -53,7 +54,12 @@ function MemberPanel({ group, onClose }) {
     },
   });
 
-  const memberIds = new Set((membersQuery.data ?? []).map((s) => s.id));
+  const members = membersQuery.data ?? [];
+  const openMembers = members.filter((student) => !student.leftOn);
+  const pastMembers = members.filter((student) => student.leftOn);
+  // Only open members are excluded from the "add" picker, so a student who
+  // left can be re-added (which starts a new membership row).
+  const memberIds = new Set(openMembers.map((s) => s.id));
 
   return (
     <section className="group-members section-card">
@@ -72,7 +78,7 @@ function MemberPanel({ group, onClose }) {
             <p className="hint">No students yet.</p>
           )}
           <ul className="plain-list">
-            {membersQuery.data?.map((student) => (
+            {openMembers.map((student) => (
               <li key={student.id}>
                 {student.fullName}{' '}
                 <code className="hint">{student.studentCode}</code>
@@ -87,6 +93,30 @@ function MemberPanel({ group, onClose }) {
               </li>
             ))}
           </ul>
+          {pastMembers.length > 0 && (
+            <>
+              <h3>Past members</h3>
+              <ul className="plain-list">
+                {pastMembers.map((student) => (
+                  <li key={student.id} className="hint">
+                    {student.fullName}{' '}
+                    <span className="hint">
+                      ({formatIsoDate(student.joinedOn)} →{' '}
+                      {formatIsoDate(student.leftOn)})
+                    </span>
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() => change.mutate({ add: [student.id] })}
+                  disabled={change.isPending}
+                >
+                  Re-add
+                </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
 
         <div>

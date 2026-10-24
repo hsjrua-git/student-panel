@@ -49,7 +49,8 @@ export async function studentIdsInGroupTree(db, rootId) {
      )
      SELECT DISTINCT m.student_id AS "studentId"
      FROM student_group_members m
-     JOIN tree ON m.group_id = tree.id`,
+     JOIN tree ON m.group_id = tree.id
+     WHERE m.left_on IS NULL`,
     [rootId]
   );
   return result.rows.map((row) => row.studentId);
