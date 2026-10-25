@@ -29,6 +29,13 @@ export const PERMISSIONS = [
   { key: 'cafe.inventory', group: 'Cafe', label: 'Record waste and adjust stock' },
   { key: 'cafe.manage', group: 'Cafe', label: 'Manage cafe products' },
 
+  // Accounting
+  { key: 'accounting.view', group: 'Accounting', label: 'See the journal and reports' },
+  { key: 'accounting.enter', group: 'Accounting', label: 'Draft journal entries' },
+  { key: 'accounting.post', group: 'Accounting', label: 'Post and void journal entries' },
+  { key: 'accounting.close', group: 'Accounting', label: 'Close and reopen fiscal periods' },
+  { key: 'accounting.manage', group: 'Accounting', label: 'Manage the chart of accounts and mappings' },
+
   // Scores
   { key: 'scores.view', group: 'Scores', label: 'See scores' },
   { key: 'scores.enter', group: 'Scores', label: 'Enter and change scores' },
@@ -88,6 +95,13 @@ export const PREREQUISITES = {
   'cafe.supplies': ['cafe.view'],
   'cafe.inventory': ['cafe.view'],
   'cafe.manage': ['cafe.view'],
+  // The accounting ladder: drafting needs the reports, posting needs the
+  // drafting, closing needs posting; managing the chart stands on its own
+  // view requirement.
+  'accounting.enter': ['accounting.view'],
+  'accounting.post': ['accounting.enter'],
+  'accounting.close': ['accounting.post'],
+  'accounting.manage': ['accounting.view'],
   // NOTE: scores.enter does NOT require scores.view — a "blind entry" role is
   // allowed (it can type scores but the server refuses to read them back).
   'scores.enter': ['students.view', 'parameters.view'],

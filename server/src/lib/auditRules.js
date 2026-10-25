@@ -24,6 +24,12 @@ const RULES = [
   { method: 'PATCH', pattern: /^\/api\/task-templates\/[^/]+$/, action: 'task_template.update', entityType: 'task_template' },
   { method: 'DELETE', pattern: /^\/api\/task-templates\/[^/]+$/, action: 'task_template.archive', entityType: 'task_template' },
   { method: 'PATCH', pattern: /^\/api\/alerts\/[^/]+$/, action: 'alert.update', entityType: 'alert' },
+  { method: 'POST', pattern: /^\/api\/accounting\/accounts$/, action: 'accounting_account.create', entityType: 'acct_account' },
+  { method: 'POST', pattern: /^\/api\/accounting\/periods$/, action: 'accounting_period.create', entityType: 'acct_fiscal_period' },
+  { method: 'PATCH', pattern: /^\/api\/accounting\/accounts\/[^/]+$/, action: 'accounting_account.update', entityType: 'acct_account' },
+  { method: 'DELETE', pattern: /^\/api\/accounting\/accounts\/[^/]+$/, action: 'accounting_account.deactivate', entityType: 'acct_account' },
+  { method: 'PATCH', pattern: /^\/api\/accounting\/mappings\/[^/]+$/, action: 'accounting_mapping.update', entityType: 'acct_mapping' },
+  { method: 'PATCH', pattern: /^\/api\/accounting\/periods\/[^/]+$/, action: 'accounting_period.update', entityType: 'acct_fiscal_period' },
   { method: 'POST', pattern: /^\/api\/cafe\/products$/, action: 'cafe_product.create', entityType: 'cafe_product' },
   { method: 'PATCH', pattern: /^\/api\/cafe\/products\/[^/]+$/, action: 'cafe_product.update', entityType: 'cafe_product' },
   { method: 'DELETE', pattern: /^\/api\/cafe\/products\/[^/]+$/, action: 'cafe_product.deactivate', entityType: 'cafe_product' },
@@ -55,6 +61,9 @@ const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/cafe\/sales(\/|$)/,
   /^\/api\/cafe\/balances$/,
   /^\/api\/cafe\/inventory$/,
+  /^\/api\/accounting\/journal(\/|$)/,
+  /^\/api\/accounting\/periods\/[^/]+\/(close|reopen)$/,
+  /^\/api\/accounting\/periods\/opening$/,
 ];
 
 export function normalisePath(url) {

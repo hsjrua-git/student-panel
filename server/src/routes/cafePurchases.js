@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
+import { postMappedEvent } from '../lib/accountingJournal.js';
 import { updateAverageCost } from '../lib/cafeStock.js';
 import { isUuid } from '../lib/ids.js';
 import { isValidIsoDate } from '../lib/periods.js';
@@ -181,6 +182,19 @@ router.post('/', async (req, res) => {
        FROM cafe_purchase_items WHERE purchase_id = $1`,
       [purchaseId]
     );
+    const purchaseTotal = Number(totals.rows[0].total);
+
+    // Auto-post Dr Inventory / Cr Cash when the mapping is active — inside
+    // the same transaction as the purchase itself.
+    await postMappedEvent(client, {
+      user: req.user,
+      sourceType: 'cafe_purchase',
+      sourceId: purchaseId,
+      date: purchasedAt ?? null,
+      memo: 'Cafe purchase',
+      pairs: [{ event: 'cafe.purchase', amount: purchaseTotal }],
+    });
+
     await recordAudit(client, {
       userId: req.user.id,
       actor: req.user.username,
@@ -190,7 +204,7 @@ router.post('/', async (req, res) => {
         purchaseId,
         supplierId,
         itemCount: items.length,
-        total: Number(totals.rows[0].total),
+        total: purchaseTotal,
       },
     });
 

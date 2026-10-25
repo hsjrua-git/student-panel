@@ -4,8 +4,11 @@
 // can always be replayed. OVERDRAFT IS ALLOWED by design — a charge may push
 // the balance negative; nothing here refuses it.
 //
-// `kind' must already satisfy the table's CHECK (topup/refund > 0, charge < 0,
-// adjustment <> 0); callers sign the delta to match.
+// MANUAL top-ups and refunds (referenceType null — i.e. not the internal
+// refund a sale-void performs) also auto-post their journal pair when the
+// mapping is active.
+
+import { postMappedEvent } from './accountingJournal.js';
 
 export async function applyBalanceChange(
   db,
@@ -21,12 +24,27 @@ export async function applyBalanceChange(
   );
   const balanceAfter = Number(balance.rows[0].balance);
 
-  await db.query(
+  const txn = await db.query(
     `INSERT INTO student_balance_transactions
        (student_id, kind, amount, balance_after, reference_type, reference_id, note, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id`,
     [studentId, kind, delta, balanceAfter, referenceType, referenceId, note, createdBy]
   );
+
+  if (
+    (kind === 'topup' || kind === 'refund') &&
+    referenceType === null
+  ) {
+    await postMappedEvent(db, {
+      user: { id: createdBy, username: null },
+      sourceType: 'balance_txn',
+      sourceId: txn.rows[0].id,
+      date: null,
+      memo: kind === 'topup' ? 'Balance top-up' : 'Balance refund',
+      pairs: [{ event: `balance.${kind}`, amount: Math.abs(delta) }],
+    });
+  }
 
   return balanceAfter;
 }

@@ -34,6 +34,11 @@ import cafeSalesRouter from './routes/cafeSales.js';
 import cafeBalancesRouter from './routes/cafeBalances.js';
 import cafeInventoryRouter from './routes/cafeInventory.js';
 import cafeReportsRouter from './routes/cafeReports.js';
+import accountingAccountsRouter from './routes/accountingAccounts.js';
+import accountingMappingsRouter from './routes/accountingMappings.js';
+import accountingJournalRouter from './routes/accountingJournal.js';
+import accountingPeriodsRouter from './routes/accountingPeriods.js';
+import accountingReportsRouter from './routes/accountingReports.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -368,6 +373,48 @@ app.use(
   cafeInventoryRouter
 );
 app.use('/api/cafe/reports', authorize({ GET: 'cafe.view' }), cafeReportsRouter);
+// The accounting ladder: anyone with accounting.view reads; entering,
+// posting, closing and managing stack on top (see lib/permissions.js).
+app.use(
+  '/api/accounting/accounts',
+  authorize({
+    GET: 'accounting.view',
+    POST: 'accounting.manage',
+    PATCH: 'accounting.manage',
+    DELETE: 'accounting.manage',
+  }),
+  accountingAccountsRouter
+);
+app.use(
+  '/api/accounting/mappings',
+  authorize({
+    GET: 'accounting.view',
+    PATCH: 'accounting.manage',
+  }),
+  accountingMappingsRouter
+);
+app.use(
+  '/api/accounting/journal',
+  authorize({
+    GET: 'accounting.view',
+    POST: 'accounting.enter',
+  }),
+  accountingJournalRouter
+);
+app.use(
+  '/api/accounting/periods',
+  authorize({
+    GET: 'accounting.view',
+    POST: 'accounting.manage',
+    PATCH: 'accounting.manage',
+  }),
+  accountingPeriodsRouter
+);
+app.use(
+  '/api/accounting/reports',
+  authorize({ GET: 'accounting.view' }),
+  accountingReportsRouter
+);
 app.use(
   '/api/preferences',
   authorize({ GET: true, PUT: true, DELETE: true }),

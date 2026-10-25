@@ -65,6 +65,9 @@
   "SAVED_VIEWS_TOO_MANY": "You can keep at most {{max}} saved views. Delete one first.",
   "EXPORT_TOO_MANY_IDS": "Too many items requested (max {{max}}).",
   "entities": {
+    "account": "Account",
+    "entry": "Entry",
+    "mapping": "Mapping",
     "alert": "Alert",
     "assignment": "Assignment",
     "field": "Field",
@@ -80,5 +83,16 @@
     "template": "Template",
     "user": "User",
     "view": "Saved view"
-  }
+  },
+  "ACCOUNTING_UNBALANCED": "The entry does not balance (Σdebit ≠ Σcredit).",
+  "ACCOUNTING_PERIOD_CLOSED": "That fiscal period is closed.",
+  "ACCOUNTING_PERIOD_OPEN": "That fiscal period is open.",
+  "ACCOUNTING_PERIOD_OVERLAP": "That range overlaps another fiscal period.",
+  "ACCOUNTING_PERIOD_RANGE": "The period cannot end before it starts.",
+  "ACCOUNTING_ENTRY_NOT_DRAFT": "That action only applies to drafts.",
+  "ACCOUNTING_ENTRY_NOT_POSTED": "That action only applies to posted entries.",
+  "ACCOUNTING_ACCOUNT_IMMUTABLE": "This system account cannot be changed; deactivate it instead.",
+  "ACCOUNTING_ACCOUNT_CYCLE": "An account cannot be its own parent.",
+  "ACCOUNTING_OPENING_EXISTS": "The opening entry already exists.",
+  "ACCOUNTING_NOTHING_TO_OPEN": "There is nothing to put on the books (no stock, no balances)."
 }

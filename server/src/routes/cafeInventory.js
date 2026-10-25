@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
+import { postMappedEvent } from '../lib/accountingJournal.js';
 import { isUuid } from '../lib/ids.js';
 import { parseInventoryBody } from '../validation/cafeInventory.js';
 
@@ -153,6 +155,25 @@ router.post('/', async (req, res) => {
         items.map((item) => (kind === 'waste' ? byId.get(item.productId) : 0)),
       ]
     );
+
+    // Waste is a loss valued at the current average cost — auto-post the
+    // pair (Dr expenses / Cr inventory) when the mapping is active.
+    if (kind === 'waste') {
+      const wasteValue = items.reduce(
+        (sum, item) => sum + Math.abs(item.qty) * byId.get(item.productId),
+        0
+      );
+      if (wasteValue > 0) {
+        await postMappedEvent(client, {
+          user: req.user,
+          sourceType: 'cafe_waste',
+          sourceId: randomUUID(),
+          date: null,
+          memo: 'Cafe waste',
+          pairs: [{ event: 'cafe.waste', amount: Math.round(wasteValue) }],
+        });
+      }
+    }
 
     await recordAudit(client, {
       userId: req.user.id,

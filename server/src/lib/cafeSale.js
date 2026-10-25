@@ -3,6 +3,7 @@
 // balance refund). Routes stay thin; the smoke test exercises these directly.
 
 import { applyBalanceChange } from './cafeBalance.js';
+import { findEntryBySource, postMappedEvent, voidEntry } from './accountingJournal.js';
 import { recordAudit } from './audit.js';
 
 // `user` is the acting request user ({ id, username }). Returns the created
@@ -44,7 +45,7 @@ export async function createSale(db, { user, customer, studentId, items, note })
   const sale = await db.query(
     `INSERT INTO cafe_sales (sold_by, customer, student_id, note)
      VALUES ($1, $2, $3, $4)
-     RETURNING id`,
+     RETURNING id, sold_at::date AS day`,
     [user.id, customer, studentId ?? null, note ?? null]
   );
   const saleId = sale.rows[0].id;
@@ -103,12 +104,38 @@ export async function createSale(db, { user, customer, studentId, items, note })
     });
   }
 
+  // Auto-post to the journal when the mappings are active: the revenue pair
+  // for this customer type plus the COGS pair, all in one entry inside the
+  // sale's transaction. Inactive mappings make this a no-op.
+  const accounting = await postMappedEvent(db, {
+    user,
+    sourceType: 'cafe_sale',
+    sourceId: saleId,
+    date: sale.rows[0].day,
+    memo: customer === 'student' ? 'Cafe sale (student)' : 'Cafe sale (walk-in)',
+    pairs: [
+      {
+        event: customer === 'student' ? 'cafe.sale_student' : 'cafe.sale_walk_in',
+        amount: total,
+      },
+      { event: 'cafe.cogs', amount: costTotal },
+    ],
+  });
+
   await recordAudit(db, {
     userId: user.id,
     actor: user.username,
     action: 'cafe_sale.create',
     entityType: 'cafe_sale',
-    details: { saleId, customer, itemCount: items.length, total, costTotal, balanceAfter },
+    details: {
+      saleId,
+      customer,
+      itemCount: items.length,
+      total,
+      costTotal,
+      balanceAfter,
+      journalEntryNo: accounting.posted ? accounting.entryNo : null,
+    },
   });
 
   return { saleId, total, costTotal, balanceAfter };
@@ -149,6 +176,14 @@ export async function voidSale(db, { user, saleId }) {
     'UPDATE cafe_sales SET voided_at = now(), voided_by = $2 WHERE id = $1',
     [saleId, user.id]
   );
+
+  // The sale's journal entry (if one was posted) is voided in the same
+  // transaction — voiding unposts its economics, which is exactly the
+  // reversal the books need.
+  const entry = await findEntryBySource(db, 'cafe_sale', saleId);
+  if (entry) {
+    await voidEntry(db, { user, entryId: entry.id });
+  }
 
   await recordAudit(db, {
     userId: user.id,
