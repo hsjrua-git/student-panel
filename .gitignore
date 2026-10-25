@@ -30,3 +30,7 @@ npm-debug.log*
 /project.txt
 /to send.txt
 student-panel-compacted
+
+# Voice agent runtime artifacts
+agent/.env
+agent/logs/
