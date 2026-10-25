@@ -27,6 +27,13 @@ import sessionsRouter from './routes/sessions.js';
 import tasksRouter from './routes/tasks.js';
 import taskTemplatesRouter from './routes/taskTemplates.js';
 import alertsRouter from './routes/alerts.js';
+import cafeProductsRouter from './routes/cafeProducts.js';
+import cafeSuppliersRouter from './routes/cafeSuppliers.js';
+import cafePurchasesRouter from './routes/cafePurchases.js';
+import cafeSalesRouter from './routes/cafeSales.js';
+import cafeBalancesRouter from './routes/cafeBalances.js';
+import cafeInventoryRouter from './routes/cafeInventory.js';
+import cafeReportsRouter from './routes/cafeReports.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -308,6 +315,59 @@ app.use(
   }),
   alertsRouter
 );
+app.use(
+  '/api/cafe/products',
+  authorize({
+    GET: 'cafe.view',
+    POST: 'cafe.manage',
+    PATCH: 'cafe.manage',
+    DELETE: 'cafe.manage',
+  }),
+  cafeProductsRouter
+);
+app.use(
+  '/api/cafe/suppliers',
+  authorize({
+    GET: 'cafe.supplies',
+    POST: 'cafe.supplies',
+    PATCH: 'cafe.supplies',
+    DELETE: 'cafe.supplies',
+  }),
+  cafeSuppliersRouter
+);
+app.use(
+  '/api/cafe/purchases',
+  authorize({
+    GET: 'cafe.supplies',
+    POST: 'cafe.supplies',
+  }),
+  cafePurchasesRouter
+);
+app.use(
+  '/api/cafe/sales',
+  authorize({
+    GET: 'cafe.view',
+    POST: 'cafe.sell',
+  }),
+  cafeSalesRouter
+);
+// The balances router checks cafe.sell OR cafe.balance itself (the POS finds
+// students and shows balances without students.view — the blind-entry
+// precedent), so the mount only requires a session.
+app.use(
+  '/api/cafe/balances',
+  authorize({ GET: true, POST: true }),
+  cafeBalancesRouter
+);
+app.use(
+  '/api/cafe/inventory',
+  authorize({
+    GET: 'cafe.view',
+    POST: 'cafe.inventory',
+  }),
+  cafeInventoryRouter
+);
+app.use('/api/cafe/reports', authorize({ GET: 'cafe.view' }), cafeReportsRouter);
 app.use(
   '/api/preferences',
   authorize({ GET: true, PUT: true, DELETE: true }),

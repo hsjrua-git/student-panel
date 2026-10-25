@@ -24,6 +24,12 @@ const RULES = [
   { method: 'PATCH', pattern: /^\/api\/task-templates\/[^/]+$/, action: 'task_template.update', entityType: 'task_template' },
   { method: 'DELETE', pattern: /^\/api\/task-templates\/[^/]+$/, action: 'task_template.archive', entityType: 'task_template' },
   { method: 'PATCH', pattern: /^\/api\/alerts\/[^/]+$/, action: 'alert.update', entityType: 'alert' },
+  { method: 'POST', pattern: /^\/api\/cafe\/products$/, action: 'cafe_product.create', entityType: 'cafe_product' },
+  { method: 'PATCH', pattern: /^\/api\/cafe\/products\/[^/]+$/, action: 'cafe_product.update', entityType: 'cafe_product' },
+  { method: 'DELETE', pattern: /^\/api\/cafe\/products\/[^/]+$/, action: 'cafe_product.deactivate', entityType: 'cafe_product' },
+  { method: 'POST', pattern: /^\/api\/cafe\/suppliers$/, action: 'cafe_supplier.create', entityType: 'cafe_supplier' },
+  { method: 'PATCH', pattern: /^\/api\/cafe\/suppliers\/[^/]+$/, action: 'cafe_supplier.update', entityType: 'cafe_supplier' },
+  { method: 'DELETE', pattern: /^\/api\/cafe\/suppliers\/[^/]+$/, action: 'cafe_supplier.deactivate', entityType: 'cafe_supplier' },
   { method: 'POST', pattern: /^\/api\/parameters$/, action: 'parameter.create', entityType: 'parameter' },
   { method: 'PATCH', pattern: /^\/api\/parameters\/[^/]+$/, action: 'parameter.update', entityType: 'parameter' },
   { method: 'POST', pattern: /^\/api\/parameter-changes$/, action: 'parameter_change.create', entityType: 'parameter_change' },
@@ -45,6 +51,10 @@ const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/sessions\/generate$/,
   /^\/api\/tasks\/from-template$/,
   /^\/api\/alerts\/scan$/,
+  /^\/api\/cafe\/purchases$/,
+  /^\/api\/cafe\/sales(\/|$)/,
+  /^\/api\/cafe\/balances$/,
+  /^\/api\/cafe\/inventory$/,
 ];
 
 export function normalisePath(url) {

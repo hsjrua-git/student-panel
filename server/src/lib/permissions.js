@@ -21,6 +21,14 @@ export const PERMISSIONS = [
   { key: 'schedule.view', group: 'Scheduling', label: 'View the schedule' },
   { key: 'schedule.manage', group: 'Scheduling', label: 'Manage assignments and intervals' },
 
+  // Cafe
+  { key: 'cafe.view', group: 'Cafe', label: 'See the cafe pages' },
+  { key: 'cafe.sell', group: 'Cafe', label: 'Record cafe sales' },
+  { key: 'cafe.balance', group: 'Cafe', label: 'Top up and refund student balances' },
+  { key: 'cafe.supplies', group: 'Cafe', label: 'Record purchases and manage suppliers' },
+  { key: 'cafe.inventory', group: 'Cafe', label: 'Record waste and adjust stock' },
+  { key: 'cafe.manage', group: 'Cafe', label: 'Manage cafe products' },
+
   // Scores
   { key: 'scores.view', group: 'Scores', label: 'See scores' },
   { key: 'scores.enter', group: 'Scores', label: 'Enter and change scores' },
@@ -71,6 +79,15 @@ export const PREREQUISITES = {
   'teachers.manage': ['teachers.view'],
   // Scheduling a teacher with a group needs to see both, plus the schedule.
   'schedule.manage': ['schedule.view', 'teachers.view', 'students.view'],
+  // Cafe keys build on seeing the cafe. NOTE: cafe.sell deliberately does
+  // NOT require students.view — like scores.enter's blind-entry role, the
+  // POS exposes only minimal student identity (name, code, balance) so a
+  // cashier role can work without access to student records.
+  'cafe.sell': ['cafe.view'],
+  'cafe.balance': ['cafe.view'],
+  'cafe.supplies': ['cafe.view'],
+  'cafe.inventory': ['cafe.view'],
+  'cafe.manage': ['cafe.view'],
   // NOTE: scores.enter does NOT require scores.view — a "blind entry" role is
   // allowed (it can type scores but the server refuses to read them back).
   'scores.enter': ['students.view', 'parameters.view'],
