@@ -4,7 +4,8 @@
     "teaching": "آموزش",
     "cafe": "کافه",
     "setup": "راه‌اندازی",
-    "administration": "مدیریت"
+    "administration": "مدیریت",
+    "accounting": "حسابداری"
   },
   "items": {
     "dashboard": "داشبورد",
@@ -28,7 +29,11 @@
     "roles": "نقش‌ها",
     "audit": "گزارش فعالیت‌ها",
     "preferences": "تنظیمات شخصی",
-    "changePassword": "تغییر گذرواژه"
+    "changePassword": "تغییر گذرواژه",
+    "journal": "دفتر روزنامه",
+    "accounts": "کدینگ حساب‌ها",
+    "accountingReports": "گزارش‌های مالی",
+    "periods": "دوره‌های مالی"
   },
   "titles": {
     "preferences": "تنظیمات شخصی",

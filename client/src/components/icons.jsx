@@ -279,6 +279,28 @@ export function BarsIcon(props) {
   );
 }
 
+// An open ledger book: the accounting journal.
+export function LedgerIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 4.5h7a2 2 0 0 1 2 2V20a2 2 0 0 0-2-1.5H4z" />
+      <path d="M20 4.5h-7a2 2 0 0 0-2 2V20a2 2 0 0 1 2-1.5h7z" />
+      <path d="M7 9h2M15 9h2M7 13h2M15 13h2" />
+    </Svg>
+  );
+}
+
+// Scales: reports and the fiscal year.
+export function ScaleIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3v17M5 20h14" />
+      <path d="M12 6 5 8m7-2 7 2" />
+      <path d="M3.5 13 5 8l1.5 5a1.8 1.8 0 0 1-3 0zM14.5 13 16 8l1.5 5a1.8 1.8 0 0 1-3 0z" />
+    </Svg>
+  );
+}
+
 // A shield with a check: roles/permissions.
 export function RolesIcon(props) {
   return (

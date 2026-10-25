@@ -37,6 +37,8 @@ import {
   TruckIcon,
   BoxIcon,
   BarsIcon,
+  LedgerIcon,
+  ScaleIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
@@ -58,6 +60,10 @@ export const ROUTE_PERMISSIONS = {
   '/cafe/purchases': 'cafe.supplies',
   '/cafe/inventory': 'cafe.view',
   '/cafe/reports': 'cafe.view',
+  '/accounting/journal': 'accounting.view',
+  '/accounting/accounts': 'accounting.view',
+  '/accounting/periods': 'accounting.view',
+  '/accounting/reports': 'accounting.view',
   '/settings': 'settings.manage',
   '/users': 'users.manage',
   '/roles': 'roles.manage',
@@ -96,6 +102,15 @@ export const NAV_SECTIONS = [
       { to: '/cafe/purchases', key: 'purchases', icon: TruckIcon },
       { to: '/cafe/inventory', key: 'inventory', icon: BoxIcon },
       { to: '/cafe/reports', key: 'reports', icon: BarsIcon },
+    ],
+  },
+  {
+    key: 'accounting',
+    items: [
+      { to: '/accounting/journal', key: 'journal', icon: LedgerIcon },
+      { to: '/accounting/accounts', key: 'accounts', icon: LedgerIcon },
+      { to: '/accounting/reports', key: 'accountingReports', icon: ScaleIcon },
+      { to: '/accounting/periods', key: 'periods', icon: ScaleIcon },
     ],
   },
   {

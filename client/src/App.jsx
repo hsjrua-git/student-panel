@@ -53,6 +53,10 @@ const CafeSalesPage = lazyWithReload(() => import('./pages/CafeSalesPage.jsx'));
 const CafePurchasesPage = lazyWithReload(() => import('./pages/CafePurchasesPage.jsx'));
 const CafeInventoryPage = lazyWithReload(() => import('./pages/CafeInventoryPage.jsx'));
 const CafeReportsPage = lazyWithReload(() => import('./pages/CafeReportsPage.jsx'));
+const AccountingJournalPage = lazyWithReload(() => import('./pages/AccountingJournalPage.jsx'));
+const AccountingAccountsPage = lazyWithReload(() => import('./pages/AccountingAccountsPage.jsx'));
+const AccountingPeriodsPage = lazyWithReload(() => import('./pages/AccountingPeriodsPage.jsx'));
+const AccountingReportsPage = lazyWithReload(() => import('./pages/AccountingReportsPage.jsx'));
 const PreferencesPage = lazyWithReload(() => import('./pages/PreferencesPage.jsx'));
 const SettingsPage = lazyWithReload(() => import('./pages/SettingsPage.jsx'));
 const ChangePasswordPage = lazyWithReload(() => import('./pages/ChangePasswordPage.jsx'));
@@ -86,6 +90,10 @@ const ROUTE_PRELOADS = [
   ['/cafe/purchases', CafePurchasesPage],
   ['/cafe/inventory', CafeInventoryPage],
   ['/cafe/reports', CafeReportsPage],
+  ['/accounting/journal', AccountingJournalPage],
+  ['/accounting/accounts', AccountingAccountsPage],
+  ['/accounting/periods', AccountingPeriodsPage],
+  ['/accounting/reports', AccountingReportsPage],
   ['/preferences', PreferencesPage],
   ['/settings', SettingsPage],
   ['/change-password', ChangePasswordPage],
@@ -620,6 +628,10 @@ function AnimatedRoutes() {
             <Route path="/cafe/purchases" element={<CafePurchasesPage />} />
             <Route path="/cafe/inventory" element={<CafeInventoryPage />} />
             <Route path="/cafe/reports" element={<CafeReportsPage />} />
+            <Route path="/accounting/journal" element={<AccountingJournalPage />} />
+            <Route path="/accounting/accounts" element={<AccountingAccountsPage />} />
+            <Route path="/accounting/periods" element={<AccountingPeriodsPage />} />
+            <Route path="/accounting/reports" element={<AccountingReportsPage />} />
             <Route path="/preferences" element={<PreferencesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />

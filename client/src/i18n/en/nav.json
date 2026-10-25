@@ -4,7 +4,8 @@
     "teaching": "Teaching",
     "cafe": "Cafe",
     "setup": "Setup",
-    "administration": "Administration"
+    "administration": "Administration",
+    "accounting": "Accounting"
   },
   "items": {
     "dashboard": "Dashboard",
@@ -28,7 +29,11 @@
     "roles": "Roles",
     "audit": "Audit log",
     "preferences": "Preferences",
-    "changePassword": "Change password"
+    "changePassword": "Change password",
+    "journal": "Journal",
+    "accounts": "Chart of accounts",
+    "accountingReports": "Financial reports",
+    "periods": "Fiscal periods"
   },
   "titles": {
     "preferences": "Preferences",
