@@ -34,3 +34,15 @@ student-panel-compacted
 # Voice agent runtime artifacts
 agent/.env
 agent/logs/
+
+# Personal/reference material (kept on disk, not in the repo)
+/Mine/
+/helpful/
+/student-panel-tutoring/
+/student-panel-explained.txt
+/student-panel-rules.txt
+/student-panel-ER.html
+/answers.md
+/evaluation database
+/backups/
+/VERSION-NOTES.md
