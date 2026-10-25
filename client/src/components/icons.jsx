@@ -237,6 +237,17 @@ export function CoffeeIcon(props) {
   );
 }
 
+// A shopping cart: the cafe POS.
+export function CartIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3 4.5h2l2.2 10.2a1.6 1.6 0 0 0 1.6 1.3h6.9a1.6 1.6 0 0 0 1.6-1.2L19 8H6" />
+      <circle cx="9.5" cy="20" r="1.4" />
+      <circle cx="16.5" cy="20" r="1.4" />
+    </Svg>
+  );
+}
+
 // A shield with a check: roles/permissions.
 export function RolesIcon(props) {
   return (
