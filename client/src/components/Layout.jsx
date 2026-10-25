@@ -3,8 +3,11 @@ import { NavLink, Outlet, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 import {
-  NAV_SECTIONS,
+  NAV_ITEMS,
+  NAV_PANELS,
+  HOME_ITEM,
   ROUTE_PERMISSIONS,
+  panelForPath,
   extraTitleForPath,
 } from '../lib/navigation.js';
 import {
@@ -30,12 +33,13 @@ function Layout() {
   // Starts collapsed at every login — Layout unmounts on logout, so this
   // default re-applies each time a user signs in (ref 5's slim-rail default).
   const [navCollapsed, setNavCollapsed] = useState(true);
-  // Which nav groups are expanded. Starts empty (all folded) at every login.
-  // Layout stays mounted while navigating between pages, so an expanded group
-  // stays expanded across the session; logging out unmounts Layout, which
-  // resets this back to folded. Kept in React state (not browser storage) so it
-  // never leaks between users on a shared machine.
-  const [openGroups, setOpenGroups] = useState({});
+  // The two-level panel menu: null shows the panel list; a panel key swaps
+  // the sidebar to that panel's pages. Follows the route automatically (see
+  // the render-time adjust below the drawer close), so landing directly on
+  // /cafe/purchases opens the Cafe panel — and the back control returns to
+  // the panel list. Kept in React state (not browser storage) so it never
+  // leaks between users on a shared machine.
+  const [openPanel, setOpenPanel] = useState(() => panelForPath(location.pathname)?.key ?? null);
   const sidebarRef = useRef(null);
   const toggleRef = useRef(null);
 
@@ -46,6 +50,9 @@ function Layout() {
   if (location.pathname !== lastPath) {
     setLastPath(location.pathname);
     setDrawerOpen(false);
+    // The sidebar follows: landing on a page of another panel swaps to it.
+    const panel = panelForPath(location.pathname)?.key ?? null;
+    if (panel !== openPanel) setOpenPanel(panel);
   }
 
   // Track whether we're at the width where the sidebar becomes an overlay
@@ -103,21 +110,41 @@ function Layout() {
 
   const showNav = !user.mustChangePassword;
 
-  // Only render a section (and its items) the user is actually allowed to see.
+  // Only render a panel (and its items) the user is actually allowed to see.
   // The permission for each item comes from ROUTE_PERMISSIONS (null = any
   // signed-in user), the same map the route guard uses — so a hidden link is
-  // always also a blocked page.
-  const sections = showNav
-    ? NAV_SECTIONS.map((section) => ({
-        ...section,
-        items: section.items.filter((item) => {
-          const permission = ROUTE_PERMISSIONS[item.to];
-          return !permission || can(permission);
-        }),
-      })).filter((section) => section.items.length > 0)
+  // always also a blocked page. Dashboard (HOME_ITEM) renders above the
+  // panels as the permanent home link.
+  const allowedItem = (item) => {
+    const permission = ROUTE_PERMISSIONS[item.to];
+    return !permission || can(permission);
+  };
+  const panels = showNav
+    ? NAV_PANELS.map((panel) => ({
+        ...panel,
+        items: panel.items.filter(allowedItem),
+      })).filter((panel) => panel.items.length > 0)
     : [];
+  const flatItems = showNav ? NAV_ITEMS.filter(allowedItem) : [];
+  const showHome = showNav && allowedItem(HOME_ITEM);
+  const activePanel = panels.find((panel) => panel.key === openPanel) ?? null;
+  // NavLink's isActive is prefix-based, so on /agent/transcripts it would light
+  // up BOTH sibling AI pages. Within a panel, highlight only the item the path
+  // actually belongs to: the longest item path that is a prefix of it (exact
+  // for the page itself, the top-level page for nested routes like /students/:id).
+  const activeTo = activePanel
+    ? activePanel.items.reduce(
+        (best, item) =>
+          (location.pathname === item.to ||
+            location.pathname.startsWith(`${item.to}/`)) &&
+          (!best || item.to.length > best.length)
+          ? item.to
+          : best,
+        null
+      )
+    : null;
 
-  const titleKey = titleKeyForPath(location.pathname, sections);
+  const titleKey = titleKeyForPath(location.pathname, panels);
   const currentTitle = titleKey ? t(titleKey) : t('common:appName');
 
   // The icon-only rail is a desktop affordance; on mobile the sidebar is a
@@ -163,66 +190,100 @@ function Layout() {
         </div>
         {showNav && (
           <nav className="sidebar-nav">
-            {sections.map((section) => (
-              <details
-                className="nav-group"
-                open={railCollapsed || Boolean(openGroups[section.key])}
-                onToggle={(event) => {
-                  // While collapsed the rail forces every group open so all
-                  // icons show; don't record that transient state — the user's
-                  // real expand/fold choices are preserved for when they expand
-                  // the rail again.
-                  if (railCollapsed) return;
-                  // Read the element's open state NOW, while the event is still
-                  // live. React releases the synthetic event once this handler
-                  // returns and nulls out currentTarget, so reading it inside
-                  // the setState updater below (which runs later, during render)
-                  // would throw "Cannot read properties of null (reading
-                  // 'open')". Capture the boolean first, then use that.
-                  const isOpen = event.currentTarget.open;
-                  setOpenGroups((current) => {
-                    if (Boolean(current[section.key]) === isOpen) return current;
-                    return { ...current, [section.key]: isOpen };
-                  });
-                }}
-                key={section.key}
-              >
-                <summary className="nav-group-head">
-                  <span>{t(`sections.${section.key}`)}</span>
-                  <svg className="chevron" viewBox="0 0 12 12" aria-hidden="true">
-                    <path
-                      d="M2.5 4.5 6 8l3.5-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </summary>
-                <div className="nav-group-items">
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const label = t(`items.${item.key}`);
-                    return (
+            {railCollapsed ? (
+              /* The slim icon rail stays FLAT (closest to the old rail): one
+                 icon per page across every panel, tooltips when collapsed. */
+              <ul className="nav-flat">
+                {flatItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.to}>
                       <NavLink
-                        key={item.to}
                         to={item.to}
-                        className="nav-link"
-                        title={railCollapsed ? label : undefined}
+                        end={item.to === HOME_ITEM.to ? undefined : false}
+                        className={({ isActive }) =>
+                          `nav-link${isActive && item.to === location.pathname ? ' active' : ''}`
+                        }
+                        title={item.key ? t(`items.${item.key}`) : undefined}
                       >
-                        {Icon && (
-                          <span className="nav-icon" aria-hidden="true">
-                            <Icon size={18} />
-                          </span>
-                        )}
-                        <span className="nav-label">{label}</span>
+                        <span className="nav-icon" aria-hidden="true">
+                          {Icon && <Icon size={18} />}
+                        </span>
+                        <span className="nav-label">{item.key ? t(`items.${item.key}`) : ''}</span>
                       </NavLink>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : activePanel ? (
+              /* Panel view: the selected panel's pages, with a back control. */
+              <>
+                <button
+                  type="button"
+                  className="panel-back"
+                  onClick={() => setOpenPanel(null)}
+                >
+                  <ChevronsLeftIcon className="panel-back-icon" size={16} />
+                  <span>{t('allPanels')}</span>
+                </button>
+                <p className="panel-title">{t(`panels.${activePanel.key}`)}</p>
+                <ul className="nav-flat">
+                  {activePanel.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <li key={item.to}>
+                        <NavLink
+                          to={item.to}
+                          className={() =>
+                            `nav-link${item.to === activeTo ? ' active' : ''}`
+                          }
+                          title={item.key ? t(`items.${item.key}`) : undefined}
+                        >
+                          <span className="nav-icon" aria-hidden="true">
+                            {Icon && <Icon size={18} />}
+                          </span>
+                          <span className="nav-label">{item.key ? t(`items.${item.key}`) : ''}</span>
+                        </NavLink>
+                      </li>
                     );
                   })}
-                </div>
-              </details>
-            ))}
+                </ul>
+              </>
+            ) : (
+              /* Panel list: the home link plus one button per panel. */
+              <ul className="nav-flat">
+                {showHome && (
+                  <li>
+                    <NavLink
+                      to={HOME_ITEM.to}
+                      end
+                      className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                    >
+                      <span className="nav-icon" aria-hidden="true">
+                        <HOME_ITEM.icon size={18} />
+                      </span>
+                      <span className="nav-label">{t(`items.${HOME_ITEM.key}`)}</span>
+                    </NavLink>
+                  </li>
+                )}
+                {panels.map((panel) => (
+                  <li key={panel.key}>
+                    <button
+                      type="button"
+                      className="nav-link panel-link"
+                      onClick={() => setOpenPanel(panel.key)}
+                      aria-haspopup="true"
+                    >
+                      <span className="nav-label">{t(`panels.${panel.key}`)}</span>
+                      <span className="panel-count" aria-hidden="true">
+                        {panel.items.length}
+                      </span>
+                      <ChevronsLeftIcon className="panel-chevron" size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </nav>
         )}
 

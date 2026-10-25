@@ -138,7 +138,8 @@
     "Custom fields": "Custom fields",
     "Reports": "Reports",
     "Administration": "Administration",
-    "Accounting": "Accounting"
+    "Accounting": "Accounting",
+    "AI": "AI"
   },
   "audit": {
     "readOnlyTitle": "Read-only access",

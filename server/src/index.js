@@ -39,6 +39,7 @@ import accountingMappingsRouter from './routes/accountingMappings.js';
 import accountingJournalRouter from './routes/accountingJournal.js';
 import accountingPeriodsRouter from './routes/accountingPeriods.js';
 import accountingReportsRouter from './routes/accountingReports.js';
+import agentRouter from './routes/agent.js';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
@@ -415,6 +416,7 @@ app.use(
   authorize({ GET: 'accounting.view' }),
   accountingReportsRouter
 );
+app.use('/api/agent', authorize({ GET: 'agent.view' }), agentRouter);
 app.use(
   '/api/preferences',
   authorize({ GET: true, PUT: true, DELETE: true }),

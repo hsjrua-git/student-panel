@@ -57,6 +57,8 @@ const AccountingJournalPage = lazyWithReload(() => import('./pages/AccountingJou
 const AccountingAccountsPage = lazyWithReload(() => import('./pages/AccountingAccountsPage.jsx'));
 const AccountingPeriodsPage = lazyWithReload(() => import('./pages/AccountingPeriodsPage.jsx'));
 const AccountingReportsPage = lazyWithReload(() => import('./pages/AccountingReportsPage.jsx'));
+const AgentPage = lazyWithReload(() => import('./pages/AgentPage.jsx'));
+const AgentTranscriptsPage = lazyWithReload(() => import('./pages/AgentTranscriptsPage.jsx'));
 const PreferencesPage = lazyWithReload(() => import('./pages/PreferencesPage.jsx'));
 const SettingsPage = lazyWithReload(() => import('./pages/SettingsPage.jsx'));
 const ChangePasswordPage = lazyWithReload(() => import('./pages/ChangePasswordPage.jsx'));
@@ -94,6 +96,8 @@ const ROUTE_PRELOADS = [
   ['/accounting/accounts', AccountingAccountsPage],
   ['/accounting/periods', AccountingPeriodsPage],
   ['/accounting/reports', AccountingReportsPage],
+  ['/agent', AgentPage],
+  ['/agent/transcripts', AgentTranscriptsPage],
   ['/preferences', PreferencesPage],
   ['/settings', SettingsPage],
   ['/change-password', ChangePasswordPage],
@@ -632,6 +636,8 @@ function AnimatedRoutes() {
             <Route path="/accounting/accounts" element={<AccountingAccountsPage />} />
             <Route path="/accounting/periods" element={<AccountingPeriodsPage />} />
             <Route path="/accounting/reports" element={<AccountingReportsPage />} />
+            <Route path="/agent" element={<AgentPage />} />
+            <Route path="/agent/transcripts" element={<AgentTranscriptsPage />} />
             <Route path="/preferences" element={<PreferencesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />

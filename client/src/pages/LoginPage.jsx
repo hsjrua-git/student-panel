@@ -43,7 +43,7 @@ function LoginPage() {
     return (
       <main className="auth-screen">
         <div className="auth-card">
-          <p>Loading...</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );

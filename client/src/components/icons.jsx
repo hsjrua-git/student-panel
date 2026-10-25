@@ -290,6 +290,30 @@ export function LedgerIcon(props) {
   );
 }
 
+// A friendly robot head: the AI panel.
+export function BotIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="5" y="8" width="14" height="11" rx="3" />
+      <path d="M12 8V4.5M9 4.5h6" />
+      <circle cx="9.5" cy="13" r="1.2" />
+      <circle cx="14.5" cy="13" r="1.2" />
+      <path d="M9.5 16.2h5" />
+    </Svg>
+  );
+}
+
+// A speech transcript: the retained dialogue log.
+export function TranscriptIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M6 3.5h9.5L19 7v13.5H6z" />
+      <path d="M9 8.5h7M9 12h7M9 15.5h4.5" />
+      <path d="m4.5 19 2-2.5" />
+    </Svg>
+  );
+}
+
 // Scales: reports and the fiscal year.
 export function ScaleIcon(props) {
   return (

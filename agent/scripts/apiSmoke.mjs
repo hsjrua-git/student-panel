@@ -61,6 +61,8 @@ const CHECKS = [
   { get: () => [`/api/accounting/reports/trial-balance?from=${monthAgo}&to=${today}`] },
   { get: () => [`/api/accounting/reports/income-statement?from=${monthAgo}&to=${today}`] },
   { get: () => [`/api/accounting/reports/balance-sheet?asOf=${today}`] },
+  { get: () => ['/api/agent/status'] },
+  { get: () => [`/api/agent/transcripts?from=${monthAgo}&to=${today}`] },
   // id-dependent ones are appended dynamically below
 ];
 

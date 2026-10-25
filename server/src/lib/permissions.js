@@ -36,6 +36,9 @@ export const PERMISSIONS = [
   { key: 'accounting.close', group: 'Accounting', label: 'Close and reopen fiscal periods' },
   { key: 'accounting.manage', group: 'Accounting', label: 'Manage the chart of accounts and mappings' },
 
+  // AI / voice agent
+  { key: 'agent.view', group: 'AI', label: 'See the voice agent panel' },
+
   // Scores
   { key: 'scores.view', group: 'Scores', label: 'See scores' },
   { key: 'scores.enter', group: 'Scores', label: 'Enter and change scores' },

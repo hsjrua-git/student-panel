@@ -72,3 +72,55 @@ smoke-verified.
 - The UI tour found one wording nit worth a follow-up: the Evaluate page h1
   says «ثبت نمره» while the nav/topbar say «ثبت نمرات» — align whichever you
   prefer.
+
+---
+
+# Nav redesign + AI panel — 2026-10-25 (second pass)
+
+Finished the interrupted nav-redesign chat and shipped the AI panel. The
+interrupted chat had left the tree **unbuildable**: the rewritten
+`navigation.js` dropped `EXTRA_TITLES`/`extraTitleForPath` which `Layout.jsx`
+still imports, and none of the new panel classes (`nav-flat`, `panel-*`)
+existed in `index.css` yet. Both restored/completed here.
+
+## Shipped
+
+1. **Two-level sidebar** (approved design): the expanded rail lists the five
+   panels (Evaluation / Cafe / Accounting / AI / Administration, user's
+   grouping); selecting one swaps the sidebar to that panel's pages with a
+   «همه بخش‌ها» back control; landing on any page deep-link opens its panel
+   automatically (render-time adjust, no effect). The collapsed icon rail
+   stays flat exactly as before. Old `<details>` group CSS removed.
+2. **AI panel** — migration 028 (`agent.view`, no prerequisite, seeded to
+   Administrator; applied to the live DB), `routes/agent.js` (`/api/agent/
+   status` + `/api/agent/transcripts`, both `agent.view`-gated, filters
+   validated, 100-turn cap with `truncated`), client pages
+   `AgentPage` (kiosk footprint + setup checklist pairing the data with
+   agent/README.md steps; the running-process step is honestly "manual")
+   and `AgentTranscriptsPage` (session/role/date filters, dir="auto" text,
+   audio-kept badge, meta expander), born bilingual (`agent.json` fa/en).
+3. **i18n**: `nav.json` `sections` → `panels` (+ `allPanels`, items.agent /
+   items.transcripts) in both languages; `admin.json` `permissionGroups.AI`
+   (Roles page renders «هوش مصنوعی» / "AI").
+4. apiSmoke now covers the two agent endpoints (45 endpoints, all OK).
+
+## Found during the visual tour (fixed in place)
+
+5. **Specificity**: `.transcript-how { white-space: normal }` lost to
+   `.table-wrap td`'s nowrap — the setup checklist overflowed its card and
+   pushed the status badges off-screen. Re-scoped at `.table-wrap` depth.
+6. **The global `.table-wrap table { min-width: max-content }` floor** then
+   still defeated the wrap (long how-to lines forced a horizontal scrollbar).
+   These two tables now shrink (`:has(.transcript-…)` override).
+7. **Double active highlight**: in the panel view, NavLink's prefix matching
+   lit BOTH AI pages on `/agent/transcripts`. The panel view now highlights
+   the longest item path that prefixes the location (the collapsed rail keeps
+   its exact-match rule).
+
+## Verified
+
+Client lint + 197/197 tests + build; server 183 pass / 4 skipped
+(integration gated); apiSmoke 45/45; live tour as Administrator in fa + en,
+desktop + mobile drawer: panel list, swap, back, auto-active on deep links,
+both AI pages (live Jalali timestamps, checklist badges), Roles group label.
+Tour artifacts (throwaway user, seeded transcript turns) removed afterwards.

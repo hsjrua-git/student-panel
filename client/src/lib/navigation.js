@@ -1,20 +1,20 @@
 // Single source of truth for which permission each route needs, plus the
-// grouped sidebar. Three things read from here — the sidebar (Layout), the
-// client-side route guard (RequirePermission), and the post-login landing
-// (firstAllowedPath) — so a role, INCLUDING any new one an admin builds out of
-// permission keys, automatically gets a menu, page access, and a landing spot
-// that match exactly what it is allowed to do, with no per-route wiring.
+// PANEL-BASED sidebar: the menu first lists the main panels (Evaluation,
+// Cafe, Accounting, AI, Administration); selecting a panel swaps the sidebar
+// to that panel's pages, with a back control (see Layout). Dashboard is the
+// permanent home link above the panels.
 //
-// A permission of `null` means "any signed-in user" (Preferences, Change
-// password). The server still enforces every permission on the API; this map
-// only decides what the client shows and lets you navigate to — the API remains
-// the real gate.
+// The collapsed icon rail ignores the two-level structure and shows one
+// flat icon per page (kept closest to the previous behaviour).
 //
-// Sections and items carry stable translation `key`s, not display text: the
-// labels live in i18n/{fa,en}/nav.json under `sections.<key>` / `items.<key>`
-// (and `titles.<key>` for EXTRA_TITLES) and Layout renders them with t(). The
-// keys are language-independent, so anything keyed by them (React keys, the
-// open-groups state) stays stable across a language switch.
+// Everything below is also what the client-side route guard
+// (RequirePermission via permissionForPath) and the post-login landing
+// (firstAllowedPath) read, so a role — INCLUDING any new one an admin
+// builds from permission keys — automatically gets a menu, page access, and
+// a landing spot that match exactly what it is allowed to do.
+//
+// Sections and items carry stable translation `key`s; labels live in
+// i18n/{fa,en}/nav.json under `panels.<key>` / `items.<key>`.
 
 import {
   DashboardIcon,
@@ -39,6 +39,8 @@ import {
   BarsIcon,
   LedgerIcon,
   ScaleIcon,
+  BotIcon,
+  TranscriptIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
@@ -64,6 +66,8 @@ export const ROUTE_PERMISSIONS = {
   '/accounting/accounts': 'accounting.view',
   '/accounting/periods': 'accounting.view',
   '/accounting/reports': 'accounting.view',
+  '/agent': 'agent.view',
+  '/agent/transcripts': 'agent.view',
   '/settings': 'settings.manage',
   '/users': 'users.manage',
   '/roles': 'roles.manage',
@@ -72,26 +76,28 @@ export const ROUTE_PERMISSIONS = {
   '/change-password': null,
 };
 
-// The grouped sidebar. Each item's required permission is looked up from
-// ROUTE_PERMISSIONS above (by its `to` path), so the menu and the route guard
-// can never drift apart.
-export const NAV_SECTIONS = [
+// Dashboard: the permanent home link above the panels.
+export const HOME_ITEM = {
+  to: '/dashboard',
+  key: 'dashboard',
+  icon: DashboardIcon,
+  permission: 'dashboard.view',
+};
+
+// The main panels. `key` translates via nav.json `panels.<key>`; `items` are
+// the pages revealed when the panel is selected (order = display order).
+export const NAV_PANELS = [
   {
-    key: 'overview',
-    items: [
-      { to: '/dashboard', key: 'dashboard', icon: DashboardIcon },
-      { to: '/results', key: 'results', icon: ResultsIcon },
-      { to: '/export', key: 'export', icon: DownloadIcon },
-    ],
-  },
-  {
-    key: 'teaching',
+    key: 'evaluation',
     items: [
       { to: '/students', key: 'students', icon: StudentsIcon },
       { to: '/evaluate', key: 'evaluate', icon: EvaluateIcon },
+      { to: '/results', key: 'results', icon: ResultsIcon },
+      { to: '/export', key: 'export', icon: DownloadIcon },
       { to: '/teachers', key: 'teachers', icon: TeacherIcon },
       { to: '/schedule', key: 'schedule', icon: CalendarIcon },
       { to: '/sessions', key: 'sessions', icon: SessionIcon },
+      { to: '/parameters', key: 'parameters', icon: ParametersIcon },
     ],
   },
   {
@@ -114,12 +120,10 @@ export const NAV_SECTIONS = [
     ],
   },
   {
-    key: 'setup',
+    key: 'ai',
     items: [
-      { to: '/parameters', key: 'parameters', icon: ParametersIcon },
-      { to: '/groups', key: 'groups', icon: GroupsIcon },
-      { to: '/fields', key: 'fields', icon: FieldsIcon },
-      { to: '/settings', key: 'settings', icon: SettingsIcon },
+      { to: '/agent', key: 'agent', icon: BotIcon },
+      { to: '/agent/transcripts', key: 'transcripts', icon: TranscriptIcon },
     ],
   },
   {
@@ -127,9 +131,19 @@ export const NAV_SECTIONS = [
     items: [
       { to: '/users', key: 'users', icon: UsersIcon },
       { to: '/roles', key: 'roles', icon: RolesIcon },
+      { to: '/groups', key: 'groups', icon: GroupsIcon },
+      { to: '/fields', key: 'fields', icon: FieldsIcon },
       { to: '/audit', key: 'audit', icon: AuditIcon },
+      { to: '/settings', key: 'settings', icon: SettingsIcon },
     ],
   },
+];
+
+// Every sidebar page, flat — the collapsed icon rail and the title lookup
+// walk this.
+export const NAV_ITEMS = [
+  HOME_ITEM,
+  ...NAV_PANELS.flatMap((panel) => panel.items),
 ];
 
 // Topbar titles for routes that aren't in the sidebar. Values are keys into
@@ -155,9 +169,19 @@ export function extraTitleForPath(pathname) {
   return null;
 }
 
-// The permission a path needs, or `null` for "any signed-in user". Nested paths
-// that aren't listed explicitly (e.g. the student detail page /students/:id)
-// fall back to their top-level section's rule (/students → students.view).
+// The panel holding a path (nested routes like /students/:id resolve to
+// their top-level page's panel), or null for the home link / non-panel pages.
+export function panelForPath(pathname) {
+  const top = '/' + pathname.split('/').filter(Boolean)[0];
+  const page =
+    NAV_ITEMS.find((item) => item.to === pathname) ??
+    NAV_ITEMS.find((item) => item.to === top);
+  if (!page || page === HOME_ITEM) return null;
+  return NAV_PANELS.find((panel) => panel.items.includes(page)) ?? null;
+}
+
+// The permission a path needs, or `null` for "any signed-in user". Nested
+// paths not listed explicitly fall back to their top-level rule.
 export function permissionForPath(pathname) {
   if (pathname in ROUTE_PERMISSIONS) return ROUTE_PERMISSIONS[pathname];
   const top = '/' + pathname.split('/').filter(Boolean)[0];
@@ -166,14 +190,15 @@ export function permissionForPath(pathname) {
 }
 
 // The first place a freshly signed-in user is allowed to see. Prefers the
-// dashboard (the app's home) when they can view it, otherwise walks the sidebar
-// in order and picks the first item they can reach, and finally falls back to
-// Preferences — which every signed-in user can open — so there is ALWAYS a
-// valid landing spot, even for a role stripped down to almost nothing.
+// dashboard (the app's home) when they can view it, otherwise walks the
+// panels in order and picks the first reachable page, and finally falls back
+// to Preferences — which every signed-in user can open.
 export function firstAllowedPath(can) {
-  if (can('dashboard.view')) return '/dashboard';
-  for (const section of NAV_SECTIONS) {
-    for (const item of section.items) {
+  if (!HOME_ITEM.permission || can(HOME_ITEM.permission)) {
+    return HOME_ITEM.to;
+  }
+  for (const panel of NAV_PANELS) {
+    for (const item of panel.items) {
       const permission = ROUTE_PERMISSIONS[item.to];
       if (!permission || can(permission)) return item.to;
     }

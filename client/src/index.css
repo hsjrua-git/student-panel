@@ -1368,52 +1368,103 @@ tr.inactive,
   gap: 0.15rem;
 }
 
-/* ---- collapsible nav groups (native <details>) ---- */
-.nav-group {
-  margin-bottom: 0.35rem;
+/* ---- two-level panel menu ---- */
+/* The expanded sidebar first lists the main panels; selecting one swaps the
+   list for that panel's pages, with a back control (Layout). `.nav-flat` is
+   the shared list — the panel list, a panel's pages, and the collapsed icon
+   rail all render it. */
+.nav-flat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.15rem 0 0.35rem;
 }
 
-.nav-group-head {
+/* A panel row in the list: same chrome as a nav-link (the class is shared),
+   with the label at the inline start and the count + forward chevron at the
+   inline end. */
+.panel-link {
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: start;
+}
+
+.panel-link .nav-label {
+  flex: 1 1 auto;
+}
+
+.panel-count {
+  flex: none;
+  font-family: var(--font-numeric);
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--sidebar-ink-soft);
+  background: var(--sidebar-hover);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+/* The row chevron points "into" the panel — forward in reading order: right
+   in LTR, left in RTL. The glyph points left, so LTR mirrors it. */
+.panel-chevron {
+  color: var(--sidebar-ink-soft);
+  transform: scaleX(-1);
+}
+
+[dir='rtl'] .panel-chevron {
+  transform: none;
+}
+
+/* Inside a panel: the back control above the panel's name and its pages. */
+.panel-back {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.4rem 0.65rem;
+  gap: 0.45rem;
+  margin: 0.15rem 0 0.1rem;
+  padding: 0.35rem 0.55rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--sidebar-ink-soft);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  list-style: none;
+  text-align: start;
+  transition:
+    background-color var(--t) var(--ease),
+    color var(--t) var(--ease);
+}
+
+.panel-back:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-ink);
+}
+
+.panel-back-icon {
+  flex: none;
+}
+
+/* Back means "out to the panel list" — left in LTR, right in RTL; the glyph
+   already points left, so RTL mirrors it. */
+[dir='rtl'] .panel-back-icon {
+  transform: scaleX(-1);
+}
+
+.panel-title {
+  margin: 0;
+  padding: 0.3rem 0.65rem 0.45rem;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--sidebar-ink-soft);
-  border-radius: var(--radius-sm);
-  transition: color var(--t) var(--ease);
   user-select: none;
-}
-
-.nav-group-head::-webkit-details-marker {
-  display: none;
-}
-
-.nav-group-head:hover {
-  color: var(--sidebar-ink);
-}
-
-.chevron {
-  width: 0.7rem;
-  height: 0.7rem;
-  opacity: 0.7;
-  transition: transform var(--t) var(--ease);
-}
-
-.nav-group[open] .chevron {
-  transform: rotate(180deg);
-}
-
-.nav-group-items {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0.15rem 0 0.35rem;
 }
 
 .nav-link {
@@ -1482,28 +1533,6 @@ tr.inactive,
   background: var(--sidebar-active-bar);
 }
 
-/* ---- animated disclosure (progressive enhancement) ---- */
-@supports (interpolate-size: allow-keywords) {
-  :root {
-    interpolate-size: allow-keywords;
-  }
-
-  .nav-group::details-content {
-    height: 0;
-    overflow: hidden;
-    opacity: 0;
-    transition:
-      height var(--t) var(--ease),
-      opacity var(--t) var(--ease),
-      content-visibility var(--t) allow-discrete;
-  }
-
-  .nav-group[open]::details-content {
-    height: auto;
-    opacity: 1;
-  }
-}
-
 /* ---- collapse-to-rail toggle + slim icon-only rail ---- */
 /* A compact square icon button living in the sidebar top row. One glyph serves
    both directions — CSS rotates it 180° while the rail is collapsed. */
@@ -1555,8 +1584,6 @@ tr.inactive,
 }
 
 .nav-collapsed .brand-name,
-.nav-collapsed .nav-group-head > span,
-.nav-collapsed .nav-group-head .chevron,
 .nav-collapsed .nav-label {
   display: none;
 }
@@ -1566,13 +1593,6 @@ tr.inactive,
    being clipped off the top if the list is ever taller than the rail. */
 .nav-collapsed .sidebar-nav {
   justify-content: safe center;
-}
-
-.nav-collapsed .nav-group-head {
-  justify-content: center;
-  padding: 0.15rem;
-  pointer-events: none;
-  min-height: 0.5rem;
 }
 
 .nav-collapsed .nav-link {
@@ -2390,8 +2410,12 @@ tr.inactive,
 .sat-frac {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  /* Flex, not grid: the count and its "/total" are two separate children
+     (a text node + a span), and grid stacks each child into its own row —
+     spilling the total out of the ring. Flex keeps them on one line. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-numeric);
   font-size: 0.8rem;
   font-weight: 750;
@@ -3142,6 +3166,28 @@ table.audit-changes {
   margin-top: 0.5rem;
 }
 
+/* Voice-transcript tables (AI panel): the dialogue text and the setup how-to
+   must wrap — every other table cell stays on one line. Lives at .table-wrap
+   depth so it out-ranks .table-wrap td's nowrap. The dialogue itself reads in
+   its own direction (dir="auto" on the cell) because the kiosk is bilingual. */
+.table-wrap .transcript-text,
+.table-wrap .transcript-how {
+  white-space: normal;
+}
+
+.table-wrap .transcript-text {
+  min-width: 16rem;
+  max-width: 46rem;
+}
+
+/* The global .table-wrap table floor (min-width: max-content) would defeat the
+   wrapping above — a long how-to line would force a horizontal scrollbar
+   instead of breaking. Let exactly these tables shrink. */
+.table-wrap:has(.transcript-text) table,
+.table-wrap:has(.transcript-how) table {
+  min-width: 0;
+}
+
 /* ------------------------------------ groups, roles, custom fields, prefs - */
 .sr-only {
   position: absolute;
@@ -3614,33 +3660,39 @@ html {
 
 @media (max-width: 880px) {
   .app-shell.drawer-open .sidebar-top,
-  .app-shell.drawer-open .nav-group,
+  .app-shell.drawer-open .panel-back,
+  .app-shell.drawer-open .panel-title,
+  .app-shell.drawer-open .nav-flat > li,
   .app-shell.drawer-open .sidebar-account {
     animation: drawer-item 440ms var(--ease) both;
   }
 
   [dir='rtl'] .app-shell.drawer-open .sidebar-top,
-  [dir='rtl'] .app-shell.drawer-open .nav-group,
+  [dir='rtl'] .app-shell.drawer-open .panel-back,
+  [dir='rtl'] .app-shell.drawer-open .panel-title,
+  [dir='rtl'] .app-shell.drawer-open .nav-flat > li,
   [dir='rtl'] .app-shell.drawer-open .sidebar-account {
     animation-name: drawer-item-rtl;
   }
 
-  .app-shell.drawer-open .sidebar-top {
+  .app-shell.drawer-open .sidebar-top,
+  .app-shell.drawer-open .panel-back,
+  .app-shell.drawer-open .panel-title {
     animation-delay: 60ms;
   }
-  .app-shell.drawer-open .sidebar-nav > .nav-group:nth-child(1) {
+  .app-shell.drawer-open .nav-flat > li:nth-child(1) {
     animation-delay: 110ms;
   }
-  .app-shell.drawer-open .sidebar-nav > .nav-group:nth-child(2) {
+  .app-shell.drawer-open .nav-flat > li:nth-child(2) {
     animation-delay: 150ms;
   }
-  .app-shell.drawer-open .sidebar-nav > .nav-group:nth-child(3) {
+  .app-shell.drawer-open .nav-flat > li:nth-child(3) {
     animation-delay: 190ms;
   }
-  .app-shell.drawer-open .sidebar-nav > .nav-group:nth-child(4) {
+  .app-shell.drawer-open .nav-flat > li:nth-child(4) {
     animation-delay: 230ms;
   }
-  .app-shell.drawer-open .sidebar-nav > .nav-group:nth-child(n + 5) {
+  .app-shell.drawer-open .nav-flat > li:nth-child(n + 5) {
     animation-delay: 270ms;
   }
   .app-shell.drawer-open .sidebar-account {
