@@ -43,5 +43,26 @@
     "saveEdit": "Save supplier",
     "addSubmit": "Add supplier",
     "added": "Added \"{{name}}\"."
+  },
+  "balance": {
+    "title": "Cafe balance",
+    "current": "Current balance",
+    "inDebt": "In debt",
+    "kind": "Transaction type",
+    "kinds": {
+      "topup": "Top-up",
+      "refund": "Refund",
+      "adjustment": "Adjustment",
+      "charge": "Charge"
+    },
+    "amount": "Amount (Toman)",
+    "amountHint": "Whole Toman; for an adjustment include the sign (e.g. -5000).",
+    "note": "Note (optional)",
+    "submit": "Record",
+    "saved": "Recorded; new balance: {{balance}}",
+    "when": "When",
+    "kindCol": "Type",
+    "after": "Balance after",
+    "truncated": "Only the last 100 transactions are shown."
   }
 }

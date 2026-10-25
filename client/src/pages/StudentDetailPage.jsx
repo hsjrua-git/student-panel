@@ -21,6 +21,7 @@ import StudentFieldsSection from '../components/StudentFieldsSection.jsx';
 import StudentGroupsSection from '../components/StudentGroupsSection.jsx';
 import StudentIdentitySection from '../components/StudentIdentitySection.jsx';
 import StudentEvaluateSection from '../components/StudentEvaluateSection.jsx';
+import StudentBalanceSection from '../components/StudentBalanceSection.jsx';
 import { historyCsvRows } from '../lib/exports.js';
 
 // Tab ids double as the stored preference value ('overview' / 'period' /
@@ -212,6 +213,7 @@ function StudentDetailPage() {
       <StudentFieldsSection student={student} />
       <StudentGroupsSection student={student} />
       <StudentEvaluateSection student={student} />
+      {can('cafe.balance') && <StudentBalanceSection student={student} />}
 
       {canViewHistory && (
         <section className="section-card">

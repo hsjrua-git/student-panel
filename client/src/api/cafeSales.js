@@ -50,3 +50,14 @@ export async function searchCafeStudents(search) {
 export function getStudentBalance(studentId) {
   return request(`/api/cafe/balances/${encodeURIComponent(studentId)}`);
 }
+
+// A manual balance event (top-up / refund / signed adjustment); resolves to
+// `{ balanceAfter }`. Needs `cafe.balance`.
+export function recordBalanceEvent({ studentId, kind, amount, note }) {
+  const body = { studentId, kind, amount };
+  if (note !== undefined) body.note = note;
+  return request('/api/cafe/balances', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
