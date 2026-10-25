@@ -35,6 +35,8 @@ import {
   CoffeeIcon,
   CartIcon,
   TruckIcon,
+  BoxIcon,
+  BarsIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
@@ -54,6 +56,8 @@ export const ROUTE_PERMISSIONS = {
   '/cafe': 'cafe.view',
   '/cafe/products': 'cafe.view',
   '/cafe/purchases': 'cafe.supplies',
+  '/cafe/inventory': 'cafe.view',
+  '/cafe/reports': 'cafe.view',
   '/settings': 'settings.manage',
   '/users': 'users.manage',
   '/roles': 'roles.manage',
@@ -90,6 +94,8 @@ export const NAV_SECTIONS = [
       { to: '/cafe', key: 'sales', icon: CartIcon },
       { to: '/cafe/products', key: 'products', icon: CoffeeIcon },
       { to: '/cafe/purchases', key: 'purchases', icon: TruckIcon },
+      { to: '/cafe/inventory', key: 'inventory', icon: BoxIcon },
+      { to: '/cafe/reports', key: 'reports', icon: BarsIcon },
     ],
   },
   {

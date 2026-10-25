@@ -216,6 +216,23 @@ namespace in BOTH `client/src/i18n/{fa,en}/errors.json`.
 - `audit.js` — read the audit log (filter by category/actor, paginated); writes
   come from `middleware/audit.js` + `lib/audit.js` (+ `lib/auditRules.js` which
   redacts secret-like keys and decides what is recorded).
+- `cafe*.js` — the cafe module. Money is **bigint Toman** everywhere;
+  quantities `numeric(12,3)`. `cafe_products`/`cafe_suppliers` (022,
+  deactivate-not-delete); purchases + an **append-only** `cafe_stock_movements`
+  ledger (023, UPDATE/DELETE refused by trigger; stock = SUM(qty); the
+  moving-average `avg_cost` is maintained transactionally by
+  `lib/cafeStock.js`); sales + prepaid `student_balances` with
+  **overdraft allowed** (024 — a charge may push the balance negative; the
+  `student_balance_transactions` history keeps `balance_after` so it replays;
+  sales VOID — stock back, balance refunded — never delete, see
+  `lib/cafeSale.js`/`lib/cafeBalance.js`); waste (valued at avg cost) and
+  sign-carrying adjustments (`cafeInventory.js`); aggregates in
+  `lib/cafeReports.js`. Permissions `cafe.view/sell/balance/supplies/
+  inventory/manage` (each → `cafe.view`); `cafe.sell` deliberately needs no
+  `students.view` — the POS sees only name/code/balance via
+  `/api/cafe/balances/students` (the blind-entry precedent). All money-moving
+  writes are single transactions audited in-route; rolled-back live smokes in
+  `src/scripts/cafe*Smoke.mjs` cover the ledger math.
 
 ### Scripts and tests
 

@@ -260,6 +260,25 @@ export function TruckIcon(props) {
   );
 }
 
+// Stacked boxes: the stockroom.
+export function BoxIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 3.2 20 7v10l-8 3.8L4 17V7z" />
+      <path d="M4 7l8 3.8L20 7M12 10.8V20.8" />
+    </Svg>
+  );
+}
+
+// Rising bars: cafe reports.
+export function BarsIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </Svg>
+  );
+}
+
 // A shield with a check: roles/permissions.
 export function RolesIcon(props) {
   return (

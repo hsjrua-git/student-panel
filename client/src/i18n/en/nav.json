@@ -17,6 +17,8 @@
     "sessions": "Sessions",
     "products": "Products",
     "purchases": "Purchases",
+    "inventory": "Inventory",
+    "reports": "Reports",
     "sales": "Sales",
     "parameters": "Parameters",
     "groups": "Groups",

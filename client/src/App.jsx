@@ -51,6 +51,8 @@ const SessionsPage = lazyWithReload(() => import('./pages/SessionsPage.jsx'));
 const CafeProductsPage = lazyWithReload(() => import('./pages/CafeProductsPage.jsx'));
 const CafeSalesPage = lazyWithReload(() => import('./pages/CafeSalesPage.jsx'));
 const CafePurchasesPage = lazyWithReload(() => import('./pages/CafePurchasesPage.jsx'));
+const CafeInventoryPage = lazyWithReload(() => import('./pages/CafeInventoryPage.jsx'));
+const CafeReportsPage = lazyWithReload(() => import('./pages/CafeReportsPage.jsx'));
 const PreferencesPage = lazyWithReload(() => import('./pages/PreferencesPage.jsx'));
 const SettingsPage = lazyWithReload(() => import('./pages/SettingsPage.jsx'));
 const ChangePasswordPage = lazyWithReload(() => import('./pages/ChangePasswordPage.jsx'));
@@ -82,6 +84,8 @@ const ROUTE_PRELOADS = [
   ['/cafe', CafeSalesPage],
   ['/cafe/products', CafeProductsPage],
   ['/cafe/purchases', CafePurchasesPage],
+  ['/cafe/inventory', CafeInventoryPage],
+  ['/cafe/reports', CafeReportsPage],
   ['/preferences', PreferencesPage],
   ['/settings', SettingsPage],
   ['/change-password', ChangePasswordPage],
@@ -614,6 +618,8 @@ function AnimatedRoutes() {
             <Route path="/cafe" element={<CafeSalesPage />} />
             <Route path="/cafe/products" element={<CafeProductsPage />} />
             <Route path="/cafe/purchases" element={<CafePurchasesPage />} />
+            <Route path="/cafe/inventory" element={<CafeInventoryPage />} />
+            <Route path="/cafe/reports" element={<CafeReportsPage />} />
             <Route path="/preferences" element={<PreferencesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
