@@ -259,6 +259,11 @@ namespace in BOTH `client/src/i18n/{fa,en}/errors.json`.
   deactivating a mapping pauses that event and the cafe keeps working
   standalone. Live rolled-back smoke: `src/scripts/accountingSmoke.mjs`.
 
+- `docs/voice-agent-architecture.md` — the approved design for a
+  fully-local Persian voice agent over the existing API (machine users,
+  confirmation protocol, staged rollout). No code depends on it yet; read
+  it before any kiosk work.
+
 ### Scripts and tests
 
 - `scripts/createUser.js`, `scripts/seedSample.js`.

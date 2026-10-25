@@ -30,7 +30,26 @@ by configurable roles built from fine-grained permissions.
   number, date, yes/no, choice). A field can be marked *restricted*, in which
   case its values are only shown to people allowed to see restricted fields.
 - **Roles & permissions** — build your own roles from a fixed catalogue of
-  permission keys. Three roles ship by default: Viewer, Staff, Administrator.
+  permission keys. Four roles ship by default: Viewer, Staff, Accountant,
+  Administrator.
+- **Bilingual, Persian-first** — the whole interface is Persian/English
+  (Persian default) with RTL layout and both Jalali and Gregorian calendars
+  side by side; dates are entered in either calendar and stored as ISO.
+- **Teaching** — teachers, recurring assignments (every N days/months),
+  generated sessions with move/cancel/archive, session tasks and reusable
+  task templates, and unconfirmed-session alerts surfaced on the dashboard.
+- **Cafe** — products and suppliers, purchases feeding an append-only stock
+  ledger with a moving-average cost, a point-of-sale for walk-in and
+  student sales, prepaid student balances (overdraft allowed by design,
+  full transaction history), waste/adjustments, and sales/stock reports.
+- **Accounting** — a simplified accrual chart of accounts, a double-entry
+  journal whose balance rule is enforced by the database, fiscal periods
+  with an automatic closing entry, trial balance / ledger / income
+  statement / balance sheet, and automatic posting of cafe events through
+  an editable mapping table.
+- **Voice agent (design)** — a fully-local, Persian-speaking kiosk agent is
+  designed for the cafe counter; see
+  [docs/voice-agent-architecture.md](docs/voice-agent-architecture.md).
 
 ## Roles and permissions
 
