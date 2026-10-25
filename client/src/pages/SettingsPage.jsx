@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { setPeriodAnchor } from '../api/periods.js';
+import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import { usePeriods } from '../lib/usePeriods.js';
 import { useAuth } from '../auth/AuthContext.jsx';
@@ -76,11 +77,10 @@ function AnchorForm({ savedAnchor }) {
     <form onSubmit={handleSubmit}>
       <label htmlFor="anchorDate">{t('settings.anchorLabel')}</label>
       <div className="row">
-        <input
+        <JalaliDatePicker
           id="anchorDate"
-          type="date"
           value={anchorDate}
-          onChange={(event) => setAnchorDate(event.target.value)}
+          onChange={setAnchorDate}
         />
         <button type="submit" disabled={mutation.isPending}>
           {mutation.isPending

@@ -9,6 +9,23 @@ import { formatDateTime, formatStudentCode } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { errorMessage } from '../i18n/errors.js';
 
+// Renders the action sentence from describeAudit's translation-ready
+// segments: each resolves against admin:audit.actions.*, joined by the
+// locale's joiner (', ' / '، '). The raw action code is the defaultValue, so
+// an action the locale files do not know yet shows its code, never a key.
+function ActionText({ entry }) {
+  const { t } = useTranslation(['admin', 'common']);
+  return describeAudit(entry).map((segment, index) => (
+    <span key={index}>
+      {index > 0 && t('audit.joiner')}
+      {t(`audit.actions.${segment.key}`, {
+        defaultValue: segment.key,
+        ...segment.params,
+      })}
+    </span>
+  ));
+}
+
 function Details({ entry }) {
   const { t } = useTranslation(['admin', 'common']);
   const details = entry.details ?? {};
@@ -148,7 +165,7 @@ function AuditPage() {
                     <td className="nowrap">{formatDateTime(entry.occurredAt)}</td>
                     <td>{entry.actor}</td>
                     <td>
-                      {describeAudit(entry)}
+                      <ActionText entry={entry} />
                       <details className="audit-details">
                         <summary>{t('audit.details')}</summary>
                         <Details entry={entry} />

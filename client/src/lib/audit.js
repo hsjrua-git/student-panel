@@ -1,24 +1,33 @@
-import { formatStudentCode } from './format.js';
+import { formatIsoDate, formatStudentCode } from './format.js';
 
 export const CATEGORY_OPTIONS = [
-  { value: '', label: 'Everything' },
-  { value: 'scores', label: 'Scores' },
-  { value: 'student', label: 'Students' },
-  { value: 'parameter', label: 'Parameters' },
-  { value: 'parameter_change', label: 'Parameter changes' },
-  { value: 'settings', label: 'Settings' },
-  { value: 'user', label: 'Users' },
-  { value: 'role', label: 'Roles' },
-  { value: 'group', label: 'Groups' },
-  { value: 'field', label: 'Custom fields' },
-  { value: 'auth', label: 'Sign-in and passwords' },
-  { value: 'api', label: 'Other changes' },
+  { value: '' },
+  { value: 'scores' },
+  { value: 'student' },
+  { value: 'parameter' },
+  { value: 'parameter_change' },
+  { value: 'settings' },
+  { value: 'user' },
+  { value: 'role' },
+  { value: 'group' },
+  { value: 'field' },
+  { value: 'auth' },
+  { value: 'api' },
 ];
 
 function withCode(code) {
   return code ? ` (${formatStudentCode(code)})` : '';
 }
 
+// Turns one audit entry into translation-ready segments: { key, params }
+// pairs resolved against the admin namespace's audit.actions.* keys at the
+// render site (AuditPage). The page falls back to the raw action code when
+// a key is missing, so actions this switch does not know about — and future
+// ones the server adds — never render a bare translation key. Action codes
+// and detail fields are data and stay untranslated; only the sentence
+// templates live in the locale files. Most actions are a single segment;
+// composite ones (a save with an override, a user update touching several
+// fields) return several, joined by the translated audit.joiner.
 export function describeAudit(entry) {
   const details = entry.details ?? {};
   const result = details.result ?? {};
@@ -26,100 +35,238 @@ export function describeAudit(entry) {
 
   switch (entry.action) {
     case 'student.create':
-      return `Added student ${result.fullName ?? request.fullName ?? ''}${withCode(result.studentCode)}`.trim();
+      return [
+        {
+          key: 'student.create',
+          params: {
+            name: result.fullName ?? request.fullName ?? '',
+            code: withCode(result.studentCode),
+          },
+        },
+      ];
     case 'student.update':
-      return `Renamed student to ${result.fullName ?? request.fullName ?? '?'}${withCode(result.studentCode)}`;
+      return [
+        {
+          key: 'student.update',
+          params: {
+            name: result.fullName ?? request.fullName ?? '?',
+            code: withCode(result.studentCode),
+          },
+        },
+      ];
     case 'student.delete':
       return entry.studentName
-        ? `Deleted student ${entry.studentName}${withCode(entry.studentCode)}`
-        : 'Deleted a student';
+        ? [
+            {
+              key: 'student.deleteNamed',
+              params: {
+                name: entry.studentName,
+                code: withCode(entry.studentCode),
+              },
+            },
+          ]
+        : [{ key: 'student.deleteUnnamed' }];
     case 'parameter.create':
-      return `Added parameter ${result.name ?? request.name ?? '?'}, used from Period ${request.startPeriod ?? '?'} on`;
+      return [
+        {
+          key: 'parameter.create',
+          params: {
+            name: result.name ?? request.name ?? '?',
+            period: request.startPeriod ?? '?',
+          },
+        },
+      ];
     case 'parameter.update':
-      return `Edited parameter ${entry.parameterName ?? result.name ?? 'a parameter'}`;
+      return [
+        {
+          key: 'parameter.update',
+          params: { name: entry.parameterName ?? result.name ?? '?' },
+        },
+      ];
     case 'parameter_change.create': {
-      const name = entry.changeParameterName ?? 'a parameter';
-      const verb = result.action === 'add' ? 'Added' : 'Removed';
-      const where =
-        result.scope === 'this_period_only'
-          ? 'for this period only'
-          : 'from this period on';
-      return `${verb} ${name} ${where}, Period ${result.periodNumber ?? '?'}`;
+      const name = entry.changeParameterName ?? '?';
+      const verb = result.action === 'add' ? 'add' : 'remove';
+      const scope =
+        result.scope === 'this_period_only' ? 'thisPeriod' : 'fromHereOn';
+      return [
+        {
+          key: `parameter_change.create.${verb}.${scope}`,
+          params: { name, periodNumber: result.periodNumber ?? '?' },
+        },
+      ];
     }
     case 'parameter_change.delete':
-      return 'Undid a parameter change';
-    case 'settings.period_anchor':
-      return `Set the period start date to ${result.anchorDate ?? request.anchorDate ?? '?'}`;
+      return [{ key: 'parameter_change.delete' }];
+    case 'settings.period_anchor': {
+      const anchor = result.anchorDate ?? request.anchorDate;
+      return [
+        {
+          key: 'settings.period_anchor',
+          params: { date: anchor ? formatIsoDate(anchor) : '?' },
+        },
+      ];
+    }
     case 'scores.save': {
       const count = details.count ?? 0;
-      const noun = `score${count === 1 ? '' : 's'}`;
-      const base =
-        details.source === 'import'
-          ? `Imported ${count} ${noun} from a file into Period ${details.periodNumber ?? '?'}`
-          : `Saved ${count} ${noun} in Period ${details.periodNumber ?? '?'}`;
-      return details.overrideReason
-        ? `${base}, including locked scores changed with an override: "${details.overrideReason}"`
-        : base;
+      const segments = [
+        {
+          key:
+            details.source === 'import'
+              ? 'scores.save.imported'
+              : 'scores.save.saved',
+          params: { count, periodNumber: details.periodNumber ?? '?' },
+        },
+      ];
+      if (details.overrideReason) {
+        segments.push({
+          key: 'scores.save.overrideSuffix',
+          params: { reason: details.overrideReason },
+        });
+      }
+      return segments;
     }
     case 'auth.login':
-      return 'Signed in';
+      return [{ key: 'auth.login' }];
     case 'auth.login_failed':
-      return `Failed sign-in attempt for "${details.attemptedUsername ?? '?'}"`;
+      return [
+        {
+          key: 'auth.login_failed',
+          params: { username: details.attemptedUsername ?? '?' },
+        },
+      ];
     case 'auth.logout':
-      return 'Signed out';
+      return [{ key: 'auth.logout' }];
     case 'auth.password_change':
-      return 'Changed their password';
+      return [{ key: 'auth.password_change' }];
     case 'api.change':
-      return `${details.method ?? ''} ${details.path ?? ''}`.trim();
+      return [
+        {
+          key: 'api.change',
+          params: { method: details.method ?? '', path: details.path ?? '' },
+        },
+      ];
     case 'user.create':
-      return `Created ${details.role ?? ''} account "${details.username ?? '?'}" (${details.fullName ?? ''})`;
+      return [
+        {
+          key: 'user.create',
+          params: {
+            role: details.role ?? '',
+            username: details.username ?? '?',
+            fullName: details.fullName ?? '',
+          },
+        },
+      ];
     case 'user.update': {
       const changes = details.changes ?? {};
-      const parts = [];
-      if (changes.role) parts.push(`role ${changes.role.from} → ${changes.role.to}`);
-      if (changes.isActive) {
-        parts.push(changes.isActive.to ? 'reactivated' : 'deactivated');
+      const segments = [
+        { key: 'user.update', params: { username: details.username ?? '?' } },
+      ];
+      if (changes.role) {
+        segments.push({
+          key: 'user.updateRole',
+          params: { from: changes.role.from, to: changes.role.to },
+        });
       }
-      if (changes.fullName) parts.push(`renamed to ${changes.fullName.to}`);
-      return `Updated user "${details.username ?? '?'}": ${parts.join(', ') || 'no changes'}`;
+      if (changes.isActive) {
+        segments.push({
+          key: changes.isActive.to
+            ? 'user.updateReactivated'
+            : 'user.updateDeactivated',
+        });
+      }
+      if (changes.fullName) {
+        segments.push({
+          key: 'user.updateRenamed',
+          params: { name: changes.fullName.to },
+        });
+      }
+      if (segments.length === 1) segments.push({ key: 'user.updateNone' });
+      return segments;
     }
     case 'user.password_reset':
-      return `Reset the password of "${details.username ?? '?'}"`;
+      return [
+        {
+          key: 'user.password_reset',
+          params: { username: details.username ?? '?' },
+        },
+      ];
     case 'role.create':
-      return `Created role "${details.name ?? '?'}"`;
+      return [{ key: 'role.create', params: { name: details.name ?? '?' } }];
     case 'role.update':
       return details.renamedFrom
-        ? `Renamed role "${details.renamedFrom}" to "${details.name ?? '?'}"`
-        : `Updated role "${details.name ?? '?'}"`;
+        ? [
+            {
+              key: 'role.updateRenamed',
+              params: { from: details.renamedFrom, name: details.name ?? '?' },
+            },
+          ]
+        : [{ key: 'role.update', params: { name: details.name ?? '?' } }];
     case 'role.delete':
-      return `Deleted role "${details.name ?? '?'}"`;
+      return [{ key: 'role.delete', params: { name: details.name ?? '?' } }];
     case 'group.create':
-      return `Created group "${details.name ?? '?'}"`;
+      return [{ key: 'group.create', params: { name: details.name ?? '?' } }];
     case 'group.update':
-      return `Updated group "${details.name ?? '?'}"`;
+      return [{ key: 'group.update', params: { name: details.name ?? '?' } }];
     case 'group.archive':
-      return `Archived group "${details.name ?? '?'}"`;
+      return [{ key: 'group.archive', params: { name: details.name ?? '?' } }];
     case 'group.members': {
-      const parts = [];
-      if (details.added) parts.push(`added ${details.added}`);
-      if (details.removed) parts.push(`removed ${details.removed}`);
-      return `Group "${details.name ?? '?'}" members: ${parts.join(', ') || 'no change'}`;
+      const name = details.name ?? '?';
+      const segments = [{ key: 'group.members', params: { name } }];
+      if (details.added) {
+        segments.push({
+          key: 'group.membersAdded',
+          params: { count: details.added },
+        });
+      }
+      if (details.removed) {
+        segments.push({
+          key: 'group.membersRemoved',
+          params: { count: details.removed },
+        });
+      }
+      return segments.length > 1
+        ? segments
+        : [{ key: 'group.membersNone', params: { name } }];
     }
     case 'field.create':
-      return `Added custom field "${details.label ?? '?'}"`;
+      return [{ key: 'field.create', params: { label: details.label ?? '?' } }];
     case 'field.update':
-      return `Updated custom field "${details.label ?? '?'}"`;
+      return [{ key: 'field.update', params: { label: details.label ?? '?' } }];
     case 'field.archive':
-      return `Archived custom field "${details.label ?? '?'}"`;
+      return [{ key: 'field.archive', params: { label: details.label ?? '?' } }];
     case 'student.import': {
       const count = details.count ?? 0;
       const skipped = details.skipped ?? 0;
-      const base = `Imported ${count} student${count === 1 ? '' : 's'} from a file`;
-      return skipped > 0
-        ? `${base} (${skipped} row${skipped === 1 ? '' : 's'} skipped)`
-        : base;
+      const segments = [{ key: 'student.import', params: { count } }];
+      if (skipped > 0) {
+        segments.push({
+          key: 'student.importSkipped',
+          params: { count: skipped },
+        });
+      }
+      return segments;
     }
+    case 'session.generate':
+      return [
+        {
+          key: 'session.generate',
+          params: {
+            count: details.created ?? 0,
+            until: details.until ? formatIsoDate(details.until) : '?',
+          },
+        },
+      ];
+    case 'alert.scan':
+      return [
+        {
+          key: 'alert.scan',
+          params: {
+            raised: details.raised ?? 0,
+            resolved: details.resolved ?? 0,
+          },
+        },
+      ];
     default:
-      return entry.action;
+      return [{ key: entry.action }];
   }
 }

@@ -12,6 +12,7 @@ import {
 import { cubeValues } from '../lib/cube.js';
 import { distribution } from '../lib/dashboard.js';
 import { CHART_TOOLTIP } from '../lib/chartTheme.js';
+import { useLocale } from '../lib/locale.js';
 
 // How many students scored in each band of a parameter's range, for one period.
 // Single-series, so it keeps the base brand bar colour (no series class). Bins
@@ -19,6 +20,7 @@ import { CHART_TOOLTIP } from '../lib/chartTheme.js';
 // values so the chart agrees with the exported data.
 function DistributionChart({ cube, parameterId, periodNumber }) {
   const { t } = useTranslation(['reports', 'common']);
+  const { isRtl } = useLocale();
   const parameter = useMemo(
     () =>
       cube.parameters.find((item) => item.id === parameterId) ??
@@ -49,11 +51,16 @@ function DistributionChart({ cube, parameterId, periodNumber }) {
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={bins} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="label" tick={{ fill: 'currentColor', fontSize: 12 }} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: 'currentColor', fontSize: 12 }}
+            reversed={isRtl}
+          />
           <YAxis
             allowDecimals={false}
             tick={{ fill: 'currentColor', fontSize: 12 }}
             width={40}
+            orientation={isRtl ? 'right' : 'left'}
           />
           <Tooltip {...CHART_TOOLTIP} cursor={false} />
           <Bar

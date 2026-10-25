@@ -60,6 +60,8 @@ Two independently-installed packages:
 - `@tanstack/react-query@^5` — all server state (fetching/caching/mutations).
 - `recharts@^3` — dashboard charts (lazy-loaded into a `charts` chunk).
 - `papaparse@^5` — CSV parsing for the import pages.
+- `i18next@^26` + `react-i18next@^17` — bilingual UI (Persian default,
+  `fa`/`en`), and `jalaali-js` for typed Jalali date entry.
 - Build/dev: `vite@^8` (`@vitejs/plugin-react`). Tests: `vitest@^5` +
   `@testing-library/react` + `jsdom`. Lint: `eslint@^10` (flat config) with
   `react-hooks` and `react-refresh` plugins.
@@ -182,6 +184,13 @@ Boots the app and wires middleware **in this order** (order matters):
 
 ### Feature routers (`routes/`) and their permission policies
 
+Every error response carries a stable machine-readable `code` (UPPER_SNAKE,
+e.g. `VALIDATION_TOO_LONG` with `params: { max }`) next to its unchanged
+message — validation modules return `{ error, code, params? }` and routes
+forward them; the client translates by code and falls back to the message.
+When adding an error, pick or coin a code and add it to the `errors`
+namespace in BOTH `client/src/i18n/{fa,en}/errors.json`.
+
 - `auth.js` — `POST /login` (argon2 verify, dummy-hash on miss to equalize
   timing, rate-limited, `session.regenerate` on success), `POST /logout`,
   `GET /me`, `POST /change-password` (requires current password; wipes other
@@ -231,7 +240,27 @@ Boots the app and wires middleware **in this order** (order matters):
   `user`, `isLoading`, `loadError`, `can(key)`, `login`, `logout`. `user` comes
   from `GET /api/auth/me` (query key `['me']`).
 - `preferences/` — same split (`PreferencesProvider.jsx` + `PreferencesContext.jsx`);
-  per-user preferences (theme, sort, etc.) with optimistic updates.
+  per-user preferences (theme, palette, sort, `language`, etc.) with optimistic
+  updates.
+- `i18n/` — bilingual foundation, **Persian default**. Locale JSON files live in
+  `i18n/{fa,en}/*.json` (one namespace per file: `common`, `nav`, `errors`,
+  plus one per page group) and are auto-registered via `import.meta.glob` —
+  adding translations means dropping in JSON, nothing else. A Vitest parity
+  test keeps both languages' key trees identical. Language state mirrors the
+  theme: a localStorage draft applied at boot (login screen starts Persian),
+  the stored per-user preference once signed in, and `<html lang/dir>` stays
+  in sync (`setLanguage` in `i18n/index.js` is the single switch). Errors
+  render through `errorMessage()` (`i18n/errors.js`), which translates by the
+  server's machine-readable `code` (catalogue in the `errors` namespace) and
+  falls back to the server message. `lib/locale.js` renders Jalali dates via
+  `Intl` (`fa-IR-u-ca-persian`), converts digits both ways, and backs
+  `components/JalaliDatePicker.jsx` (Gregorian + Jalali input side by side;
+  the value stays ISO). `lib/format.js` is locale-aware through it — full
+  dates show BOTH calendars. Vazirmatn (self-hosted, `assets/fonts/`) leads
+  the font stack under `[lang='fa']`; `--font-numeric` stays Manrope-first so
+  tables keep lining Latin digits. The stylesheet uses logical properties
+  (`inline-start/end`, `text-align: start/end`) with explicit `[dir='rtl']`
+  overrides where a transform is physical (drawers).
 
 ### Routing and auth gating — `App.jsx`, `components/RequireAuth.jsx`, `components/Layout.jsx`
 

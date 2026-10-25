@@ -14,6 +14,7 @@ import {
 import { distribution } from '../lib/dashboard.js';
 import { CHART_TOOLTIP } from '../lib/chartTheme.js';
 import { formatChange, formatParameterHint } from '../lib/format.js';
+import { useLocale } from '../lib/locale.js';
 import { CloseIcon } from './icons.jsx';
 import Drawer from './Drawer.jsx';
 
@@ -28,6 +29,7 @@ const MARGIN = { top: 8, right: 8, bottom: 0, left: 0 };
 // returns to the satellite that opened it (handled in the effect's cleanup).
 function DrawerBody({ stat, trend, trendError, titleId, onClose }) {
   const { t } = useTranslation(['reports', 'common']);
+  const { isRtl } = useLocale();
   const gradientId = useId();
   const { parameter } = stat;
   const bins = distribution(stat.values, parameter);
@@ -97,11 +99,17 @@ function DrawerBody({ stat, trend, trendError, titleId, onClose }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={AXIS} interval="preserveStartEnd" />
+              <XAxis
+                dataKey="label"
+                tick={AXIS}
+                interval="preserveStartEnd"
+                reversed={isRtl}
+              />
               <YAxis
                 domain={[parameter.minValue ?? 'auto', parameter.maxValue ?? 'auto']}
                 tick={AXIS}
                 width={32}
+                orientation={isRtl ? 'right' : 'left'}
               />
               <Tooltip {...CHART_TOOLTIP} cursor={{ strokeDasharray: '3 3' }} />
               <Area
@@ -132,8 +140,13 @@ function DrawerBody({ stat, trend, trendError, titleId, onClose }) {
           <ResponsiveContainer width="100%" height={170}>
             <BarChart data={bins} margin={MARGIN}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={AXIS} />
-              <YAxis allowDecimals={false} tick={AXIS} width={28} />
+              <XAxis dataKey="label" tick={AXIS} reversed={isRtl} />
+              <YAxis
+                allowDecimals={false}
+                tick={AXIS}
+                width={28}
+                orientation={isRtl ? 'right' : 'left'}
+              />
               <Tooltip {...CHART_TOOLTIP} />
               <Bar
                 dataKey="count"

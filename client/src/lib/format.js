@@ -1,19 +1,30 @@
+import i18n from '../i18n/index.js';
+import { formatBothDates, formatLocaleShortDate } from './locale.js';
+
+// The whole app renders dates through these formatters, so locale awareness
+// lives HERE rather than at every call site: Persian shows the Jalali date
+// with the Gregorian in brackets (the institution runs on Jalali, the data
+// on Gregorian — both stay visible), English mirrors it. Stored dates are
+// never touched; only the rendering changes.
+function language() {
+  return i18n.resolvedLanguage === 'en' ? 'en' : 'fa';
+}
+
 export function formatStudentCode(code) {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
 export function formatDateTime(isoString) {
-  return new Date(isoString).toLocaleString();
+  const locale = language() === 'fa' ? 'fa-IR-u-ca-persian' : undefined;
+  return new Date(isoString).toLocaleString(locale);
 }
 
 export function formatIsoDate(isoDate) {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatBothDates(isoDate, language());
+}
+
+export function formatShortIsoDate(isoDate) {
+  return formatLocaleShortDate(isoDate, language());
 }
 
 export function toIsoDate(date) {
@@ -24,23 +35,17 @@ export function toIsoDate(date) {
 }
 
 export function describeChange({ scope, action }) {
-  const verb = action === 'add' ? 'Added' : 'Removed';
-  return scope === 'from_here_on'
-    ? `${verb}, from this period on`
-    : `${verb}, this period only`;
+  const verb = action === 'add' ? i18n.t('changes.add') : i18n.t('changes.remove');
+  const tail =
+    scope === 'from_here_on'
+      ? i18n.t('changes.fromHereOn')
+      : i18n.t('changes.thisOnly');
+  return `${verb}${tail}`;
 }
 
 export function formatRange({ minValue, maxValue }) {
   if (minValue === null && maxValue === null) return '—';
-  return `${minValue ?? '…'} to ${maxValue ?? '…'}`;
-}
-
-export function formatShortIsoDate(isoDate) {
-  const [year, month, day] = isoDate.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  });
+  return `${minValue ?? '…'} ${i18n.t('changes.to')} ${maxValue ?? '…'}`;
 }
 
 export function formatParameterHint(parameter) {

@@ -1,11 +1,16 @@
+// Operator labels are NOT here: the select options and the filter chips
+// translate the stable `value` ids through the reports namespace's
+// filterEditor.operators.* keys at render time (lib stays data-only).
+import i18n from '../i18n/index.js';
+
 export const OPERATORS = [
-  { value: 'lt', label: 'is below', symbol: '<', needsValue: true },
-  { value: 'lte', label: 'is at most', symbol: '≤', needsValue: true },
-  { value: 'gt', label: 'is above', symbol: '>', needsValue: true },
-  { value: 'gte', label: 'is at least', symbol: '≥', needsValue: true },
-  { value: 'eq', label: 'equals', symbol: '=', needsValue: true },
-  { value: 'missing', label: 'was not measured', symbol: null, needsValue: false },
-  { value: 'present', label: 'was measured', symbol: null, needsValue: false },
+  { value: 'lt', symbol: '<', needsValue: true },
+  { value: 'lte', symbol: '≤', needsValue: true },
+  { value: 'gt', symbol: '>', needsValue: true },
+  { value: 'gte', symbol: '≥', needsValue: true },
+  { value: 'eq', symbol: '=', needsValue: true },
+  { value: 'missing', symbol: null, needsValue: false },
+  { value: 'present', symbol: null, needsValue: false },
 ];
 
 export const MAX_FILTERS = 10;
@@ -119,11 +124,13 @@ export function changeOf(row, parameterId) {
 }
 
 export function describeFilter(filter, parametersById) {
-  const name = parametersById.get(filter.parameterId)?.name ?? 'Unknown parameter';
+  const name =
+    parametersById.get(filter.parameterId)?.name ??
+    i18n.t('reports:filter.unknownParameter');
   const operator = OPERATOR_BY_VALUE.get(filter.op);
   if (!operator) return name;
   if (operator.needsValue) return `${name} ${operator.symbol} ${filter.value}`;
-  return `${name} ${filter.op === 'missing' ? 'not measured' : 'measured'}`;
+  return `${name} ${i18n.t(`reports:filterEditor.operators.${filter.op}`)}`;
 }
 
 function matchesFilter(row, filter) {

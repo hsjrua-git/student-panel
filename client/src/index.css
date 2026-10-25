@@ -737,6 +737,16 @@ main.auth-screen::before {
   font-size: 0.78rem;
 }
 
+/* The dual-calendar date field: native Gregorian input + Jalali text input,
+   side by side, wrapping when narrow. The Jalali box is dir="ltr" so the
+   yyyy/mm/dd shape reads consistently in both languages. */
+.jalali-date-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 @keyframes auth-card-in {
   from {
     opacity: 0;
@@ -1047,7 +1057,7 @@ table {
 
 th,
 td {
-  text-align: left;
+  text-align: start;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--line);
 }
@@ -1127,7 +1137,7 @@ tr.inactive,
 }
 
 .num {
-  text-align: right;
+  text-align: end;
 }
 
 .nowrap {
@@ -1145,7 +1155,7 @@ tr.inactive,
 }
 
 .actions button + button {
-  margin-left: var(--space-2);
+  margin-inline-start: var(--space-2);
 }
 
 .pager {
@@ -1290,9 +1300,9 @@ tr.inactive,
      a full-height drawer or the fixed rail runs edge to edge. */
   padding-top: calc(1rem + env(safe-area-inset-top));
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
-  padding-left: calc(0.75rem + env(safe-area-inset-left));
+  padding-inline-start: calc(0.75rem + env(safe-area-inset-left));
   background: var(--sidebar-bg);
-  border-right: 1px solid var(--sidebar-edge);
+  border-inline-end: 1px solid var(--sidebar-edge);
   color: var(--sidebar-ink);
 }
 
@@ -1460,11 +1470,14 @@ tr.inactive,
 .nav-link.active::before {
   content: '';
   position: absolute;
-  left: -0.75rem;
+  inset-inline-start: -0.75rem;
   top: 0.35rem;
   bottom: 0.35rem;
   width: 3px;
-  border-radius: 0 3px 3px 0;
+  border-start-start-radius: 0;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  border-end-start-radius: 0;
   background: var(--sidebar-active-bar);
 }
 
@@ -1531,15 +1544,13 @@ tr.inactive,
 }
 
 .nav-collapsed .sidebar {
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
+  padding-inline: 0.5rem;
   align-items: stretch;
 }
 
 .nav-collapsed .sidebar-top {
   justify-content: center;
-  padding-left: 0;
-  padding-right: 0;
+  padding-inline: 0;
 }
 
 .nav-collapsed .brand-name,
@@ -1569,15 +1580,14 @@ tr.inactive,
 }
 
 .nav-collapsed .nav-link.active::before {
-  left: -0.5rem;
+  inset-inline-start: -0.5rem;
 }
 
 /* Collapsed account block: only the avatar and the icon actions remain; the
    name/role text and the label-only Change password link drop away. */
 .nav-collapsed .sidebar-account-id {
   justify-content: center;
-  padding-left: 0;
-  padding-right: 0;
+  padding-inline: 0;
 }
 
 .nav-collapsed .sidebar-account-meta,
@@ -1634,7 +1644,7 @@ tr.inactive,
   font-weight: 620;
   font-size: 1rem;
   color: var(--ink);
-  margin-right: auto;
+  margin-inline-end: auto;
 }
 
 .nav-toggle {
@@ -1765,12 +1775,23 @@ tr.inactive,
   .sidebar {
     position: fixed;
     top: 0;
-    left: 0;
+    inset-inline-start: 0;
     z-index: 60;
     width: min(84vw, var(--sidebar-w));
     transform: translateX(-100%);
     transition: transform var(--t) var(--ease);
     box-shadow: none;
+  }
+
+  /* In RTL the drawer hangs off the inline-start (right) edge, so its hidden
+     position flips sign. The open state must be restated to beat this rule's
+     specificity. */
+  [dir='rtl'] .sidebar {
+    transform: translateX(100%);
+  }
+
+  [dir='rtl'] .app-shell.drawer-open .sidebar {
+    transform: translateX(0);
   }
 
   .app-shell.drawer-open .sidebar {
@@ -1903,7 +1924,7 @@ tr.inactive,
 .stat-card::before {
   content: '';
   position: absolute;
-  left: 0;
+  inset-inline-start: 0;
   top: 0;
   bottom: 0;
   width: 3px;
@@ -2564,7 +2585,7 @@ tr.inactive,
 .param-drawer {
   position: fixed;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   z-index: 90;
   display: flex;
   flex-direction: column;
@@ -2575,7 +2596,7 @@ tr.inactive,
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--surface);
-  border-left: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
   transform: translateX(100%);
   transition: transform var(--t) var(--ease);
 }
@@ -2583,6 +2604,15 @@ tr.inactive,
 .param-drawer.open {
   transform: translateX(0);
   box-shadow: var(--shadow-pop);
+}
+
+/* The slide-over hugs the inline-end edge; in RTL it enters from the left. */
+[dir='rtl'] .param-drawer {
+  transform: translateX(-100%);
+}
+
+[dir='rtl'] .param-drawer.open {
+  transform: translateX(0);
 }
 
 .drawer-head {
@@ -3559,11 +3589,27 @@ html {
   }
 }
 
+/* Same stagger, arriving from the other side when the drawer lives on the
+   right (RTL). Keyframes cannot read direction, so the RTL variant gets its
+   own name and the stagger targets switch to it. */
+@keyframes drawer-item-rtl {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
 @media (max-width: 880px) {
   .app-shell.drawer-open .sidebar-top,
   .app-shell.drawer-open .nav-group,
   .app-shell.drawer-open .sidebar-account {
     animation: drawer-item 440ms var(--ease) both;
+  }
+
+  [dir='rtl'] .app-shell.drawer-open .sidebar-top,
+  [dir='rtl'] .app-shell.drawer-open .nav-group,
+  [dir='rtl'] .app-shell.drawer-open .sidebar-account {
+    animation-name: drawer-item-rtl;
   }
 
   .app-shell.drawer-open .sidebar-top {

@@ -12,10 +12,12 @@ import {
 import { CHART_TOOLTIP } from '../lib/chartTheme.js';
 import { formatChange, formatShortIsoDate } from '../lib/format.js';
 import { buildHistory } from '../lib/history.js';
+import { useLocale } from '../lib/locale.js';
 import { parameterView } from '../lib/views.js';
 
 function ByParameterView({ evaluations, periods, parameters }) {
   const { t } = useTranslation(['reports', 'common']);
+  const { isRtl } = useLocale();
   const [chosenId, setChosenId] = useState(null);
   const gradientId = useId();
 
@@ -104,11 +106,13 @@ function ByParameterView({ evaluations, periods, parameters }) {
                 <XAxis
                   dataKey="label"
                   tick={{ fill: 'currentColor', fontSize: 12 }}
+                  reversed={isRtl}
                 />
                 <YAxis
                   domain={[parameter.minValue ?? 'auto', parameter.maxValue ?? 'auto']}
                   tick={{ fill: 'currentColor', fontSize: 12 }}
                   width={40}
+                  orientation={isRtl ? 'right' : 'left'}
                 />
                 <Tooltip {...CHART_TOOLTIP} cursor={{ strokeDasharray: '3 3' }} />
                 <Area

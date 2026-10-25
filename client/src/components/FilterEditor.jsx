@@ -67,7 +67,7 @@ function FilterRow({ filter, parameters, onChange, onRemove }) {
       >
         {OPERATORS.map((item) => (
           <option key={item.value} value={item.value}>
-            {item.label}
+            {t(`filterEditor.operators.${item.value}`)}
           </option>
         ))}
       </select>

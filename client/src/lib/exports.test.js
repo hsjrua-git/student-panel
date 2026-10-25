@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import i18n from '../i18n/index.js';
 import { buildCube } from './cube.js';
 import {
   cubeLongRows,
@@ -8,6 +9,13 @@ import {
   auditTrailRows,
   cubeJson,
 } from './exports.js';
+
+// The audit trail's category and action text renders through i18next, whose
+// default language is Persian; pin English for these assertions (the fa
+// renderings are covered by src/i18n tests), like format.test.js does.
+beforeAll(() => {
+  i18n.changeLanguage('en');
+});
 
 const parameters = [
   { id: 'speed', name: 'Speed', unit: null, minValue: 0, maxValue: 10 },

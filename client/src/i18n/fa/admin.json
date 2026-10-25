@@ -100,6 +100,124 @@
       "overridden": "قفل بود؛ نادیده گرفته شد",
       "moreChanges_one": "…و {{count}} تغییر دیگر.",
       "moreChanges_other": "…و {{count}} تغییر دیگر."
+    },
+    "joiner": "، ",
+    "actions": {
+      "student": {
+        "create": "دانش‌آموز {{name}} اضافه شد{{code}}",
+        "update": "نام دانش‌آموز به {{name}} تغییر کرد{{code}}",
+        "deleteNamed": "دانش‌آموز {{name}} حذف شد{{code}}",
+        "deleteUnnamed": "یک دانش‌آموز حذف شد",
+        "import_one": "{{count}} دانش‌آموز از یک فایل وارد شد",
+        "import_other": "{{count}} دانش‌آموز از یک فایل وارد شد",
+        "importSkipped_one": "{{count}} ردیف نادیده گرفته شد",
+        "importSkipped_other": "{{count}} ردیف نادیده گرفته شد"
+      },
+      "teacher": {
+        "create": "معلم جدید اضافه شد",
+        "update": "معلم به‌روزرسانی شد",
+        "archive": "معلم بایگانی شد"
+      },
+      "interval": {
+        "create": "بازهٔ جلسات جدید اضافه شد",
+        "update": "بازهٔ جلسات به‌روزرسانی شد",
+        "archive": "بازهٔ جلسات بایگانی شد"
+      },
+      "assignment": {
+        "create": "تخصیص جدید اضافه شد",
+        "update": "تخصیص به‌روزرسانی شد",
+        "archive": "تخصیص بایگانی شد"
+      },
+      "session": {
+        "generate_one": "{{count}} جلسهٔ برنامه‌ریزی‌شده تا {{until}} تولید شد",
+        "generate_other": "{{count}} جلسهٔ برنامه‌ریزی‌شده تا {{until}} تولید شد",
+        "update": "جلسه به‌روزرسانی شد"
+      },
+      "task": {
+        "create": "کار جدید اضافه شد",
+        "update": "کار به‌روزرسانی شد",
+        "delete": "کار حذف شد",
+        "assign_template": "کارها از یک الگو به جلسه اضافه شد"
+      },
+      "task_template": {
+        "create": "الگوی کار جدید اضافه شد",
+        "update": "الگوی کار به‌روزرسانی شد",
+        "archive": "الگوی کار بایگانی شد"
+      },
+      "alert": {
+        "scan": "پویش جلسات: {{raised}} هشدار جدید ثبت و {{resolved}} هشدار رفع شد",
+        "update": "هشدار به‌روزرسانی شد"
+      },
+      "parameter": {
+        "create": "شاخص {{name}} اضافه شد؛ استفاده از دوره {{period}} به بعد",
+        "update": "شاخص {{name}} ویرایش شد"
+      },
+      "parameter_change": {
+        "create": {
+          "add": {
+            "thisPeriod": "{{name}} فقط برای همین دوره اضافه شد (دوره {{periodNumber}})",
+            "fromHereOn": "{{name}} از این دوره به بعد اضافه شد (دوره {{periodNumber}})"
+          },
+          "remove": {
+            "thisPeriod": "{{name}} فقط برای همین دوره حذف شد (دوره {{periodNumber}})",
+            "fromHereOn": "{{name}} از این دوره به بعد حذف شد (دوره {{periodNumber}})"
+          }
+        },
+        "delete": "یک تغییر شاخص بازگردانده شد"
+      },
+      "settings": {
+        "period_anchor": "تاریخ مبدأ دوره‌ها به {{date}} تنظیم شد"
+      },
+      "scores": {
+        "save": {
+          "saved_one": "{{count}} نمره در دوره {{periodNumber}} ذخیره شد",
+          "saved_other": "{{count}} نمره در دوره {{periodNumber}} ذخیره شد",
+          "imported_one": "{{count}} نمره از یک فایل وارد دوره {{periodNumber}} شد",
+          "imported_other": "{{count}} نمره از یک فایل وارد دوره {{periodNumber}} شد",
+          "overrideSuffix": "شامل نمره‌های قفل‌شده‌ای که با نادیده‌گرفتن قفل تغییر کرده‌اند: «{{reason}}»"
+        }
+      },
+      "auth": {
+        "login": "وارد شد",
+        "login_failed": "تلاش ناموفق برای ورود با نام کاربری «{{username}}»",
+        "logout": "خارج شد",
+        "password_change": "گذرواژهٔ خود را تغییر داد"
+      },
+      "api": {
+        "change": "{{method}} {{path}}"
+      },
+      "user": {
+        "create": "حساب کاربری {{role}} برای «{{username}}» ساخته شد ({{fullName}})",
+        "update": "کاربر «{{username}}» به‌روزرسانی شد",
+        "updateRole": "نقش از {{from}} به {{to}} تغییر کرد",
+        "updateReactivated": "فعال شد",
+        "updateDeactivated": "غیرفعال شد",
+        "updateRenamed": "نام به {{name}} تغییر کرد",
+        "updateNone": "بدون تغییر",
+        "password_reset": "گذرواژهٔ «{{username}}» بازنشانی شد"
+      },
+      "role": {
+        "create": "نقش «{{name}}» ساخته شد",
+        "update": "نقش «{{name}}» به‌روزرسانی شد",
+        "updateRenamed": "نام نقش «{{from}}» به «{{name}}» تغییر کرد",
+        "delete": "نقش «{{name}}» حذف شد"
+      },
+      "group": {
+        "create": "گروه «{{name}}» ساخته شد",
+        "update": "گروه «{{name}}» به‌روزرسانی شد",
+        "archive": "گروه «{{name}}» بایگانی شد",
+        "members": "اعضای گروه «{{name}}»",
+        "membersAdded_one": "{{count}} نفر اضافه شد",
+        "membersAdded_other": "{{count}} نفر اضافه شد",
+        "membersRemoved_one": "{{count}} نفر حذف شد",
+        "membersRemoved_other": "{{count}} نفر حذف شد",
+        "membersNone": "اعضای گروه «{{name}}»: بدون تغییر"
+      },
+      "field": {
+        "create": "فیلد سفارشی «{{label}}» اضافه شد",
+        "update": "فیلد سفارشی «{{label}}» به‌روزرسانی شد",
+        "archive": "فیلد سفارشی «{{label}}» بایگانی شد"
+      }
     }
   },
   "settings": {

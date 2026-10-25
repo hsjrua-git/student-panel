@@ -17,6 +17,7 @@ import { listStudents } from '../api/students.js';
 import { listTeachers } from '../api/teachers.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { errorMessage } from '../i18n/errors.js';
@@ -179,11 +180,10 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
       </select>
 
       <label htmlFor="assignment-anchor">{t('schedule.form.anchor')}</label>
-      <input
+      <JalaliDatePicker
         id="assignment-anchor"
-        type="date"
         value={anchorDate}
-        onChange={(event) => setAnchorDate(event.target.value)}
+        onChange={setAnchorDate}
         disabled={save.isPending}
       />
 

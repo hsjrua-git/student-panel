@@ -100,6 +100,124 @@
       "overridden": "Locked, overridden",
       "moreChanges_one": "…and {{count}} more change.",
       "moreChanges_other": "…and {{count}} more changes."
+    },
+    "joiner": ", ",
+    "actions": {
+      "student": {
+        "create": "Added student {{name}}{{code}}",
+        "update": "Renamed student to {{name}}{{code}}",
+        "deleteNamed": "Deleted student {{name}}{{code}}",
+        "deleteUnnamed": "Deleted a student",
+        "import_one": "Imported {{count}} student from a file",
+        "import_other": "Imported {{count}} students from a file",
+        "importSkipped_one": "{{count}} row skipped",
+        "importSkipped_other": "{{count}} rows skipped"
+      },
+      "teacher": {
+        "create": "Added a teacher",
+        "update": "Updated a teacher",
+        "archive": "Archived a teacher"
+      },
+      "interval": {
+        "create": "Added a schedule interval",
+        "update": "Updated a schedule interval",
+        "archive": "Archived a schedule interval"
+      },
+      "assignment": {
+        "create": "Added a schedule assignment",
+        "update": "Updated a schedule assignment",
+        "archive": "Archived a schedule assignment"
+      },
+      "session": {
+        "generate_one": "Generated {{count}} planned session up to {{until}}",
+        "generate_other": "Generated {{count}} planned sessions up to {{until}}",
+        "update": "Updated a session"
+      },
+      "task": {
+        "create": "Added a task",
+        "update": "Updated a task",
+        "delete": "Deleted a task",
+        "assign_template": "Added tasks to a session from a template"
+      },
+      "task_template": {
+        "create": "Added a task template",
+        "update": "Updated a task template",
+        "archive": "Archived a task template"
+      },
+      "alert": {
+        "scan": "Scanned sessions: {{raised}} alerts raised, {{resolved}} resolved",
+        "update": "Updated an alert"
+      },
+      "parameter": {
+        "create": "Added parameter {{name}}, used from Period {{period}} on",
+        "update": "Edited parameter {{name}}"
+      },
+      "parameter_change": {
+        "create": {
+          "add": {
+            "thisPeriod": "Added {{name}} for this period only, Period {{periodNumber}}",
+            "fromHereOn": "Added {{name}} from this period on, Period {{periodNumber}}"
+          },
+          "remove": {
+            "thisPeriod": "Removed {{name}} for this period only, Period {{periodNumber}}",
+            "fromHereOn": "Removed {{name}} from this period on, Period {{periodNumber}}"
+          }
+        },
+        "delete": "Undid a parameter change"
+      },
+      "settings": {
+        "period_anchor": "Set the period start date to {{date}}"
+      },
+      "scores": {
+        "save": {
+          "saved_one": "Saved {{count}} score in Period {{periodNumber}}",
+          "saved_other": "Saved {{count}} scores in Period {{periodNumber}}",
+          "imported_one": "Imported {{count}} score from a file into Period {{periodNumber}}",
+          "imported_other": "Imported {{count}} scores from a file into Period {{periodNumber}}",
+          "overrideSuffix": "including locked scores changed with an override: \"{{reason}}\""
+        }
+      },
+      "auth": {
+        "login": "Signed in",
+        "login_failed": "Failed sign-in attempt for \"{{username}}\"",
+        "logout": "Signed out",
+        "password_change": "Changed their password"
+      },
+      "api": {
+        "change": "{{method}} {{path}}"
+      },
+      "user": {
+        "create": "Created {{role}} account \"{{username}}\" ({{fullName}})",
+        "update": "Updated user \"{{username}}\"",
+        "updateRole": "role {{from}} → {{to}}",
+        "updateReactivated": "reactivated",
+        "updateDeactivated": "deactivated",
+        "updateRenamed": "renamed to {{name}}",
+        "updateNone": "no changes",
+        "password_reset": "Reset the password of \"{{username}}\""
+      },
+      "role": {
+        "create": "Created role \"{{name}}\"",
+        "update": "Updated role \"{{name}}\"",
+        "updateRenamed": "Renamed role \"{{from}}\" to \"{{name}}\"",
+        "delete": "Deleted role \"{{name}}\""
+      },
+      "group": {
+        "create": "Created group \"{{name}}\"",
+        "update": "Updated group \"{{name}}\"",
+        "archive": "Archived group \"{{name}}\"",
+        "members": "Group \"{{name}}\" members",
+        "membersAdded_one": "{{count}} added",
+        "membersAdded_other": "{{count}} added",
+        "membersRemoved_one": "{{count}} removed",
+        "membersRemoved_other": "{{count}} removed",
+        "membersNone": "Group \"{{name}}\" members: no change"
+      },
+      "field": {
+        "create": "Added custom field \"{{label}}\"",
+        "update": "Updated custom field \"{{label}}\"",
+        "archive": "Archived custom field \"{{label}}\""
+      }
     }
   },
   "settings": {

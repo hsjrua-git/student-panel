@@ -9,6 +9,7 @@ import {
 } from '../api/teachers.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
 import { formatIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
 import { errorMessage } from '../i18n/errors.js';
@@ -65,11 +66,10 @@ function TeacherForm({ teacher, onDone }) {
       <label htmlFor={isEdit ? `teacher-birth-${teacher.id}` : 'teacher-birth'}>
         {t('teachers.birthDate')}
       </label>
-      <input
+      <JalaliDatePicker
         id={isEdit ? `teacher-birth-${teacher.id}` : 'teacher-birth'}
-        type="date"
         value={birthDate}
-        onChange={(event) => setBirthDate(event.target.value)}
+        onChange={setBirthDate}
         disabled={save.isPending}
       />
 

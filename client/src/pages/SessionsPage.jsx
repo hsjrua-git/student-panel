@@ -21,6 +21,7 @@ import {
 import { listTeachers } from '../api/teachers.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import { errorMessage } from '../i18n/errors.js';
 
@@ -64,11 +65,10 @@ function SessionEditRow({ session, onDone }) {
       <label htmlFor={`moved-${session.id}`}>
         {t('sessions.edit.takesPlaceOn')}
       </label>
-      <input
+      <JalaliDatePicker
         id={`moved-${session.id}`}
-        type="date"
         value={movedTo}
-        onChange={(event) => setMovedTo(event.target.value)}
+        onChange={setMovedTo}
         disabled={save.isPending}
       />
       <p className="hint">
@@ -505,11 +505,10 @@ function SessionsPage() {
             <label htmlFor="generate-until">
               {t('sessions.generate.untilLabel')}
             </label>
-            <input
+            <JalaliDatePicker
               id="generate-until"
-              type="date"
               value={generateUntil}
-              onChange={(event) => setGenerateUntil(event.target.value)}
+              onChange={setGenerateUntil}
             />
             <button
               type="button"
@@ -569,19 +568,9 @@ function SessionsPage() {
       <section className="section-card">
         <div className="toolbar">
           <label htmlFor="sessions-from">{t('sessions.from')}</label>
-          <input
-            id="sessions-from"
-            type="date"
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-          />
+          <JalaliDatePicker id="sessions-from" value={from} onChange={setFrom} />
           <label htmlFor="sessions-to">{t('sessions.to')}</label>
-          <input
-            id="sessions-to"
-            type="date"
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-          />
+          <JalaliDatePicker id="sessions-to" value={to} onChange={setTo} />
           {canPickTeachers && (
             <select
               aria-label={t('sessions.filterTeacher')}

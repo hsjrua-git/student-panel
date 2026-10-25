@@ -1,6 +1,7 @@
 import { buildHistory, visibleRows } from './history.js';
 import { changeOf } from './resultsView.js';
-import { describeAudit, CATEGORY_OPTIONS } from './audit.js';
+import i18n from '../i18n/index.js';
+import { describeAudit } from './audit.js';
 
 // A custom-field value as it should read in a CSV cell.
 function fieldCsvValue(definition, raw) {
@@ -208,12 +209,23 @@ export function trackingLogRows(changes, parametersById = null) {
   return [header, ...body];
 }
 
-const CATEGORY_LABELS = new Map(
-  CATEGORY_OPTIONS.filter((option) => option.value).map((option) => [
-    option.value,
-    option.label,
-  ])
-);
+// Categories and action sentences resolve through the same admin-namespace
+// keys the Audit page renders with, so an exported file reads exactly like
+// the page in either language. Both fall back to the raw code.
+function categoryLabel(value) {
+  return i18n.t(`admin:audit.categories.${value}`, { defaultValue: value });
+}
+
+function auditText(entry) {
+  return describeAudit(entry)
+    .map((segment) =>
+      i18n.t(`admin:audit.actions.${segment.key}`, {
+        defaultValue: segment.key,
+        ...segment.params,
+      })
+    )
+    .join(i18n.t('admin:audit.joiner'));
+}
 
 // The full edit audit trail. `entries` is the shape from GET /api/audit; the
 // human-readable description reuses `describeAudit` so the file reads exactly
@@ -225,9 +237,9 @@ export function auditTrailRows(entries) {
     return [
       entry.occurredAt ?? null,
       entry.actor ?? null,
-      CATEGORY_LABELS.get(category) ?? category,
+      categoryLabel(category),
       entry.action,
-      describeAudit(entry),
+      auditText(entry),
     ];
   });
   return [header, ...body];

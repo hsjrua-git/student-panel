@@ -4,6 +4,7 @@
 // while editing; yes/no is kept as a real boolean. The value <-> `extra`
 // conversion helpers live in ../lib/studentFields.js.
 import { useTranslation } from 'react-i18next';
+import JalaliDatePicker from './JalaliDatePicker.jsx';
 
 function Control({ definition, controlId, value, onChange, disabled }) {
   const { t } = useTranslation(['students', 'common']);
@@ -31,11 +32,11 @@ function Control({ definition, controlId, value, onChange, disabled }) {
       );
     case 'date':
       return (
-        <input
-          {...common}
-          type="date"
+        <JalaliDatePicker
+          id={controlId}
           value={value}
-          onChange={(event) => onChange(definition.id, event.target.value)}
+          onChange={(next) => onChange(definition.id, next)}
+          disabled={disabled}
         />
       );
     case 'yes_no':

@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { cohortAverages } from '../lib/cube.js';
 import { CHART_TOOLTIP, seriesClass } from '../lib/chartTheme.js';
+import { useLocale } from '../lib/locale.js';
 
 // Cohort-average trend over periods: one line per selected parameter, each point
 // the mean of every (filtered) student's value that period. Reads straight from
@@ -20,6 +21,7 @@ import { CHART_TOOLTIP, seriesClass } from '../lib/chartTheme.js';
 // SVG, and a mid-tween capture would freeze half-drawn lines.
 function TrendChart({ cube, parameterIds }) {
   const { t } = useTranslation(['reports', 'common']);
+  const { isRtl } = useLocale();
   const ids = useMemo(() => new Set(parameterIds), [parameterIds]);
   const params = useMemo(
     () => cube.parameters.filter((parameter) => ids.has(parameter.id)),
@@ -50,8 +52,16 @@ function TrendChart({ cube, parameterIds }) {
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="label" tick={{ fill: 'currentColor', fontSize: 12 }} />
-          <YAxis tick={{ fill: 'currentColor', fontSize: 12 }} width={40} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: 'currentColor', fontSize: 12 }}
+            reversed={isRtl}
+          />
+          <YAxis
+            tick={{ fill: 'currentColor', fontSize: 12 }}
+            width={40}
+            orientation={isRtl ? 'right' : 'left'}
+          />
           <Tooltip {...CHART_TOOLTIP} cursor={{ strokeDasharray: '3 3' }} />
           <Legend />
           {params.map((parameter, index) => (

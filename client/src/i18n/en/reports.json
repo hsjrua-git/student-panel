@@ -121,6 +121,17 @@
     "add": "Add filter",
     "max": "Maximum of {{count}} filters."
   },
+  "filterEditor": {
+    "operators": {
+      "lt": "is below",
+      "lte": "is at most",
+      "gt": "is above",
+      "gte": "is at least",
+      "eq": "equals",
+      "missing": "was not measured",
+      "present": "was measured"
+    }
+  },
   "includePicker": {
     "legend": "Include",
     "dataLabel": "Scores (data)",

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import i18n from '../i18n/index.js';
 import {
   applyView,
   changeOf,
@@ -9,6 +10,13 @@ import {
   toggleColumn,
   toggleSort,
 } from './resultsView.js';
+
+// describeFilter renders the valueless operators through i18next, whose
+// default language is Persian; pin English for these assertions (the fa
+// renderings are covered by src/i18n tests), like format.test.js does.
+beforeAll(() => {
+  i18n.changeLanguage('en');
+});
 
 const parameters = [
   { id: 'p1', name: 'Speed' },
@@ -111,7 +119,7 @@ describe('describeFilter', () => {
 
   it('renders the valueless operators in words', () => {
     expect(describeFilter({ parameterId: 'p2', op: 'missing' }, parametersById)).toBe(
-      'Strength not measured',
+      'Strength was not measured',
     );
   });
 });

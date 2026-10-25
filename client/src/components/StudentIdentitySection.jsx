@@ -5,6 +5,7 @@ import { updateStudent } from '../api/students.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatIsoDate } from '../lib/format.js';
+import JalaliDatePicker from './JalaliDatePicker.jsx';
 
 // The built-in identity fields (gender, birth date, father name, national ID)
 // live on the students table itself, unlike the admin-defined custom fields
@@ -67,11 +68,10 @@ function StudentIdentitySection({ student }) {
           </select>
 
           <label htmlFor="student-birth-date">{t('detail.birthDate')}</label>
-          <input
+          <JalaliDatePicker
             id="student-birth-date"
-            type="date"
             value={birthDate}
-            onChange={(event) => setBirthDate(event.target.value)}
+            onChange={setBirthDate}
             disabled={save.isPending}
           />
 

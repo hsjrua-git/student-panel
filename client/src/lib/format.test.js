@@ -1,12 +1,21 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import i18n from '../i18n/index.js';
 import {
   describeChange,
   formatChange,
+  formatIsoDate,
   formatParameterHint,
   formatRange,
   formatStudentCode,
   toIsoDate,
 } from './format.js';
+
+// The formatters render in the active UI language; the app defaults to
+// Persian, so pin English for these assertions (the fa renderings are covered
+// by src/i18n and src/lib/locale tests).
+beforeAll(() => {
+  i18n.changeLanguage('en');
+});
 
 describe('formatStudentCode', () => {
   it('splits an 8-char code into two groups of four', () => {
@@ -17,6 +26,14 @@ describe('formatStudentCode', () => {
 describe('toIsoDate', () => {
   it('formats a Date as YYYY-MM-DD with zero padding', () => {
     expect(toIsoDate(new Date(2026, 0, 5))).toBe('2026-01-05');
+  });
+});
+
+describe('formatIsoDate', () => {
+  it('shows the Gregorian date with the Jalali date beside it', () => {
+    const text = formatIsoDate('2026-10-25');
+    expect(text).toContain('2026');
+    expect(text).toContain('۱۴۰۵');
   });
 });
 
