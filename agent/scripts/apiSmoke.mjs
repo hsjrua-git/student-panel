@@ -1,0 +1,169 @@
+// API smoke: log in as an admin and GET every read endpoint the app has, so
+// SQL that only fails at runtime (bad column, unpassed parameters) is caught
+// the same way the app hits it. Run with the server up:
+//   cd server && npm start                                  (terminal 1)
+//   cd agent && node --env-file=../server/.env ../agent/scripts/apiSmoke.mjs
+// (runs from agent/ so it can borrow the panel client + server env)
+
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const agentDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+const requireFromServer = createRequire(join(agentDir, '..', 'server', 'package.json'));
+const { hashPassword, verifyPassword } = requireFromServer('../server/src/lib/passwords.js');
+
+const { config } = await import('../src/config.js');
+const { Panel, PanelError } = await import('../src/panel.js');
+
+const today = new Date().toISOString().slice(0, 10);
+const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+
+// Every GET endpoint with the query its own UI sends. Path params are
+// resolved from the list responses as the smoke runs.
+const CHECKS = [
+  { get: () => ['/api/health'] },
+  { get: () => ['/api/auth/me'] },
+  { get: () => ['/api/students?pageSize=5'] },
+  { get: () => ['/api/groups'] },
+  { get: () => ['/api/teachers'] },
+  { get: () => ['/api/intervals'] },
+  { get: () => [`/api/assignments`] },
+  { get: () => [`/api/sessions?from=${monthAgo}&to=${today}`] },
+  { get: () => ['/api/tasks?sessionId=00000000-0000-4000-8000-000000000000'] },
+  { get: () => ['/api/task-templates'] },
+  { get: () => ['/api/alerts'] },
+  { get: () => ['/api/parameters'] },
+  { get: () => ['/api/periods'] },
+  { get: () => ['/api/parameter-changes'] },
+  { get: () => ['/api/evaluations?studentId=00000000-0000-4000-8000-000000000000'] },
+  { get: () => ['/api/results?periodNumber=1'] },
+  { get: () => ['/api/dashboard/trends'] },
+  { get: () => ['/api/roles'] },
+  { get: () => ['/api/users'] },
+  { get: () => ['/api/audit?page=1'] },
+  { get: () => ['/api/field-definitions'] },
+  { get: () => ['/api/saved-views'] },
+  { get: () => ['/api/preferences'] },
+  { get: () => ['/api/cafe/products'] },
+  { get: () => ['/api/cafe/suppliers'] },
+  { get: () => [`/api/cafe/purchases?from=${monthAgo}&to=${today}`] },
+  { get: () => [`/api/cafe/sales?from=${monthAgo}&to=${today}`] },
+  { get: () => ['/api/cafe/balances/students?search=a'] },
+  { get: () => ['/api/cafe/inventory'] },
+  { get: () => [`/api/cafe/reports?from=${monthAgo}&to=${today}`] },
+  { get: () => ['/api/accounting/accounts'] },
+  { get: () => ['/api/accounting/mappings'] },
+  { get: () => ['/api/accounting/journal'] },
+  { get: () => ['/api/accounting/periods'] },
+  { get: () => ['/api/accounting/periods/opening'] },
+  { get: () => [`/api/accounting/reports/trial-balance?from=${monthAgo}&to=${today}`] },
+  { get: () => [`/api/accounting/reports/income-statement?from=${monthAgo}&to=${today}`] },
+  { get: () => [`/api/accounting/reports/balance-sheet?asOf=${today}`] },
+  // id-dependent ones are appended dynamically below
+];
+
+const pool = new (requireFromServer('pg').Pool)({
+  connectionString: process.env.DATABASE_URL,
+});
+
+try {
+  // Ensure an admin login exists: reuse `demo` when present, else create a
+  // temporary admin and remove it afterwards.
+  let username = 'demo';
+  let password = process.env.SMOKE_PASSWORD ?? '';
+  let temp = null;
+  const demoUser = (
+    await pool.query(`SELECT id FROM users WHERE username = 'demo' AND is_active`)
+  ).rows[0];
+  if (!demoUser) {
+    username = 'zz-api-smoke';
+    password = 'api-smoke-' + Math.random().toString(36).slice(2, 12);
+    const adminRole = (await pool.query(`SELECT id FROM roles WHERE lower(name) = 'administrator'`)).rows[0];
+    temp = (
+      await pool.query(
+        `INSERT INTO users (username, full_name, role_id, password_hash, must_change_password)
+         VALUES ($1, 'API Smoke', $2, $3, false) RETURNING id`,
+        [username, adminRole.id, await hashPassword(password)]
+      )
+    ).rows[0].id;
+  } else if (!password) {
+    // demo exists but we don't know its password: rotate it for the smoke,
+    // restore nothing (it is a demo account).
+    password = 'api-smoke-' + Math.random().toString(36).slice(2, 12);
+    await pool.query(`UPDATE users SET password_hash = $1 WHERE username = 'demo'`, [
+      await hashPassword(password),
+    ]);
+  }
+
+  const panel = new Panel({ baseUrl: config.panelBaseUrl, username, password });
+  await panel.login();
+
+  // Resolve ids the id-dependent checks need.
+  const [students, products, periods] = await Promise.all([
+    panel.request('/api/students?pageSize=1').then((d) => d.students ?? []),
+    panel.request('/api/cafe/products').then((d) => d.products ?? []),
+    panel.request('/api/periods').then((d) => d),
+  ]);
+  const studentId = students[0]?.id;
+  const productId = products[0]?.id;
+  const anchor = periods.anchorDate ?? today;
+  const periodNumber = periods.current ?? 1;
+
+  const idChecks = [];
+  if (studentId) {
+    idChecks.push(
+      { get: () => [`/api/students/${studentId}`] },
+      { get: () => [`/api/evaluations?studentId=${studentId}&periodNumber=${periodNumber}`] },
+      { get: () => [`/api/cafe/balances/${studentId}`] },
+      { get: () => [`/api/results?periodNumber=${periodNumber}`] },
+    );
+  }
+  if (productId) {
+    idChecks.push({ get: () => [`/api/cafe/inventory/${productId}`] });
+    idChecks.push({
+      get: () => [
+        `/api/accounting/reports/ledger?accountId=${productId}&from=${monthAgo}&to=${today}`,
+      ],
+      expectFail: true, // a product is not an account — 404 is correct
+    });
+  }
+  if (anchor) {
+    idChecks.push({ get: () => [`/api/evaluations?studentId=${studentId ?? '00000000-0000-4000-8000-000000000000'}`] });
+  }
+
+  const failures = [];
+  let checked = 0;
+  for (const check of [...CHECKS, ...idChecks]) {
+    for (const path of check.get()) {
+      checked += 1;
+      try {
+        await panel.request(path);
+      } catch (err) {
+        const status = err instanceof PanelError ? err.status : 0;
+        const expected = check.expectFail && status === 404;
+        if (!expected) {
+          failures.push({ path, status, message: err.message.slice(0, 120) });
+        }
+      }
+    }
+  }
+
+  if (failures.length > 0) {
+    console.error(`api smoke: ${checked} endpoints, ${failures.length} FAILED`);
+    for (const f of failures) {
+      console.error(`  ${f.status ?? 'ERR'} ${f.path} — ${f.message}`);
+    }
+    process.exitCode = 1;
+  } else {
+    console.log(`api smoke: ${checked} endpoints, all OK`);
+  }
+
+  if (temp) {
+    await pool.query(`DELETE FROM audit_log WHERE user_id = $1`, [temp]);
+    await pool.query(`DELETE FROM users WHERE id = $1`, [temp]);
+  }
+} finally {
+  await pool.end();
+}

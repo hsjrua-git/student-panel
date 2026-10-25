@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
             qty::float8        AS qty,
             (qty * avg_cost)::bigint AS "value"
      FROM cafe_stock
-     ORDER BY is_active DESC, lower(productName)`
+     ORDER BY is_active DESC, lower(name)`
   );
 
   const movements = await pool.query(

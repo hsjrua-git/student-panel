@@ -87,7 +87,8 @@ router.get('/', async (req, res) => {
      ${PURCHASE_FROM}
      WHERE ${conditions.join(' AND ')}
      ORDER BY pu.purchased_at DESC, pu.created_at DESC
-     LIMIT ${MAX_LISTED + 1}`
+     LIMIT ${MAX_LISTED + 1}`,
+    values
   );
   res.json({
     purchases: result.rows.slice(0, MAX_LISTED),
