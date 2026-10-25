@@ -120,7 +120,12 @@
     },
     "audit": {
       "view": "Read the audit log"
-    }
+    },
+    "accounting.view": "See the journal and reports",
+    "accounting.enter": "Draft journal entries",
+    "accounting.post": "Post and void journal entries",
+    "accounting.close": "Close and reopen fiscal periods",
+    "accounting.manage": "Manage the chart of accounts and mappings"
   },
   "permissionGroups": {
     "Students": "Students",
@@ -132,7 +137,8 @@
     "Parameters": "Parameters",
     "Custom fields": "Custom fields",
     "Reports": "Reports",
-    "Administration": "Administration"
+    "Administration": "Administration",
+    "Accounting": "Accounting"
   },
   "audit": {
     "readOnlyTitle": "Read-only access",

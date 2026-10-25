@@ -120,7 +120,12 @@
     },
     "audit": {
       "view": "خواندن گزارش فعالیت‌ها"
-    }
+    },
+    "accounting.view": "مشاهده دفتر و گزارش‌ها",
+    "accounting.enter": "ثبت پیش‌نویس آرتیکل",
+    "accounting.post": "ثبت و ابطال آرتیکل",
+    "accounting.close": "بستن و بازکردن دوره‌های مالی",
+    "accounting.manage": "مدیریت کدینگ حساب‌ها و نگاشت‌ها"
   },
   "permissionGroups": {
     "Students": "دانش‌آموزان",
@@ -132,7 +137,8 @@
     "Parameters": "شاخص‌ها",
     "Custom fields": "فیلدهای سفارشی",
     "Reports": "گزارش‌ها",
-    "Administration": "مدیریت"
+    "Administration": "مدیریت",
+    "Accounting": "حسابداری"
   },
   "audit": {
     "readOnlyTitle": "دسترسی فقط‌خواندنی",

@@ -238,6 +238,26 @@ namespace in BOTH `client/src/i18n/{fa,en}/errors.json`.
   `/api/cafe/balances/students` (the blind-entry precedent). All money-moving
   writes are single transactions audited in-route; rolled-back live smokes in
   `src/scripts/cafe*Smoke.mjs` cover the ledger math.
+- `accounting*.js` — the accounting module on top of the same bigint-Toman
+  money convention. 025/026 seed a simplified accrual chart of accounts
+  (Persian names), fiscal periods, the journal, the `acct_mappings`
+  cafe-to-journal map, the accounting permission ladder
+  (`accounting.view -> enter -> post -> close`, plus `manage`) and a seeded
+  Accountant role. Database-enforced invariants (025): sigma-debit =
+  sigma-credit per entry by a DEFERRED constraint trigger at COMMIT; posted
+  entries are immutable — only the exact void transition passes, lines
+  touch drafts only, corrections are new reversing entries; nothing posts
+  into a closed period; one posted entry per source event (voiding frees
+  the slot). `lib/accountingJournal.js` is the engine (draft/post/void,
+  mapped auto-posts, the once-ever opening entry, period close with the
+  automatic closing entry into retained earnings);
+  `lib/accountingReports.js` builds trial balance / general ledger /
+  income statement / balance sheet over POSTED lines (the sheet returns
+  its identity check). Cafe transactions auto-post INSIDE their own
+  transactions (sale revenue+COGS, purchase, manual top-ups/refunds, waste
+  at the current average cost; voiding a sale voids its entry) —
+  deactivating a mapping pauses that event and the cafe keeps working
+  standalone. Live rolled-back smoke: `src/scripts/accountingSmoke.mjs`.
 
 ### Scripts and tests
 
