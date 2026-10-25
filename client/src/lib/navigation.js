@@ -32,6 +32,7 @@ import {
   TeacherIcon,
   CalendarIcon,
   SessionIcon,
+  CoffeeIcon,
 } from '../components/icons.jsx';
 
 export const ROUTE_PERMISSIONS = {
@@ -48,6 +49,7 @@ export const ROUTE_PERMISSIONS = {
   '/teachers': 'teachers.view',
   '/schedule': 'schedule.view',
   '/sessions': 'schedule.view',
+  '/cafe/products': 'cafe.view',
   '/settings': 'settings.manage',
   '/users': 'users.manage',
   '/roles': 'roles.manage',
@@ -77,6 +79,10 @@ export const NAV_SECTIONS = [
       { to: '/schedule', key: 'schedule', icon: CalendarIcon },
       { to: '/sessions', key: 'sessions', icon: SessionIcon },
     ],
+  },
+  {
+    key: 'cafe',
+    items: [{ to: '/cafe/products', key: 'products', icon: CoffeeIcon }],
   },
   {
     key: 'setup',

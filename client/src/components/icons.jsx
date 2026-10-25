@@ -226,6 +226,17 @@ export function SessionIcon(props) {
   );
 }
 
+// A steaming cup: the cafe section.
+export function CoffeeIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4.5 8.5h11v5a4.5 4.5 0 0 1-4.5 4.5H9a4.5 4.5 0 0 1-4.5-4.5z" />
+      <path d="M15.5 9.5h1.25a2.5 2.5 0 0 1 0 5h-1.4" />
+      <path d="M8.5 3v2.4M12 3v2.4" />
+    </Svg>
+  );
+}
+
 // A shield with a check: roles/permissions.
 export function RolesIcon(props) {
   return (

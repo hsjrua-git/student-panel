@@ -50,6 +50,7 @@ function removeWithDependents(keys, key, prerequisites) {
 }
 
 function PermissionEditor({ catalog, selected, onToggle, disabled }) {
+  const { t } = useTranslation(['admin', 'common']);
   const groups = useMemo(() => {
     const byGroup = new Map();
     for (const permission of catalog.permissions) {
@@ -63,7 +64,9 @@ function PermissionEditor({ catalog, selected, onToggle, disabled }) {
     <div className="permission-grid">
       {groups.map(([group, permissions]) => (
         <fieldset key={group}>
-          <legend>{group}</legend>
+          <legend>
+            {t(`permissionGroups.${group}`, { defaultValue: group })}
+          </legend>
           {permissions.map((permission) => (
             <label key={permission.key} className="checkbox-row">
               <input
@@ -74,7 +77,11 @@ function PermissionEditor({ catalog, selected, onToggle, disabled }) {
                   onToggle(permission.key, event.target.checked)
                 }
               />
-              <span>{permission.label}</span>
+              <span>
+                {t(`permissions.${permission.key}`, {
+                  defaultValue: permission.label,
+                })}
+              </span>
               <code className="hint">{permission.key}</code>
             </label>
           ))}

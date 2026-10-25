@@ -59,6 +59,81 @@
       "save": "Save changes"
     }
   },
+  "permissions": {
+    "students": {
+      "view": "View students",
+      "create": "Add students",
+      "edit": "Edit students",
+      "delete": "Delete students"
+    },
+    "groups": {
+      "manage": "Create and organise groups",
+      "assign": "Put students in groups"
+    },
+    "teachers": {
+      "view": "View teachers",
+      "manage": "Manage teachers"
+    },
+    "schedule": {
+      "view": "View the schedule",
+      "manage": "Manage assignments and intervals"
+    },
+    "cafe": {
+      "view": "See the cafe pages",
+      "sell": "Record cafe sales",
+      "balance": "Top up and refund student balances",
+      "supplies": "Record purchases and manage suppliers",
+      "inventory": "Record waste and adjust stock",
+      "manage": "Manage cafe products"
+    },
+    "scores": {
+      "view": "See scores",
+      "enter": "Enter and change scores",
+      "override": "Override locked scores"
+    },
+    "parameters": {
+      "view": "See parameters",
+      "manage": "Add and edit parameters"
+    },
+    "fields": {
+      "manage": "Define custom student fields",
+      "view_restricted": "See restricted custom fields"
+    },
+    "dashboard": {
+      "view": "See the dashboard"
+    },
+    "data": {
+      "export": "Export data to CSV",
+      "import": "Import students from CSV"
+    },
+    "views": {
+      "share": "Share saved views with others"
+    },
+    "settings": {
+      "manage": "Change settings"
+    },
+    "users": {
+      "manage": "Manage user accounts"
+    },
+    "roles": {
+      "manage": "Manage roles and permissions"
+    },
+    "audit": {
+      "view": "Read the audit log"
+    }
+  },
+  "permissionGroups": {
+    "Students": "Students",
+    "Groups": "Groups",
+    "Teachers": "Teachers",
+    "Scheduling": "Scheduling",
+    "Cafe": "Cafe",
+    "Scores": "Scores",
+    "Parameters": "Parameters",
+    "Custom fields": "Custom fields",
+    "Reports": "Reports",
+    "Administration": "Administration"
+  },
   "audit": {
     "readOnlyTitle": "Read-only access",
     "readOnlyDescription": "You do not have permission to see the audit log.",
