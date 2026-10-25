@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { toLatinDigits } from '../lib/locale.js';
 import { formatDateTime } from '../lib/format.js';
+import { formatWhole } from '../lib/money.js';
 
 const KINDS = ['topup', 'refund', 'adjustment'];
 
@@ -20,6 +21,8 @@ function StudentBalanceSection({ student }) {
   const [kind, setKind] = useState('topup');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+
+  const toman = (value) => `${formatWhole(value)} ${t('money.unit')}`;
 
   const balanceQuery = useQuery({
     queryKey: ['cafe-balance', student.id],
@@ -51,8 +54,6 @@ function StudentBalanceSection({ student }) {
     if (amount.trim() !== '') submit.mutate();
   }
 
-  const money = (value) =>
-    `${new Intl.NumberFormat('en-US').format(value)} ${t('money.unit')}`;
 
   const balance = balanceQuery.data?.balance ?? null;
   const transactions = balanceQuery.data?.transactions ?? [];
@@ -71,7 +72,7 @@ function StudentBalanceSection({ student }) {
           className={balance < 0 ? 'error' : undefined}
           aria-label={t('balance.current')}
         >
-          <bdi>{money(balance)}</bdi>
+          <bdi>{toman(balance)}</bdi>
           {balance < 0 && (
             <span className="badge danger">{t('balance.inDebt')}</span>
           )}
@@ -128,7 +129,7 @@ function StudentBalanceSection({ student }) {
           )}
           {submit.isSuccess && (
             <p className="success" role="status">
-              {t('balance.saved', { balance: money(submit.data.balanceAfter) })}
+              {t('balance.saved', { balance: toman(submit.data.balanceAfter) })}
             </p>
           )}
         </form>

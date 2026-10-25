@@ -15,15 +15,11 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { toLatinDigits } from '../lib/locale.js';
+import { formatWhole } from '../lib/money.js';
 
 // Money is whole-number Toman (bigint on the server arrives as a string over
 // JSON). Tables keep Latin digits with thousands separators — amounts are data,
 // not UI chrome — and only the unit word is translated.
-const moneyFormat = new Intl.NumberFormat('en-US');
-
-function formatMoney(value) {
-  return moneyFormat.format(Number(value ?? 0));
-}
 
 // A whole-number field (price, sort order): accepts Persian or Latin digits
 // plus stray separators, and returns a non-negative integer or null.
@@ -362,13 +358,13 @@ function CafeProductsPage() {
                   >
                     <th scope="row">{product.name}</th>
                     <td>
-                      {formatMoney(product.price)}{' '}
+                      {formatWhole(product.price)}{' '}
                       <span className="hint">{t('money.unit')}</span>
                     </td>
                     <td>
                       {Number(product.avgCost) > 0 ? (
                         <>
-                          {formatMoney(product.avgCost)}{' '}
+                          {formatWhole(product.avgCost)}{' '}
                           <span className="hint">{t('money.unit')}</span>
                         </>
                       ) : (

@@ -803,6 +803,7 @@ section + section {
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -1843,6 +1844,14 @@ tr.inactive,
 
 /* ---- phones: tighten the type scale and un-cram the pager ---- */
 @media (max-width: 640px) {
+  /* Wide tables (account selects, big grids) scroll inside their card on
+     phones instead of widening the document. Cards never clip vertically:
+     overflow-x alone would compute overflow-y to auto, but card content
+     grows the card instead of overflowing it. */
+  .section-card {
+    overflow-x: auto;
+  }
+
   h1 {
     font-size: 1.42rem;
   }
@@ -3432,18 +3441,22 @@ button.link:hover {
 
 .skip-link {
   position: absolute;
-  left: -9999px;
+  /* Logical offset: parked beyond the inline-START edge, which is never part
+     of the scrollable overflow region (scroll extends toward inline-end) —
+     a physical left:-9999px in RTL adds ~10k px of horizontal document
+     scroll. */
+  inset-inline-start: -9999px;
   top: 0;
   z-index: 100;
   background: var(--brand);
   color: #fff;
   padding: 0.5rem 1rem;
-  border-radius: 0 0 var(--radius-sm) 0;
+  border-end-end-radius: var(--radius-sm);
   text-decoration: none;
 }
 
 .skip-link:focus {
-  left: 0;
+  inset-inline-start: 0;
 }
 
 /* Focus target only (see Layout); don't show a ring when it takes focus. */

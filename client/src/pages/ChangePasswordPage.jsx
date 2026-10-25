@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { errorMessage } from '../i18n/errors.js';
+import { firstAllowedPath } from '../lib/navigation.js';
 
 const MIN_LENGTH = 10;
 
 function ChangePasswordPage() {
   const { t } = useTranslation(['admin', 'common']);
-  const { user, changePassword } = useAuth();
+  const { user, can, changePassword } = useAuth();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -38,7 +39,9 @@ function ChangePasswordPage() {
           setCurrentPassword('');
           setNewPassword('');
           setRepeat('');
-          if (wasForced) navigate('/students', { replace: true });
+          if (wasForced) {
+            navigate(firstAllowedPath(can), { replace: true });
+          }
         },
       }
     );

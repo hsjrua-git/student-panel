@@ -9,6 +9,14 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isValidJalaaliDate, toGregorian, toJalaali } from 'jalaali-js';
 
+// The institution runs on the Jalali calendar, so "this month" starts at 1
+// of the current Jalali month; ranges sent to the server stay ISO Gregorian.
+export function startOfJalaliMonth(date) {
+  const { jy, jm } = toJalaali(date);
+  const { gy, gm, gd } = toGregorian(jy, jm, 1);
+  return new Date(gy, gm - 1, gd);
+}
+
 const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
 const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 

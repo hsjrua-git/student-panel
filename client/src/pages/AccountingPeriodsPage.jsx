@@ -15,6 +15,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
+import { formatWhole } from '../lib/money.js';
 
 // Fiscal periods: the close books an automatic closing entry (income and
 // expenses zeroed into retained earnings) and locks the range; reopening is
@@ -39,8 +40,6 @@ function OpeningCard() {
       queryClient.invalidateQueries({ queryKey: ['accounting-opening'] }),
   });
 
-  const money = new Intl.NumberFormat('en-US');
-
   return (
     <section className="section-card">
       <h2>{t('opening.title')}</h2>
@@ -55,7 +54,7 @@ function OpeningCard() {
           {t('opening.exists', {
             entryNo: opening.entryNo,
             entryDate: formatIsoDate(opening.entryDate),
-            total: `${money.format(Number(opening.total))} ${t('moneyUnit', { ns: 'accountingReports' })}`,
+            total: `${formatWhole(Number(opening.total))} ${t('moneyUnit', { ns: 'accountingReports' })}`,
           })}
         </p>
       ) : (

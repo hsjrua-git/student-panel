@@ -8,39 +8,13 @@ import EmptyState from '../components/EmptyState.jsx';
 import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
-import { toLatinDigits } from '../lib/locale.js';
+import { formatAmount, parseQuantity, parseWholeNumber } from '../lib/money.js';
 
 // Money is whole-number Toman (bigint on the server arrives as a string over
 // JSON), but a live line total is qty × unit cost and qty carries up to three
 // decimals — so amounts format exactly, without forcing a whole number.
 // Like the other cafe tables, amounts keep Latin digits with thousands
 // separators (data, not UI chrome); only the unit word is translated.
-const amountFormat = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 3,
-});
-
-function formatAmount(value) {
-  return amountFormat.format(Number(value ?? 0));
-}
-
-// A whole-number Toman field: accepts Persian or Latin digits plus stray
-// separators, and returns a non-negative integer or null.
-function parseWholeNumber(text) {
-  const normalized = toLatinDigits(text).replace(/[\s,٬]/g, '');
-  return /^\d+$/.test(normalized) ? Number(normalized) : null;
-}
-
-// A quantity: positive, at most three decimals (weight/portion goods),
-// Persian or Latin digits with '.' or '٫' as the decimal separator.
-const MAX_QTY = 100_000;
-function parseQuantity(text) {
-  const normalized = toLatinDigits(text)
-    .replace(/[\s,٬]/g, '')
-    .replace(/٫/g, '.');
-  if (!/^\d+(?:\.\d{1,3})?$/.test(normalized)) return null;
-  const value = Number(normalized);
-  return value > 0 && value <= MAX_QTY ? value : null;
-}
 
 function emptyLine() {
   return { productId: '', qty: '', unitCost: '' };

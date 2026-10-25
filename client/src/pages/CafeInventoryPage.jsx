@@ -12,25 +12,13 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatDateTime } from '../lib/format.js';
-import { toLatinDigits } from '../lib/locale.js';
+import { formatAmount, formatWhole, parseQuantity } from '../lib/money.js';
 
 // The cafe stockroom: current stock per product (with its movement ledger a
 // click away), a form to record waste or count corrections, and the latest
 // movements across all products. Like the other cafe pages, money and
 // quantities keep Latin digits with thousands separators (amounts are data,
 // not UI chrome) and only the unit word is translated.
-const moneyFormat = new Intl.NumberFormat('en-US');
-const qtyFormat = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 3,
-});
-
-function formatMoney(value) {
-  return moneyFormat.format(Number(value ?? 0));
-}
-
-function formatQty(value) {
-  return qtyFormat.format(Number(value ?? 0));
-}
 
 // Movement kinds are fixed by the DB CHECK constraint; badge tones by taste —
 // purchases and sales are routine (ok), waste is a loss (danger) and an
@@ -49,25 +37,13 @@ function KindBadge({ kind }) {
   return <span className={`badge ${KIND_BADGE[kind]}`}>{t(`kind.${kind}`)}</span>;
 }
 
-// A quantity as the server accepts it: Persian or Latin digits with '.'
-// (or '٫') as the decimal separator, at most three decimals, and an optional
-// leading minus for adjustments. Non-zero and range checks depend on the
-// entry kind, so they live in parseLineQty below.
-function parseQtyText(text) {
-  const normalized = toLatinDigits(text)
-    .replace(/[\s,٬]/g, '')
-    .replace(/٫/g, '.');
-  if (!/^-?\d+(?:\.\d{1,3})?$/.test(normalized)) return null;
-  return Number(normalized);
-}
-
-// Mirrors the server's validation: waste must be positive, an adjustment
-// non-zero; both capped at 100000.
+// The kind-specific rules the server enforces: waste is entered positive,
+// an adjustment is signed and non-zero (both share the shared parser's
+// three-decimal/Persian-digit handling).
 function parseLineQty(text, kind) {
-  const value = parseQtyText(text);
+  const value = parseQuantity(text, { signed: kind === 'adjustment' });
   if (value === null) return null;
   if (kind === 'waste' && value <= 0) return null;
-  if (value === 0 || Math.abs(value) > 100000) return null;
   return value;
 }
 
@@ -94,7 +70,7 @@ function StockCardPanel({ row }) {
     <div>
       <h3>{cardQuery.data?.product.name ?? row.productName}</h3>
       {cardQuery.data && (
-        <p className="hint">{t('card.currentQty', { qty: formatQty(cardQuery.data.qty) })}</p>
+        <p className="hint">{t('card.currentQty', { qty: formatAmount(cardQuery.data.qty) })}</p>
       )}
       {cardQuery.isPending && <p className="hint">{t('common:status.loading')}</p>}
       {cardQuery.isError && (
@@ -126,14 +102,14 @@ function StockCardPanel({ row }) {
                   <KindBadge kind={movement.kind} />
                 </td>
                 <td className="nowrap">
-                  <bdi>{formatQty(movement.qty)}</bdi>
+                  <bdi>{formatAmount(movement.qty)}</bdi>
                 </td>
                 <td className="nowrap">
-                  {formatMoney(movement.unitCost)}{' '}
+                  {formatWhole(movement.unitCost)}{' '}
                   <span className="hint">{t('money.unit')}</span>
                 </td>
                 <td className="nowrap">
-                  <bdi>{formatQty(movement.runningQty)}</bdi>
+                  <bdi>{formatAmount(movement.runningQty)}</bdi>
                 </td>
                 <td>{movement.note || '—'}</td>
                 <td>{movement.createdBy}</td>
@@ -318,7 +294,7 @@ function CorrectionForm({ products, loading }) {
               {kind === 'waste'
                 ? affected !== null
                   ? t('form.lineValue', {
-                      value: formatMoney(affected),
+                      value: formatWhole(affected),
                       unit: t('money.unit'),
                     })
                   : t('form.wasteLineHint')
@@ -348,7 +324,7 @@ function CorrectionForm({ products, loading }) {
         {kind === 'waste' && (
           <span className="hint">
             {t('form.totalAffected', {
-              value: formatMoney(wasteTotal),
+              value: formatWhole(wasteTotal),
               unit: t('money.unit'),
             })}
           </span>
@@ -479,12 +455,12 @@ function CafeInventoryPage() {
                         </button>
                       </th>
                       <td>
-                        <bdi>{formatQty(row.qty)}</bdi>
+                        <bdi>{formatAmount(row.qty)}</bdi>
                       </td>
                       <td>
                         {Number(row.avgCost) > 0 ? (
                           <>
-                            {formatMoney(row.avgCost)}{' '}
+                            {formatWhole(row.avgCost)}{' '}
                             <span className="hint">{t('money.unit')}</span>
                           </>
                         ) : (
@@ -492,7 +468,7 @@ function CafeInventoryPage() {
                         )}
                       </td>
                       <td className="nowrap">
-                        <bdi>{formatMoney(row.value)}</bdi>{' '}
+                        <bdi>{formatWhole(row.value)}</bdi>{' '}
                         <span className="hint">{t('money.unit')}</span>
                       </td>
                       <td>
@@ -573,7 +549,7 @@ function CafeInventoryPage() {
                       <KindBadge kind={movement.kind} />
                     </td>
                     <td className="nowrap">
-                      <bdi>{formatQty(movement.qty)}</bdi>
+                      <bdi>{formatAmount(movement.qty)}</bdi>
                     </td>
                     <td>{movement.note || '—'}</td>
                     <td>{movement.createdBy}</td>

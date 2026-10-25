@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { toGregorian, toJalaali } from 'jalaali-js';
 import {
   getBalanceSheet,
   getGeneralLedger,
@@ -11,30 +10,17 @@ import {
 import { listAccounts } from '../api/accountingJournal.js';
 import EmptyState from '../components/EmptyState.jsx';
 import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
+import StatCard from '../components/StatCard.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
+import { startOfJalaliMonth } from '../lib/locale.js';
 
 // The institution runs on the Jalali calendar, so the range opens on the
 // first day of the current Jalali month; the wire range stays ISO.
-function startOfJalaliMonth(date) {
-  const { jy, jm } = toJalaali(date);
-  const { gy, gm, gd } = toGregorian(jy, jm, 1);
-  return new Date(gy, gm - 1, gd);
-}
-
 const money = new Intl.NumberFormat('en-US');
 const formatAmount = (value) => money.format(Number(value ?? 0));
 
 const TABS = ['trialBalance', 'incomeStatement', 'balanceSheet', 'ledger'];
-
-function StatCard({ label, value, tone }) {
-  return (
-    <div className={tone ? `stat-card ${tone}` : 'stat-card'}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-    </div>
-  );
-}
 
 function AccountingReportsPage() {
   const { t } = useTranslation(['accountingReports', 'common']);

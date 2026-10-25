@@ -1,25 +1,26 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { toGregorian, toJalaali } from 'jalaali-js';
 import { useTranslation } from 'react-i18next';
 import { getCafeReport } from '../api/cafeReports.js';
 import EmptyState from '../components/EmptyState.jsx';
 import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
+import StatCard from '../components/StatCard.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
+import { startOfJalaliMonth } from '../lib/locale.js';
+import { formatWhole } from '../lib/money.js';
 
 // The cafe range report: totals, a daily breakdown and top products over the
 // picked from/to range, plus the standing numbers (stock value, active
 // products, student debt) that are always current. Everything is read-only.
 // Like the other cafe pages, amounts keep Latin digits with thousands
 // separators (data, not UI chrome); only the unit word is translated.
-const numberFormat = new Intl.NumberFormat('en-US');
 const qtyFormat = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 3,
 });
 
 function formatNumber(value) {
-  return numberFormat.format(Number(value ?? 0));
+  return formatWhole(Number(value ?? 0));
 }
 
 function formatQty(value) {
@@ -29,23 +30,7 @@ function formatQty(value) {
 // The institution runs on the Jalali calendar, so the report opens on the
 // first day of the current Jalali month; the range sent to the server stays
 // ISO Gregorian either way.
-function startOfJalaliMonth(date) {
-  const { jy, jm } = toJalaali(date);
-  const { gy, gm, gd } = toGregorian(jy, jm, 1);
-  return new Date(gy, gm - 1, gd);
-}
-
 // A KPI tile on the existing stat-card styles (same markup HeadlineCards
-// uses). `tone` swaps the leading rule and value onto ok/danger.
-function StatCard({ label, value, tone }) {
-  return (
-    <div className={tone ? `stat-card ${tone}` : 'stat-card'}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-    </div>
-  );
-}
-
 function CafeReportsPage() {
   const { t } = useTranslation(['cafeReports', 'common']);
   const today = new Date();

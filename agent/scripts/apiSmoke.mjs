@@ -68,34 +68,46 @@ const pool = new (requireFromServer('pg').Pool)({
   connectionString: process.env.DATABASE_URL,
 });
 
+let temp = null;
 try {
-  // Ensure an admin login exists: reuse `demo` when present, else create a
-  // temporary admin and remove it afterwards.
-  let username = 'demo';
-  let password = process.env.SMOKE_PASSWORD ?? '';
-  let temp = null;
-  const demoUser = (
-    await pool.query(`SELECT id FROM users WHERE username = 'demo' AND is_active`)
+  // Always run as a THROWAWAY admin created for this smoke (never touch a
+  // real account's credentials); removed in the finally block.
+  // A previous crashed run may have left the throwaway user behind — clear
+  // it in FK order (journal lines → entries → audit → user) before seeding.
+  const stale = (
+    await pool.query(`SELECT id FROM users WHERE username = 'zz-api-smoke'`)
   ).rows[0];
-  if (!demoUser) {
-    username = 'zz-api-smoke';
-    password = 'api-smoke-' + Math.random().toString(36).slice(2, 12);
-    const adminRole = (await pool.query(`SELECT id FROM roles WHERE lower(name) = 'administrator'`)).rows[0];
-    temp = (
-      await pool.query(
-        `INSERT INTO users (username, full_name, role_id, password_hash, must_change_password)
-         VALUES ($1, 'API Smoke', $2, $3, false) RETURNING id`,
-        [username, adminRole.id, await hashPassword(password)]
-      )
-    ).rows[0].id;
-  } else if (!password) {
-    // demo exists but we don't know its password: rotate it for the smoke,
-    // restore nothing (it is a demo account).
-    password = 'api-smoke-' + Math.random().toString(36).slice(2, 12);
-    await pool.query(`UPDATE users SET password_hash = $1 WHERE username = 'demo'`, [
-      await hashPassword(password),
-    ]);
+  if (stale) {
+    await pool.query('ALTER TABLE acct_journal_lines DISABLE TRIGGER acct_lines_draft_only_trg');
+    await pool.query('ALTER TABLE acct_journal_lines DISABLE TRIGGER acct_entry_balance_trg');
+    await pool.query('ALTER TABLE acct_journal_entries DISABLE TRIGGER acct_entry_lifecycle_trg');
+    await pool.query(
+      `DELETE FROM acct_journal_lines WHERE entry_id IN
+         (SELECT id FROM acct_journal_entries WHERE posted_by = $1 OR created_by = $1)`,
+      [stale.id]
+    );
+    await pool.query(
+      `DELETE FROM acct_journal_entries WHERE posted_by = $1 OR created_by = $1`,
+      [stale.id]
+    );
+    await pool.query(`DELETE FROM audit_log WHERE user_id = $1`, [stale.id]);
+    await pool.query('ALTER TABLE acct_journal_entries ENABLE TRIGGER acct_entry_lifecycle_trg');
+    await pool.query('ALTER TABLE acct_journal_lines ENABLE TRIGGER acct_entry_balance_trg');
+    await pool.query('ALTER TABLE acct_journal_lines ENABLE TRIGGER acct_lines_draft_only_trg');
+    await pool.query(`DELETE FROM users WHERE id = $1`, [stale.id]);
   }
+  const username = 'zz-api-smoke';
+  const password = 'api-smoke-' + Math.random().toString(36).slice(2, 12);
+  const adminRole = (
+    await pool.query(`SELECT id FROM roles WHERE lower(name) = 'administrator'`)
+  ).rows[0];
+  temp = (
+    await pool.query(
+      `INSERT INTO users (username, full_name, role_id, password_hash, must_change_password)
+       VALUES ($1, 'API Smoke', $2, $3, false) RETURNING id`,
+      [username, adminRole.id, await hashPassword(password)]
+    )
+  ).rows[0].id;
 
   const panel = new Panel({ baseUrl: config.panelBaseUrl, username, password });
   await panel.login();
@@ -160,10 +172,8 @@ try {
     console.log(`api smoke: ${checked} endpoints, all OK`);
   }
 
-  if (temp) {
-    await pool.query(`DELETE FROM audit_log WHERE user_id = $1`, [temp]);
-    await pool.query(`DELETE FROM users WHERE id = $1`, [temp]);
-  }
 } finally {
+  await pool.query(`DELETE FROM audit_log WHERE user_id = $1`, [temp]).catch(() => {});
+  await pool.query(`DELETE FROM users WHERE id = $1`, [temp]).catch(() => {});
   await pool.end();
 }

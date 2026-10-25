@@ -12,51 +12,23 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatDateTime, toIsoDate } from '../lib/format.js';
-import { toLatinDigits } from '../lib/locale.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
-
+import { formatAmount, formatWhole, parseQuantity, parseWholeNumber } from '../lib/money.js';
 // The cafe POS: tap products into a cart, pick walk-in or a student (charged
 // to their prepaid balance — overdraft allowed, so balances may go negative by
 // design), record the sale, and void today's mistakes. Money and quantities in
 // tables keep Latin digits with thousands separators — amounts are data, not
 // UI chrome — and only the unit word is translated, like CafeProductsPage.
-const moneyFormat = new Intl.NumberFormat('en-US');
-const qtyFormat = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 3,
-});
-
-function formatMoney(value) {
-  return moneyFormat.format(Number(value ?? 0));
-}
-
-function formatQty(value) {
-  return qtyFormat.format(Number(value ?? 0));
-}
 
 // Client-side mirrors of the server's sale validation, so the cart can flag a
 // bad line (red input) before the POST. Persian digits and stray separators
 // are accepted, exactly like the products form.
-function parseQtyText(text) {
-  const normalized = toLatinDigits(text).replace(/[\s,٬]/g, '');
-  if (!/^\d+(?:\.\d{1,3})?$/.test(normalized)) return null;
-  const value = Number(normalized);
-  if (!(value > 0) || value > 100000) return null;
-  return value;
-}
-
-function parseWholeNumber(text) {
-  const normalized = toLatinDigits(text).replace(/[\s,٬]/g, '');
-  return /^\d+$/.test(normalized) ? Number(normalized) : null;
-}
-
-// A balance figure with its unit; negative balances render in the danger
-// colour. <bdi> keeps the minus sign on the amount in RTL text.
 function BalanceText({ value }) {
   const { t } = useTranslation(['pos']);
   const amount = Number(value ?? 0);
   return (
     <span className={amount < 0 ? 'error' : undefined}>
-      <bdi>{formatMoney(amount)}</bdi>{' '}
+      <bdi>{formatWhole(amount)}</bdi>{' '}
       <span className="hint">{t('money.unit')}</span>
     </span>
   );
@@ -159,7 +131,7 @@ function CafeSalesPage() {
   // the submit.
   const parsedLines = lines.map((line) => ({
     ...line,
-    qty: parseQtyText(line.qtyText),
+    qty: parseQuantity(line.qtyText),
     unitPrice: parseWholeNumber(line.priceText),
   }));
   const total = parsedLines.reduce(
@@ -174,10 +146,10 @@ function CafeSalesPage() {
     setLines((current) => {
       const existing = current.find((line) => line.productId === product.id);
       if (existing) {
-        const qty = parseQtyText(existing.qtyText);
+        const qty = parseQuantity(existing.qtyText);
         return current.map((line) =>
           line.productId === product.id
-            ? { ...line, qtyText: formatQty((qty ?? 0) + 1) }
+            ? { ...line, qtyText: formatAmount((qty ?? 0) + 1) }
             : line
         );
       }
@@ -376,7 +348,7 @@ function CafeSalesPage() {
                   disabled={save.isPending}
                 >
                   {product.name}{' '}
-                  <span className="hint">{formatMoney(product.price)}</span>
+                  <span className="hint">{formatWhole(product.price)}</span>
                 </button>
               ))}
             </div>
@@ -437,7 +409,7 @@ function CafeSalesPage() {
                       <td className="nowrap">
                         {line.qty !== null && line.unitPrice !== null ? (
                           <>
-                            {formatMoney(Math.round(line.qty * line.unitPrice))}{' '}
+                            {formatWhole(Math.round(line.qty * line.unitPrice))}{' '}
                             <span className="hint">{t('money.unit')}</span>
                           </>
                         ) : (
@@ -463,7 +435,7 @@ function CafeSalesPage() {
                       {t('cart.total')}
                     </th>
                     <td className="nowrap">
-                      <strong>{formatMoney(total)}</strong>{' '}
+                      <strong>{formatWhole(total)}</strong>{' '}
                       <span className="hint">{t('money.unit')}</span>
                     </td>
                     <td />
@@ -506,7 +478,7 @@ function CafeSalesPage() {
                 {save.data.sale.balanceAfter != null && (
                   <>
                     {t('success.newBalance')}{' '}
-                    <bdi>{formatMoney(save.data.sale.balanceAfter)}</bdi>{' '}
+                    <bdi>{formatWhole(save.data.sale.balanceAfter)}</bdi>{' '}
                     {t('money.unit')}
                   </>
                 )}
@@ -575,12 +547,12 @@ function CafeSalesPage() {
                       {sale.items
                         .map(
                           (item) =>
-                            `${formatQty(item.qty)} × ${item.productName}`
+                            `${formatAmount(item.qty)} × ${item.productName}`
                         )
                         .join(itemsSeparator)}
                     </td>
                     <td className="nowrap">
-                      {formatMoney(sale.total)}{' '}
+                      {formatWhole(sale.total)}{' '}
                       <span className="hint">{t('money.unit')}</span>
                     </td>
                     <td>
@@ -620,7 +592,7 @@ function CafeSalesPage() {
               {voidSaleMutation.data.balanceAfter != null && (
                 <>
                   {t('success.newBalance')}{' '}
-                  <bdi>{formatMoney(voidSaleMutation.data.balanceAfter)}</bdi>{' '}
+                  <bdi>{formatWhole(voidSaleMutation.data.balanceAfter)}</bdi>{' '}
                   {t('money.unit')}
                 </>
               )}

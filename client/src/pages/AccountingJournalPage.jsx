@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { toJalaali, toGregorian } from 'jalaali-js';
 import {
   createJournalEntry,
   listAccounts,
@@ -13,19 +12,12 @@ import EmptyState from '../components/EmptyState.jsx';
 import JalaliDatePicker from '../components/JalaliDatePicker.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
-import { toLatinDigits } from '../lib/locale.js';
+import { startOfJalaliMonth, toLatinDigits } from '../lib/locale.js';
+import { formatWhole as formatAmount } from '../lib/money.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 // The institution runs on the Jalali calendar, so the list opens on the
 // first day of the current Jalali month; the wire range stays ISO.
-function startOfJalaliMonth(date) {
-  const { jy, jm } = toJalaali(date);
-  const { gy, gm, gd } = toGregorian(jy, jm, 1);
-  return new Date(gy, gm - 1, gd);
-}
-
-const money = new Intl.NumberFormat('en-US');
-const formatAmount = (value) => money.format(Number(value ?? 0));
 
 function parseAmount(text) {
   const normalized = toLatinDigits(text).replace(/[\s,٬]/g, '');
