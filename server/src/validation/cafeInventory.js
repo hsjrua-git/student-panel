@@ -3,7 +3,7 @@
 // 0 because they fix the ledger, not the goods). Both are new append-only
 // movements; nothing is ever rewritten.
 
-import { isUuid } from './ids.js';
+import { isUuid } from '../lib/ids.js';
 
 const MAX_MONEY = 1_000_000_000_000;
 const MAX_QTY = 100_000;

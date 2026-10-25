@@ -15,7 +15,7 @@ const SALE_COLUMNS = `
   sa.customer,
   sa.student_id           AS "studentId",
   sf.full_name            AS "studentName",
-  sf.code                 AS "studentCode",
+  sf.student_code        AS "studentCode",
   sa.total,
   sa.cost_total           AS "costTotal",
   sa.note,

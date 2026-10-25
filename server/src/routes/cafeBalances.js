@@ -31,13 +31,13 @@ router.get('/students', async (req, res) => {
   let where = 's.deleted_at IS NULL';
   if (search) {
     values.push(`%${escapeLike(search)}%`);
-    where += ` AND (s.full_name ILIKE $1 OR s.code ILIKE $1)`;
+    where += ` AND (s.full_name ILIKE $1 OR s.student_code ILIKE $1)`;
   }
 
   const result = await pool.query(
     `SELECT s.id,
             s.full_name AS "fullName",
-            s.code,
+            s.student_code AS "code",
             COALESCE(b.balance, 0) AS balance
      FROM students s
      LEFT JOIN student_balances b ON b.student_id = s.id
