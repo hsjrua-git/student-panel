@@ -248,6 +248,18 @@ export function CartIcon(props) {
   );
 }
 
+// A delivery truck: cafe purchasing.
+export function TruckIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M2.5 5.5h11v10h-11z" />
+      <path d="M13.5 9h3.3l2.7 3v3.5h-6z" />
+      <circle cx="6.5" cy="18" r="1.6" />
+      <circle cx="16.5" cy="18" r="1.6" />
+    </Svg>
+  );
+}
+
 // A shield with a check: roles/permissions.
 export function RolesIcon(props) {
   return (
