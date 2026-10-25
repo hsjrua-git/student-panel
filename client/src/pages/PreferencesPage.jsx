@@ -3,18 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { listParameters } from '../api/parameters.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { LANGUAGES } from '../i18n/index.js';
+import { errorMessage } from '../i18n/errors.js';
 import { toggleHidden } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 
-const THEMES = [
-  { value: 'system', label: 'Match my device' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-];
+const THEMES = ['system', 'light', 'dark'];
 const PALETTES = [
   {
     value: 'aurora',
-    label: 'Aurora',
     preview: {
       paper: '#f4f5f7',
       surface: '#ffffff',
@@ -25,7 +21,6 @@ const PALETTES = [
   },
   {
     value: 'gradebook',
-    label: 'Gradebook',
     preview: {
       paper: '#f4f5fb',
       surface: '#ffffff',
@@ -36,7 +31,6 @@ const PALETTES = [
   },
   {
     value: 'midnight',
-    label: 'Midnight',
     preview: {
       paper: '#eef2fb',
       surface: '#ffffff',
@@ -47,7 +41,6 @@ const PALETTES = [
   },
   {
     value: 'ember',
-    label: 'Ember',
     preview: {
       paper: '#faf6f1',
       surface: '#fffdfb',
@@ -58,7 +51,6 @@ const PALETTES = [
   },
   {
     value: 'meadow',
-    label: 'Meadow',
     preview: {
       paper: '#f2f8f4',
       surface: '#ffffff',
@@ -69,7 +61,6 @@ const PALETTES = [
   },
   {
     value: 'cobalt',
-    label: 'Cobalt',
     preview: {
       paper: '#f4f5f7',
       surface: '#ffffff',
@@ -80,7 +71,6 @@ const PALETTES = [
   },
   {
     value: 'crimson',
-    label: 'Crimson',
     preview: {
       paper: '#f4f5f7',
       surface: '#ffffff',
@@ -91,22 +81,13 @@ const PALETTES = [
   },
 ];
 const PAGE_SIZES = [10, 25, 50, 100];
-const SORTS = [
-  { value: 'newest', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'name', label: 'Name (A to Z)' },
-  { value: 'code', label: 'Student code' },
-];
-const TABS = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'period', label: 'By period' },
-  { value: 'parameter', label: 'By parameter' },
-];
+const SORTS = ['newest', 'oldest', 'name', 'code'];
+const TABS = ['overview', 'period', 'parameter'];
 
 function PreferencesPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { preferences, update, reset } = usePreferences();
   const { can } = useAuth();
-  const { t } = useTranslation();
   // The "hide parameters from the overview" control only makes sense for a role
   // that can actually see parameters; without parameters.view the query would
   // 403. Gate both the fetch and the section on the permission.
@@ -124,68 +105,71 @@ function PreferencesPage() {
   }
 
   function handleReset() {
-    if (window.confirm('Reset all your preferences to the defaults?')) {
+    if (window.confirm(t('preferences.resetConfirm'))) {
       reset.mutate();
     }
   }
 
   let status = null;
   if (update.isPending || reset.isPending) {
-    status = <span>Saving...</span>;
+    status = <span>{t('preferences.statusSaving')}</span>;
   } else if (update.isError) {
     status = (
       <span className="error" role="alert">
-        Could not save: {update.error.message}
+        {t('preferences.statusSaveError', {
+          message: errorMessage(update.error),
+        })}
       </span>
     );
   } else if (reset.isError) {
     status = (
       <span className="error" role="alert">
-        Could not reset: {reset.error.message}
+        {t('preferences.statusResetError', {
+          message: errorMessage(reset.error),
+        })}
       </span>
     );
   } else if (update.isSuccess || reset.isSuccess) {
     status = (
       <span className="success" role="status">
-        Saved.
+        {t('preferences.statusSaved')}
       </span>
     );
   }
 
   return (
     <main>
-      <h1>Preferences</h1>
-      <p className="hint">
-        These settings are yours alone, and follow you to any computer. Changes
-        are saved as soon as you make them.
-      </p>
+      <h1>{t('preferences.title')}</h1>
+      <p className="hint">{t('preferences.hint')}</p>
       <p role="status" className="status-line">
         {status}
       </p>
 
       <section className="section-card">
-        <h2>Appearance</h2>
-        <p className="hint">
-          Choose light or dark, then pick a palette that recolors the whole app.
-        </p>
+        <h2>{t('preferences.appearance')}</h2>
+        <p className="hint">{t('preferences.appearanceHint')}</p>
         <fieldset className="pref-group">
-          <legend>Theme</legend>
-          <div className="segmented" role="radiogroup" aria-label="Theme">
-            {THEMES.map((option) => (
-              <label key={option.value}>
+          <legend>{t('preferences.theme')}</legend>
+          <div
+            className="segmented"
+            role="radiogroup"
+            aria-label={t('preferences.theme')}
+          >
+            {THEMES.map((value) => (
+              <label key={value}>
                 <input
                   type="radio"
                   name="theme"
-                  checked={preferences.theme === option.value}
-                  onChange={() => change({ theme: option.value })}
+                  checked={preferences.theme === value}
+                  onChange={() => change({ theme: value })}
                 />
-                {option.label}
+                {t(`preferences.themes.${value}`)}
               </label>
             ))}
           </div>
         </fieldset>
         <fieldset className="pref-group">
-          <legend>Palette</legend>
+          <legend>{t('preferences.palette')}</legend>
           <div className="palette-swatches">
             {PALETTES.map((option) => (
               <label key={option.value} className="palette-option">
@@ -213,27 +197,27 @@ function PreferencesPage() {
                     <span className="palette-preview-dot" />
                   </span>
                 </span>
-                <span className="palette-name">{option.label}</span>
+                <span className="palette-name">
+                  {t(`preferences.palettes.${option.value}`)}
+                </span>
               </label>
             ))}
           </div>
-          <p className="hint">
-            Recolors the whole interface — the sidebar, surfaces, and highlight
-            color. Each palette has a light and a dark version, so the theme
-            setting above still applies.
-          </p>
+          <p className="hint">{t('preferences.paletteHint')}</p>
         </fieldset>
       </section>
 
       <section className="section-card">
-        <h2>{t('preferences.languageTitle')}</h2>
-        <p className="hint">{t('preferences.languageHint')}</p>
+        <h2>{t('common:preferences.languageTitle')}</h2>
+        <p className="hint">{t('common:preferences.languageHint')}</p>
         <fieldset className="pref-group">
-          <legend aria-hidden="true">{t('preferences.languageTitle')}</legend>
+          <legend aria-hidden="true">
+            {t('common:preferences.languageTitle')}
+          </legend>
           <div
             className="segmented"
             role="radiogroup"
-            aria-label={t('preferences.languageTitle')}
+            aria-label={t('common:preferences.languageTitle')}
           >
             {LANGUAGES.map((code) => (
               <label key={code}>
@@ -243,7 +227,7 @@ function PreferencesPage() {
                   checked={(preferences.language ?? 'fa') === code}
                   onChange={() => change({ language: code })}
                 />
-                {t(`language.${code}`)}
+                {t(`common:language.${code}`)}
               </label>
             ))}
           </div>
@@ -251,10 +235,10 @@ function PreferencesPage() {
       </section>
 
       <section className="section-card">
-        <h2>Students list</h2>
+        <h2>{t('preferences.studentsList')}</h2>
         <div className="pref-group">
           <label className="inline">
-            Rows per page
+            {t('preferences.rowsPerPage')}
             <select
               value={preferences.studentsPageSize}
               onChange={(event) =>
@@ -269,14 +253,14 @@ function PreferencesPage() {
             </select>
           </label>
           <label className="inline">
-            Sort by
+            {t('preferences.sortBy')}
             <select
               value={preferences.studentsSort}
               onChange={(event) => change({ studentsSort: event.target.value })}
             >
-              {SORTS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {SORTS.map((value) => (
+                <option key={value} value={value}>
+                  {t(`preferences.sorts.${value}`)}
                 </option>
               ))}
             </select>
@@ -289,7 +273,7 @@ function PreferencesPage() {
                 change({ studentsShowCode: event.target.checked })
               }
             />
-            Show the code column
+            {t('preferences.showCode')}
           </label>
           <label className="inline">
             <input
@@ -299,28 +283,28 @@ function PreferencesPage() {
                 change({ studentsShowAdded: event.target.checked })
               }
             />
-            Show the "Added" column
+            {t('preferences.showAdded')}
           </label>
         </div>
         {canEnterScores && (
-          <p className="hint">The sort order also applies on the Evaluate page.</p>
+          <p className="hint">{t('preferences.sortHint')}</p>
         )}
       </section>
 
       <section className="section-card">
-        <h2>Student page</h2>
+        <h2>{t('preferences.studentPage')}</h2>
         <div className="pref-group">
           <label className="inline">
-            Open on
+            {t('preferences.openOn')}
             <select
               value={preferences.studentDefaultTab}
               onChange={(event) =>
                 change({ studentDefaultTab: event.target.value })
               }
             >
-              {TABS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {TABS.map((value) => (
+                <option key={value} value={value}>
+                  {t(`preferences.tabs.${value}`)}
                 </option>
               ))}
             </select>
@@ -333,19 +317,21 @@ function PreferencesPage() {
                 change({ studentShowAllPeriods: event.target.checked })
               }
             />
-            Show all periods in the overview, not just from the first score
+            {t('preferences.showAllPeriods')}
           </label>
         </div>
 
         {canViewParameters && (
           <>
-            <h3>Parameters shown in the overview</h3>
-            {parametersQuery.isPending && <p className="hint">Loading…</p>}
+            <h3>{t('preferences.parametersShown')}</h3>
+            {parametersQuery.isPending && (
+              <p className="hint">{t('common:status.loading')}</p>
+            )}
             {parametersQuery.isError && (
-              <p className="error">{parametersQuery.error.message}</p>
+              <p className="error">{errorMessage(parametersQuery.error)}</p>
             )}
             {parametersQuery.data && parametersQuery.data.length === 0 && (
-              <p className="hint">No parameters yet.</p>
+              <p className="hint">{t('preferences.noParameters')}</p>
             )}
             <div className="pref-group">
               {parametersQuery.data?.map((parameter) => (
@@ -367,45 +353,35 @@ function PreferencesPage() {
                 </label>
               ))}
             </div>
-            <p className="hint">
-              Hidden parameters still appear in the "By period" and "By parameter"
-              views.
-            </p>
+            <p className="hint">{t('preferences.hiddenStillShown')}</p>
           </>
         )}
       </section>
 
       {canExport && (
         <section className="section-card">
-          <h2>Spreadsheet export</h2>
+          <h2>{t('preferences.export')}</h2>
           <div className="pref-group">
             <label className="inline">
-              Separator between columns
+              {t('preferences.separator')}
               <select
                 value={preferences.csvDelimiter}
                 onChange={(event) => change({ csvDelimiter: event.target.value })}
               >
-                <option value=",">Comma ( , )</option>
-                <option value=";">Semicolon ( ; )</option>
+                <option value=",">{t('preferences.sepComma')}</option>
+                <option value=";">{t('preferences.sepSemicolon')}</option>
               </select>
             </label>
           </div>
-          <p className="hint">
-            If your spreadsheet opens an export with everything in one column,
-            switch to the other separator. Programs set up for regions that
-            write decimals with commas usually expect semicolons.
-          </p>
+          <p className="hint">{t('preferences.exportHint')}</p>
         </section>
       )}
 
       <section className="section-card">
-        <h2>Reset preferences</h2>
-        <p className="hint">
-          Put every preference above back to its default. This only affects your
-          own settings.
-        </p>
+        <h2>{t('preferences.resetTitle')}</h2>
+        <p className="hint">{t('preferences.resetHint')}</p>
         <button type="button" onClick={handleReset} disabled={reset.isPending}>
-          Reset all to defaults
+          {t('preferences.resetBtn')}
         </button>
       </section>
     </main>

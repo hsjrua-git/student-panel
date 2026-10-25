@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import {
@@ -13,6 +14,7 @@ import {
 import { listStudents } from '../api/students.js';
 import { formatIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
+import { errorMessage } from '../i18n/errors.js';
 
 function buildTree(groups) {
   const byParent = new Map();
@@ -32,6 +34,7 @@ function buildTree(groups) {
 }
 
 function MemberPanel({ group, onClose }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const debounced = useDebouncedValue(search, 250);
@@ -64,18 +67,20 @@ function MemberPanel({ group, onClose }) {
   return (
     <section className="group-members section-card">
       <div className="toolbar">
-        <h2>Members of {group.name}</h2>
+        <h2>{t('groups.membersTitle', { name: group.name })}</h2>
         <button type="button" onClick={onClose}>
-          Done
+          {t('common:actions.done')}
         </button>
       </div>
 
       <div className="two-col">
         <div>
-          <h3>In this group</h3>
-          {membersQuery.isPending && <p className="hint">Loading…</p>}
+          <h3>{t('groups.inThisGroup')}</h3>
+          {membersQuery.isPending && (
+            <p className="hint">{t('common:status.loading')}</p>
+          )}
           {membersQuery.data?.length === 0 && (
-            <p className="hint">No students yet.</p>
+            <p className="hint">{t('groups.noStudents')}</p>
           )}
           <ul className="plain-list">
             {openMembers.map((student) => (
@@ -88,14 +93,14 @@ function MemberPanel({ group, onClose }) {
                   onClick={() => change.mutate({ remove: [student.id] })}
                   disabled={change.isPending}
                 >
-                  Remove
+                  {t('groups.remove')}
                 </button>
               </li>
             ))}
           </ul>
           {pastMembers.length > 0 && (
             <>
-              <h3>Past members</h3>
+              <h3>{t('groups.pastMembers')}</h3>
               <ul className="plain-list">
                 {pastMembers.map((student) => (
                   <li key={student.id} className="hint">
@@ -110,7 +115,7 @@ function MemberPanel({ group, onClose }) {
                   onClick={() => change.mutate({ add: [student.id] })}
                   disabled={change.isPending}
                 >
-                  Re-add
+                  {t('groups.reAdd')}
                 </button>
                   </li>
                 ))}
@@ -120,14 +125,14 @@ function MemberPanel({ group, onClose }) {
         </div>
 
         <div>
-          <h3>Add students</h3>
+          <h3>{t('groups.addStudents')}</h3>
           <input
             type="search"
             className="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name or code"
-            aria-label="Search students to add"
+            placeholder={t('groups.searchPlaceholder')}
+            aria-label={t('groups.searchLabel')}
           />
           <ul className="plain-list">
             {searchQuery.data?.students
@@ -142,7 +147,7 @@ function MemberPanel({ group, onClose }) {
                     onClick={() => change.mutate({ add: [student.id] })}
                     disabled={change.isPending}
                   >
-                    Add
+                    {t('common:actions.add')}
                   </button>
                 </li>
               ))}
@@ -151,7 +156,7 @@ function MemberPanel({ group, onClose }) {
       </div>
       {change.isError && (
         <p className="error" role="alert">
-          {change.error.message}
+          {errorMessage(change.error)}
         </p>
       )}
     </section>
@@ -159,6 +164,7 @@ function MemberPanel({ group, onClose }) {
 }
 
 function NewGroupForm({ groups }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
@@ -180,7 +186,7 @@ function NewGroupForm({ groups }) {
     <form onSubmit={handleSubmit}>
       <div className="form-grid">
         <label>
-          Group name
+          {t('groups.name')}
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -189,15 +195,15 @@ function NewGroupForm({ groups }) {
           />
         </label>
         <label>
-          Inside
+          {t('groups.inside')}
           <select
             value={parentId}
             onChange={(event) => setParentId(event.target.value)}
           >
-            <option value="">(top level)</option>
+            <option value="">{t('groups.topLevel')}</option>
             {groups.map((group) => (
               <option key={group.id} value={group.id}>
-                {' '.repeat(group.depth * 2)}
+                {' '.repeat(group.depth * 2)}
                 {group.name}
               </option>
             ))}
@@ -205,11 +211,11 @@ function NewGroupForm({ groups }) {
         </label>
       </div>
       <button type="submit" disabled={create.isPending || name.trim() === ''}>
-        {create.isPending ? 'Adding…' : 'Add group'}
+        {create.isPending ? t('groups.adding') : t('groups.submit')}
       </button>
       {create.isError && (
         <p className="error" role="alert">
-          {create.error.message}
+          {errorMessage(create.error)}
         </p>
       )}
     </form>
@@ -217,6 +223,7 @@ function NewGroupForm({ groups }) {
 }
 
 function GroupRow({ group, groups, onManage }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(group.name);
@@ -248,7 +255,7 @@ function GroupRow({ group, groups, onManage }) {
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={60}
-              aria-label={`Rename ${group.name}`}
+              aria-label={t('groups.renameLabel', { name: group.name })}
             />
           ) : (
             group.name
@@ -264,10 +271,10 @@ function GroupRow({ group, groups, onManage }) {
               onClick={() => update.mutate({ name })}
               disabled={update.isPending}
             >
-              Save
+              {t('common:actions.save')}
             </button>
             <button type="button" onClick={() => setRenaming(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </button>
           </>
         ) : moving ? (
@@ -275,14 +282,14 @@ function GroupRow({ group, groups, onManage }) {
             <select
               value={parentId}
               onChange={(event) => setParentId(event.target.value)}
-              aria-label={`Move ${group.name}`}
+              aria-label={t('groups.moveLabel', { name: group.name })}
             >
-              <option value="">(top level)</option>
+              <option value="">{t('groups.topLevel')}</option>
               {groups
                 .filter((candidate) => candidate.id !== group.id)
                 .map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
-                    {' '.repeat(candidate.depth * 2)}
+                    {' '.repeat(candidate.depth * 2)}
                     {candidate.name}
                   </option>
                 ))}
@@ -292,37 +299,42 @@ function GroupRow({ group, groups, onManage }) {
               onClick={() => update.mutate({ parentId: parentId || null })}
               disabled={update.isPending}
             >
-              Move
+              {t('groups.move')}
             </button>
             <button type="button" onClick={() => setMoving(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </button>
           </>
         ) : (
           <>
             <button type="button" onClick={() => onManage(group)}>
-              Members
+              {t('groups.members')}
             </button>
             <button type="button" onClick={() => setRenaming(true)}>
-              Rename
+              {t('groups.rename')}
             </button>
             <button type="button" onClick={() => setMoving(true)}>
-              Move
+              {t('groups.move')}
             </button>
             <button
               type="button"
               onClick={() => {
-                if (window.confirm(`Archive "${group.name}"?`)) archive.mutate();
+                if (
+                  window.confirm(
+                    t('groups.archiveConfirm', { name: group.name })
+                  )
+                )
+                  archive.mutate();
               }}
               disabled={archive.isPending}
             >
-              Archive
+              {t('common:actions.archive')}
             </button>
           </>
         )}
         {(update.isError || archive.isError) && (
           <p className="error" role="alert">
-            {(update.error ?? archive.error).message}
+            {errorMessage(update.error ?? archive.error)}
           </p>
         )}
       </td>
@@ -331,6 +343,7 @@ function GroupRow({ group, groups, onManage }) {
 }
 
 function GroupsPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { can } = useAuth();
   const [managing, setManaging] = useState(null);
 
@@ -344,8 +357,8 @@ function GroupsPage() {
     return (
       <main>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to manage groups."
+          title={t('groups.readOnlyTitle')}
+          description={t('groups.readOnlyDescription')}
         />
       </main>
     );
@@ -353,34 +366,33 @@ function GroupsPage() {
 
   return (
     <main className="wide">
-      <h1>Groups</h1>
-      <p className="hint">
-        Organise students into groups and subgroups (any depth). Filtering by a
-        group includes everyone in its subgroups too.
-      </p>
+      <h1>{t('groups.title')}</h1>
+      <p className="hint">{t('groups.hint')}</p>
 
       <section className="section-card">
-        <h2>Add a group</h2>
+        <h2>{t('groups.addTitle')}</h2>
         <NewGroupForm groups={tree} />
       </section>
 
       <section className="section-card">
-        <h2>Groups</h2>
-        {groupsQuery.isPending && <p className="hint">Loading…</p>}
+        <h2>{t('groups.listTitle')}</h2>
+        {groupsQuery.isPending && (
+          <p className="hint">{t('common:status.loading')}</p>
+        )}
         {groupsQuery.isError && (
-          <p className="error">{groupsQuery.error.message}</p>
+          <p className="error">{errorMessage(groupsQuery.error)}</p>
         )}
         {groupsQuery.data && tree.length === 0 && (
-          <p className="hint">No groups yet.</p>
+          <p className="hint">{t('groups.empty')}</p>
         )}
         {tree.length > 0 && (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Group</th>
-                  <th>Members</th>
-                  <th>Actions</th>
+                  <th>{t('groups.colGroup')}</th>
+                  <th>{t('groups.colMembers')}</th>
+                  <th>{t('common:table.actions')}</th>
                 </tr>
               </thead>
               <tbody>

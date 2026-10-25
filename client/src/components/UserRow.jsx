@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { resetUserPassword, updateUser } from '../api/users.js';
 import { listRoles } from '../api/roles.js';
 import { formatDateTime } from '../lib/format.js';
 import { roleLabel } from '../lib/roleLabels.js';
+import { errorMessage } from '../i18n/errors.js';
 
 function UserRow({ user, isSelf, onNotice }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState(user.fullName);
@@ -66,7 +69,7 @@ function UserRow({ user, isSelf, onNotice }) {
   function handleToggleActive() {
     if (user.isActive) {
       const ok = window.confirm(
-        `Deactivate ${user.username}? They will be signed out and cannot sign in until you reactivate the account.`
+        t('users.row.deactivateConfirm', { name: user.username })
       );
       if (!ok) return;
     }
@@ -75,7 +78,7 @@ function UserRow({ user, isSelf, onNotice }) {
 
   function handleReset() {
     const ok = window.confirm(
-      `Reset the password of ${user.username}? They will be signed out everywhere and must choose a new password at their next sign-in.`
+      t('users.row.resetConfirm', { name: user.username })
     );
     if (ok) reset.mutate();
   }
@@ -84,7 +87,7 @@ function UserRow({ user, isSelf, onNotice }) {
     <tr className={user.isActive ? undefined : 'inactive'}>
       <td>
         {user.username}
-        {isSelf && <span className="hint"> (you)</span>}
+        {isSelf && <span className="hint"> {t('users.row.you')}</span>}
       </td>
       <td>
         {isEditing ? (
@@ -92,7 +95,7 @@ function UserRow({ user, isSelf, onNotice }) {
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
             maxLength={100}
-            aria-label={`Full name of ${user.username}`}
+            aria-label={t('users.row.fullNameLabel', { name: user.username })}
             autoComplete="off"
           />
         ) : (
@@ -105,7 +108,7 @@ function UserRow({ user, isSelf, onNotice }) {
             value={roleId}
             onChange={(event) => setRoleId(event.target.value)}
             disabled={isSelf}
-            aria-label={`Role of ${user.username}`}
+            aria-label={t('users.row.roleLabel', { name: user.username })}
           >
             {/* Keep the current role visible even before the list loads. */}
             {roles.length === 0 && (
@@ -123,29 +126,31 @@ function UserRow({ user, isSelf, onNotice }) {
       </td>
       <td>
         <span className={user.isActive ? 'badge ok' : 'badge'}>
-          {user.isActive ? 'Active' : 'Inactive'}
+          {user.isActive ? t('users.row.active') : t('users.row.inactive')}
         </span>
         {user.mustChangePassword && (
-          <div className="hint">Must change password</div>
+          <div className="hint">{t('users.row.mustChangePassword')}</div>
         )}
       </td>
       <td className="nowrap">
-        {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Never'}
+        {user.lastLoginAt
+          ? formatDateTime(user.lastLoginAt)
+          : t('users.row.never')}
       </td>
       <td className="actions">
         {isEditing ? (
           <>
             <button type="button" onClick={handleSave} disabled={update.isPending}>
-              Save
+              {t('common:actions.save')}
             </button>
             <button type="button" onClick={() => setIsEditing(false)}>
-              Cancel
+              {t('common:actions.cancel')}
             </button>
           </>
         ) : (
           <>
             <button type="button" onClick={startEditing}>
-              Edit
+              {t('common:actions.edit')}
             </button>
             {!isSelf && (
               <>
@@ -154,7 +159,7 @@ function UserRow({ user, isSelf, onNotice }) {
                   onClick={handleReset}
                   disabled={reset.isPending}
                 >
-                  Reset password
+                  {t('users.row.resetPassword')}
                 </button>
                 <button
                   type="button"
@@ -162,14 +167,18 @@ function UserRow({ user, isSelf, onNotice }) {
                   onClick={handleToggleActive}
                   disabled={update.isPending}
                 >
-                  {user.isActive ? 'Deactivate' : 'Reactivate'}
+                  {user.isActive
+                    ? t('users.row.deactivate')
+                    : t('users.row.reactivate')}
                 </button>
               </>
             )}
           </>
         )}
-        {update.isError && <p className="error">{update.error.message}</p>}
-        {reset.isError && <p className="error">{reset.error.message}</p>}
+        {update.isError && (
+          <p className="error">{errorMessage(update.error)}</p>
+        )}
+        {reset.isError && <p className="error">{errorMessage(reset.error)}</p>}
       </td>
     </tr>
   );

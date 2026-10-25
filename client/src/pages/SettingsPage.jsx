@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { setPeriodAnchor } from '../api/periods.js';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import { usePeriods } from '../lib/usePeriods.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 
 function lastSaturday() {
   const date = new Date();
@@ -17,29 +19,39 @@ function isSaturday(isoDate) {
 }
 
 function PeriodSummary({ data }) {
+  const { t } = useTranslation(['admin', 'common']);
   if (!data.anchorDate) {
-    return <p className="hint">No start date is set yet. Pick one below to begin.</p>;
+    return <p className="hint">{t('settings.noAnchor')}</p>;
   }
   if (data.current === null) {
-    return <p className="hint">Period 1 starts on {formatIsoDate(data.anchorDate)}.</p>;
+    return (
+      <p className="hint">
+        {t('settings.period1Starts', { date: formatIsoDate(data.anchorDate) })}
+      </p>
+    );
   }
   const currentPeriod = data.periods[data.periods.length - 1];
   return (
     <>
       <div className="stat-card kpi-callout">
-        <div className="stat-label">Current period</div>
-        <div className="stat-value">Period {data.current}</div>
+        <div className="stat-label">{t('settings.currentPeriod')}</div>
+        <div className="stat-value">
+          {t('settings.periodValue', { number: data.current })}
+        </div>
         <div className="hint">
           {formatIsoDate(currentPeriod.startDate)} –{' '}
           {formatIsoDate(currentPeriod.endDate)}
         </div>
       </div>
-      <p className="hint">Today is {formatIsoDate(data.today)}.</p>
+      <p className="hint">
+        {t('settings.today', { date: formatIsoDate(data.today) })}
+      </p>
     </>
   );
 }
 
 function AnchorForm({ savedAnchor }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [anchorDate, setAnchorDate] = useState(savedAnchor ?? lastSaturday());
   const [problem, setProblem] = useState(null);
@@ -53,7 +65,7 @@ function AnchorForm({ savedAnchor }) {
     event.preventDefault();
     if (!anchorDate || !isSaturday(anchorDate)) {
       mutation.reset();
-      setProblem('Please pick a Saturday.');
+      setProblem(t('settings.notSaturday'));
       return;
     }
     setProblem(null);
@@ -62,7 +74,7 @@ function AnchorForm({ savedAnchor }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <label htmlFor="anchorDate">First day of Period 1 (a Saturday)</label>
+      <label htmlFor="anchorDate">{t('settings.anchorLabel')}</label>
       <div className="row">
         <input
           id="anchorDate"
@@ -71,7 +83,9 @@ function AnchorForm({ savedAnchor }) {
           onChange={(event) => setAnchorDate(event.target.value)}
         />
         <button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? 'Saving...' : 'Save'}
+          {mutation.isPending
+            ? t('common:actions.saving')
+            : t('common:actions.save')}
         </button>
       </div>
       {problem && (
@@ -81,12 +95,12 @@ function AnchorForm({ savedAnchor }) {
       )}
       {mutation.isError && (
         <p className="error" role="alert">
-          {mutation.error.message}
+          {errorMessage(mutation.error)}
         </p>
       )}
       {mutation.isSuccess && (
         <p className="success" role="status">
-          Saved.
+          {t('settings.saved')}
         </p>
       )}
     </form>
@@ -94,29 +108,23 @@ function AnchorForm({ savedAnchor }) {
 }
 
 function SettingsPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { data, isPending, isError, error } = usePeriods();
   const { can } = useAuth();
 
   return (
     <main>
-      <h1>Settings</h1>
+      <h1>{t('settings.title')}</h1>
       <section className="section-card">
-        <h2>Periods</h2>
-        <p>
-          Evaluations are grouped into periods. Each period is one week, from
-          Saturday to Friday, numbered from Period 1. Period 1 starts on the
-          date below.
-        </p>
-        {isPending && <p className="hint">Loading…</p>}
-        {isError && <p className="error">{error.message}</p>}
+        <h2>{t('settings.periodsTitle')}</h2>
+        <p>{t('settings.periodsIntro')}</p>
+        {isPending && <p className="hint">{t('common:status.loading')}</p>}
+        {isError && <p className="error">{errorMessage(error)}</p>}
         {data && <PeriodSummary data={data} />}
         {data && can('settings.manage') && (
           <AnchorForm savedAnchor={data.anchorDate} />
         )}
-        <p className="hint">
-          The start date can only be changed until the first score is saved,
-          because changing it would move every saved score to a different week.
-        </p>
+        <p className="hint">{t('settings.anchorHint')}</p>
       </section>
     </main>
   );

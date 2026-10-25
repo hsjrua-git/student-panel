@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   archiveAssignment,
   archiveInterval,
@@ -18,15 +19,17 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
+import { errorMessage } from '../i18n/errors.js';
 
 // The schedule lists recurring assignments: a teacher meets a group (or one
 // student) on an interval from an anchor date. Sessions are generated from
 // these; the assignment itself stores no occurrences.
 
-function formatEvery(every) {
+function formatEvery(every, t) {
   if (!every) return '—';
-  if (every.months) return `${every.months} ${every.months === 1 ? 'month' : 'months'}`;
-  if (every.days) return `${every.days} ${every.days === 1 ? 'day' : 'days'}`;
+  if (every.months)
+    return t('schedule.everyMonth', { count: every.months });
+  if (every.days) return t('schedule.everyDay', { count: every.days });
   return '—';
 }
 
@@ -52,12 +55,17 @@ function nextOccurrence(anchorDate, every) {
   return null;
 }
 
-function targetLabel(assignment) {
-  if (assignment.groupId) return `Group ${assignment.groupName}`;
-  return `${assignment.studentName} (${assignment.studentGroupName})`;
+function targetLabel(assignment, t) {
+  if (assignment.groupId)
+    return t('schedule.targetGroup', { name: assignment.groupName });
+  return t('schedule.targetStudent', {
+    student: assignment.studentName,
+    group: assignment.studentGroupName,
+  });
 }
 
 function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const isEdit = assignment !== null;
 
@@ -136,14 +144,14 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
 
   return (
     <form onSubmit={handleSubmit} className="edit-form">
-      <label htmlFor="assignment-teacher">Teacher</label>
+      <label htmlFor="assignment-teacher">{t('schedule.form.teacher')}</label>
       <select
         id="assignment-teacher"
         value={teacherId}
         onChange={(event) => setTeacherId(event.target.value)}
         disabled={save.isPending}
       >
-        <option value="">Choose a teacher…</option>
+        <option value="">{t('schedule.form.chooseTeacher')}</option>
         {teachers
           .filter((teacher) => !teacher.archivedAt)
           .map((teacher) => (
@@ -153,24 +161,24 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
           ))}
       </select>
 
-      <label htmlFor="assignment-interval">Every</label>
+      <label htmlFor="assignment-interval">{t('schedule.form.every')}</label>
       <select
         id="assignment-interval"
         value={intervalId}
         onChange={(event) => setIntervalId(event.target.value)}
         disabled={save.isPending}
       >
-        <option value="">Choose an interval…</option>
+        <option value="">{t('schedule.form.chooseInterval')}</option>
         {intervals
           .filter((interval) => !interval.archivedAt)
           .map((interval) => (
             <option key={interval.id} value={interval.id}>
-              {interval.name} ({formatEvery(interval.every)})
+              {interval.name} ({formatEvery(interval.every, t)})
             </option>
           ))}
       </select>
 
-      <label htmlFor="assignment-anchor">Starting from (anchor date)</label>
+      <label htmlFor="assignment-anchor">{t('schedule.form.anchor')}</label>
       <input
         id="assignment-anchor"
         type="date"
@@ -179,25 +187,28 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
         disabled={save.isPending}
       />
 
-      <label htmlFor="assignment-name">Name (optional)</label>
+      <label htmlFor="assignment-name">
+        {t('schedule.form.nameOptional')}
+      </label>
       <input
         id="assignment-name"
         value={name}
         onChange={(event) => setName(event.target.value)}
         maxLength={100}
-        placeholder="e.g. Monday maths"
+        placeholder={t('schedule.form.namePlaceholder')}
         autoComplete="off"
         disabled={save.isPending}
       />
 
       {isEdit ? (
         <p className="hint">
-          Target: {targetLabel(assignment)} — archive this assignment and create
-          a new one to change the target.
+          {t('schedule.form.targetEditHint', {
+            target: targetLabel(assignment, t),
+          })}
         </p>
       ) : (
         <>
-          <label>Target</label>
+          <label>{t('schedule.form.target')}</label>
           <div className="row">
             <label className="hint">
               <input
@@ -207,7 +218,7 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
                 onChange={() => setTargetKind('group')}
                 disabled={save.isPending}
               />{' '}
-              Whole group
+              {t('schedule.form.wholeGroup')}
             </label>
             <label className="hint">
               <input
@@ -217,20 +228,22 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
                 onChange={() => setTargetKind('member')}
                 disabled={save.isPending}
               />{' '}
-              One student
+              {t('schedule.form.oneStudent')}
             </label>
           </div>
 
           {targetKind === 'group' ? (
             <>
-              <label htmlFor="assignment-group">Group</label>
+              <label htmlFor="assignment-group">
+                {t('schedule.form.group')}
+              </label>
               <select
                 id="assignment-group"
                 value={groupId}
                 onChange={(event) => setGroupId(event.target.value)}
                 disabled={save.isPending}
               >
-                <option value="">Choose a group…</option>
+                <option value="">{t('schedule.form.chooseGroup')}</option>
                 {groups
                   .filter((group) => !group.archivedAt)
                   .map((group) => (
@@ -242,7 +255,9 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
             </>
           ) : (
             <>
-              <label htmlFor="assignment-student">Student</label>
+              <label htmlFor="assignment-student">
+                {t('schedule.form.student')}
+              </label>
               {pickedStudent === null ? (
                 <>
                   <input
@@ -251,7 +266,7 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
                     className="search"
                     value={studentSearch}
                     onChange={(event) => setStudentSearch(event.target.value)}
-                    placeholder="Search by name or code"
+                    placeholder={t('schedule.form.searchPlaceholder')}
                     autoComplete="off"
                     disabled={save.isPending}
                   />
@@ -266,7 +281,7 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
                           onClick={() => pickStudent(student)}
                           disabled={save.isPending}
                         >
-                          Choose
+                          {t('schedule.form.choose')}
                         </button>
                       </li>
                     ))}
@@ -278,12 +293,12 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
                     {pickedStudent.fullName}{' '}
                     {memberships.length > 1 && (
                       <select
-                        aria-label="Which group membership"
+                        aria-label={t('schedule.form.membershipLabel')}
                         value={membershipId}
                         onChange={(event) => setMembershipId(event.target.value)}
                         disabled={save.isPending}
                       >
-                        <option value="">Which group?…</option>
+                        <option value="">{t('schedule.form.whichGroup')}</option>
                         {memberships.map((membership) => (
                           <option key={membership.membershipId} value={membership.membershipId}>
                             {membership.groupName}
@@ -301,14 +316,12 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
                     }}
                     disabled={save.isPending}
                   >
-                    Change
+                    {t('schedule.form.change')}
                   </button>
                 </div>
               )}
               {pickedStudent !== null && memberships.length === 0 && (
-                <p className="hint">
-                  This student is not currently in any live group.
-                </p>
+                <p className="hint">{t('schedule.form.noLiveGroup')}</p>
               )}
             </>
           )}
@@ -317,22 +330,26 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
 
       <div className="row">
         <button type="submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving...' : isEdit ? 'Save assignment' : 'Add assignment'}
+          {save.isPending
+            ? t('common:actions.saving')
+            : isEdit
+              ? t('schedule.form.save')
+              : t('schedule.form.add')}
         </button>
         {isEdit && (
           <button type="button" onClick={onDone} disabled={save.isPending}>
-            Cancel
+            {t('common:actions.cancel')}
           </button>
         )}
       </div>
       {save.isError && (
         <p className="error" role="alert">
-          {save.error.message}
+          {errorMessage(save.error)}
         </p>
       )}
       {save.isSuccess && !isEdit && (
         <p className="success" role="status">
-          Assignment added.
+          {t('schedule.form.added')}
         </p>
       )}
     </form>
@@ -340,6 +357,7 @@ function AssignmentForm({ assignment, teachers, intervals, groups, onDone }) {
 }
 
 function IntervalsManager({ intervals }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [count, setCount] = useState(7);
@@ -375,20 +393,20 @@ function IntervalsManager({ intervals }) {
 
   return (
     <section className="section-card">
-      <h2>Session intervals</h2>
+      <h2>{t('schedule.intervals.title')}</h2>
       <table>
         <thead>
           <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Every</th>
-            <th scope="col">Actions</th>
+            <th scope="col">{t('schedule.intervals.colName')}</th>
+            <th scope="col">{t('schedule.intervals.colEvery')}</th>
+            <th scope="col">{t('common:table.actions')}</th>
           </tr>
         </thead>
         <tbody>
           {intervals.map((interval) => (
             <tr key={interval.id} className={interval.archivedAt ? 'stale' : undefined}>
               <th scope="row">{interval.name}</th>
-              <td>{formatEvery(interval.every)}</td>
+              <td>{formatEvery(interval.every, t)}</td>
               <td>
                 {interval.archivedAt ? (
                   <button
@@ -397,7 +415,7 @@ function IntervalsManager({ intervals }) {
                     onClick={() => restore.mutate(interval.id)}
                     disabled={archive.isPending || restore.isPending}
                   >
-                    Restore
+                    {t('common:actions.restore')}
                   </button>
                 ) : (
                   <button
@@ -406,7 +424,7 @@ function IntervalsManager({ intervals }) {
                     onClick={() => archive.mutate(interval.id)}
                     disabled={archive.isPending || restore.isPending}
                   >
-                    Archive
+                    {t('common:actions.archive')}
                   </button>
                 )}
               </td>
@@ -416,17 +434,21 @@ function IntervalsManager({ intervals }) {
       </table>
 
       <form onSubmit={handleSubmit} className="edit-form">
-        <label htmlFor="interval-name">New interval name</label>
+        <label htmlFor="interval-name">
+          {t('schedule.intervals.newName')}
+        </label>
         <input
           id="interval-name"
           value={name}
           onChange={(event) => setName(event.target.value)}
           maxLength={60}
-          placeholder="e.g. Weekly"
+          placeholder={t('schedule.intervals.namePlaceholder')}
           autoComplete="off"
           disabled={save.isPending}
         />
-        <label htmlFor="interval-count">Every</label>
+        <label htmlFor="interval-count">
+          {t('schedule.intervals.everyLabel')}
+        </label>
         <div className="row">
           <input
             id="interval-count"
@@ -438,25 +460,30 @@ function IntervalsManager({ intervals }) {
             disabled={save.isPending}
           />
           <select
-            aria-label="Unit"
+            aria-label={t('schedule.intervals.unitLabel')}
             value={unit}
             onChange={(event) => setUnit(event.target.value)}
             disabled={save.isPending}
           >
-            <option value="days">days</option>
-            <option value="months">months</option>
+            <option value="days">{t('schedule.intervals.unitDays')}</option>
+            <option value="months">{t('schedule.intervals.unitMonths')}</option>
           </select>
           <button type="submit" disabled={save.isPending}>
-            {save.isPending ? 'Adding...' : 'Add interval'}
+            {save.isPending
+              ? t('schedule.intervals.adding')
+              : t('schedule.intervals.add')}
           </button>
         </div>
-        {save.isError && <p className="error">{save.error.message}</p>}
+        {save.isError && (
+          <p className="error">{errorMessage(save.error)}</p>
+        )}
       </form>
     </section>
   );
 }
 
 function SchedulePage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { can } = useAuth();
   const queryClient = useQueryClient();
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -505,17 +532,14 @@ function SchedulePage() {
     <main className="wide">
       <div className="page-head">
         <div>
-          <h1>Schedule</h1>
-          <p className="hint">
-            Recurring assignments: a teacher meets a group or one student, on a
-            rhythm, from a start date.
-          </p>
+          <h1>{t('schedule.title')}</h1>
+          <p className="hint">{t('schedule.hint')}</p>
         </div>
       </div>
 
       {canUseForm && editingId === null && (
         <section className="section-card">
-          <h2>Add an assignment</h2>
+          <h2>{t('schedule.addTitle')}</h2>
           <AssignmentForm
             assignment={null}
             teachers={teachersQuery.data ?? []}
@@ -534,23 +558,25 @@ function SchedulePage() {
               checked={includeArchived}
               onChange={(event) => setIncludeArchived(event.target.checked)}
             />
-            Include archived
+            {t('schedule.includeArchived')}
           </label>
         </div>
 
-        {assignmentsQuery.isPending && <p className="hint">Loading…</p>}
+        {assignmentsQuery.isPending && (
+          <p className="hint">{t('common:status.loading')}</p>
+        )}
         {assignmentsQuery.isError && (
           <p className="error" role="alert">
-            {assignmentsQuery.error.message}
+            {errorMessage(assignmentsQuery.error)}
           </p>
         )}
         {assignments.length === 0 && !assignmentsQuery.isPending && (
           <EmptyState
-            title="No assignments yet"
+            title={t('schedule.emptyTitle')}
             description={
               canUseForm
-                ? 'Add the first recurring assignment with the form above.'
-                : 'An administrator needs to set up the schedule first.'
+                ? t('schedule.emptyCanForm')
+                : t('schedule.emptyNoForm')
             }
           />
         )}
@@ -559,14 +585,16 @@ function SchedulePage() {
           <table>
             <thead>
               <tr>
-                <th scope="col">Code</th>
-                <th scope="col">Name</th>
-                <th scope="col">Teacher</th>
-                <th scope="col">Target</th>
-                <th scope="col">Every</th>
-                <th scope="col">Anchor</th>
-                <th scope="col">Next</th>
-                {canManage && <th scope="col">Actions</th>}
+                <th scope="col">{t('common:table.code')}</th>
+                <th scope="col">{t('schedule.colName')}</th>
+                <th scope="col">{t('schedule.colTeacher')}</th>
+                <th scope="col">{t('schedule.colTarget')}</th>
+                <th scope="col">{t('schedule.colEvery')}</th>
+                <th scope="col">{t('schedule.colAnchor')}</th>
+                <th scope="col">{t('schedule.colNext')}</th>
+                {canManage && (
+                  <th scope="col">{t('common:table.actions')}</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -594,10 +622,12 @@ function SchedulePage() {
                     </td>
                     <td>{assignment.name ?? '—'}</td>
                     <td>{assignment.teacherName}</td>
-                    <td>{targetLabel(assignment)}</td>
+                    <td>{targetLabel(assignment, t)}</td>
                     <td>
                       {assignment.intervalName}{' '}
-                      <span className="hint">({formatEvery(assignment.every)})</span>
+                      <span className="hint">
+                        ({formatEvery(assignment.every, t)})
+                      </span>
                     </td>
                     <td>{formatIsoDate(assignment.anchorDate)}</td>
                     <td>
@@ -614,7 +644,7 @@ function SchedulePage() {
                             onClick={() => restore.mutate(assignment)}
                             disabled={archive.isPending || restore.isPending}
                           >
-                            Restore
+                            {t('common:actions.restore')}
                           </button>
                         ) : (
                           <>
@@ -624,7 +654,7 @@ function SchedulePage() {
                               onClick={() => setEditingId(assignment.id)}
                               disabled={archive.isPending || restore.isPending}
                             >
-                              Edit
+                              {t('common:actions.edit')}
                             </button>{' '}
                             <button
                               type="button"
@@ -632,7 +662,7 @@ function SchedulePage() {
                               onClick={() => archive.mutate(assignment.id)}
                               disabled={archive.isPending || restore.isPending}
                             >
-                              Archive
+                              {t('common:actions.archive')}
                             </button>
                           </>
                         )}

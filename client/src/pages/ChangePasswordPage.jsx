@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { errorMessage } from '../i18n/errors.js';
 
 const MIN_LENGTH = 10;
 
 function ChangePasswordPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { user, changePassword } = useAuth();
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState('');
@@ -17,12 +20,12 @@ function ChangePasswordPage() {
 
     if (newPassword.length < MIN_LENGTH) {
       changePassword.reset();
-      setProblem(`The new password must be at least ${MIN_LENGTH} characters.`);
+      setProblem(t('password.tooShort', { min: MIN_LENGTH }));
       return;
     }
     if (newPassword !== repeat) {
       changePassword.reset();
-      setProblem('The two new passwords do not match.');
+      setProblem(t('password.mismatch'));
       return;
     }
 
@@ -43,13 +46,11 @@ function ChangePasswordPage() {
 
   return (
     <main className="narrow">
-      <h1>Change password</h1>
-      {user.mustChangePassword && (
-        <p>You are using a temporary password. Choose a new one to continue.</p>
-      )}
+      <h1>{t('password.title')}</h1>
+      {user.mustChangePassword && <p>{t('password.tempNotice')}</p>}
       <form onSubmit={handleSubmit} className="edit-form">
         <label>
-          Current password
+          {t('password.current')}
           <input
             type="password"
             value={currentPassword}
@@ -58,7 +59,7 @@ function ChangePasswordPage() {
           />
         </label>
         <label>
-          New password
+          {t('password.new')}
           <input
             type="password"
             value={newPassword}
@@ -67,7 +68,7 @@ function ChangePasswordPage() {
           />
         </label>
         <label>
-          Repeat new password
+          {t('password.repeat')}
           <input
             type="password"
             value={repeat}
@@ -76,7 +77,9 @@ function ChangePasswordPage() {
           />
         </label>
         <button type="submit" disabled={changePassword.isPending}>
-          {changePassword.isPending ? 'Saving...' : 'Change password'}
+          {changePassword.isPending
+            ? t('password.saving')
+            : t('password.submit')}
         </button>
         {problem && (
           <p className="error" role="alert">
@@ -85,18 +88,16 @@ function ChangePasswordPage() {
         )}
         {changePassword.isError && (
           <p className="error" role="alert">
-            {changePassword.error.message}
+            {errorMessage(changePassword.error)}
           </p>
         )}
         {changePassword.isSuccess && !user.mustChangePassword && (
           <p className="success" role="status">
-            Password changed. Your other sessions were signed out.
+            {t('password.success')}
           </p>
         )}
       </form>
-      <p className="hint">
-        Use at least {MIN_LENGTH} characters. Several random words work well.
-      </p>
+      <p className="hint">{t('password.hint', { min: MIN_LENGTH })}</p>
     </main>
   );
 }

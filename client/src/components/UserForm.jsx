@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { createUser } from '../api/users.js';
 import { listRoles } from '../api/roles.js';
+import { errorMessage } from '../i18n/errors.js';
 
 function UserForm({ onNotice }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
@@ -42,17 +45,17 @@ function UserForm({ onNotice }) {
     <form onSubmit={handleSubmit}>
       <div className="form-grid">
         <label>
-          Username
+          {t('users.form.username')}
           <input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            placeholder="e.g. tina.t"
+            placeholder={t('users.form.usernamePlaceholder')}
             maxLength={32}
             autoComplete="off"
           />
         </label>
         <label>
-          Full name
+          {t('users.form.fullName')}
           <input
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
@@ -61,7 +64,7 @@ function UserForm({ onNotice }) {
           />
         </label>
         <label>
-          Role
+          {t('users.form.role')}
           <select
             value={selectedRoleId}
             onChange={(event) => setRoleId(event.target.value)}
@@ -75,11 +78,13 @@ function UserForm({ onNotice }) {
         </label>
       </div>
       <button type="submit" disabled={mutation.isPending || selectedRoleId === ''}>
-        {mutation.isPending ? 'Creating...' : 'Create account'}
+        {mutation.isPending
+          ? t('users.form.creating')
+          : t('users.form.submit')}
       </button>
       {mutation.isError && (
         <p className="error" role="alert">
-          {mutation.error.message}
+          {errorMessage(mutation.error)}
         </p>
       )}
     </form>

@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listAudit } from '../api/audit.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { CATEGORY_OPTIONS, describeAudit } from '../lib/audit.js';
 import { formatDateTime, formatStudentCode } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
+import { errorMessage } from '../i18n/errors.js';
 
 function Details({ entry }) {
+  const { t } = useTranslation(['admin', 'common']);
   const details = entry.details ?? {};
 
   if (entry.action === 'scores.save' && Array.isArray(details.changes)) {
@@ -16,11 +19,11 @@ function Details({ entry }) {
         <table className="audit-changes">
           <thead>
             <tr>
-              <th>Student</th>
-              <th>Parameter</th>
-              <th className="num">From</th>
-              <th className="num">To</th>
-              <th>Note</th>
+              <th>{t('audit.changes.student')}</th>
+              <th>{t('audit.changes.parameter')}</th>
+              <th className="num">{t('audit.changes.from')}</th>
+              <th className="num">{t('audit.changes.to')}</th>
+              <th>{t('audit.changes.note')}</th>
             </tr>
           </thead>
           <tbody>
@@ -31,14 +34,20 @@ function Details({ entry }) {
                 </td>
                 <td>{change.parameter}</td>
                 <td className="num">{change.from ?? '—'}</td>
-                <td className="num">{change.to ?? 'cleared'}</td>
-                <td>{change.override ? 'Locked, overridden' : ''}</td>
+                <td className="num">
+                  {change.to ?? t('audit.changes.cleared')}
+                </td>
+                <td>
+                  {change.override ? t('audit.changes.overridden') : ''}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         {details.moreChanges > 0 && (
-          <p className="hint">…and {details.moreChanges} more changes.</p>
+          <p className="hint">
+            {t('audit.changes.moreChanges', { count: details.moreChanges })}
+          </p>
         )}
       </>
     );
@@ -47,6 +56,7 @@ function Details({ entry }) {
 }
 
 function AuditPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { can } = useAuth();
   const [category, setCategory] = useState('');
   const [actorText, setActorText] = useState('');
@@ -64,8 +74,8 @@ function AuditPage() {
     return (
       <main>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to see the audit log."
+          title={t('audit.readOnlyTitle')}
+          description={t('audit.readOnlyDescription')}
         />
       </main>
     );
@@ -76,14 +86,12 @@ function AuditPage() {
 
   return (
     <main className="wide">
-      <h1>Audit log</h1>
-      <p className="hint">
-        A record of who changed what, and when. Passwords are never recorded.
-      </p>
+      <h1>{t('audit.title')}</h1>
+      <p className="hint">{t('audit.hint')}</p>
 
       <div className="filters">
         <select
-          aria-label="Category"
+          aria-label={t('audit.categoryLabel')}
           value={category}
           onChange={(event) => {
             setCategory(event.target.value);
@@ -92,7 +100,9 @@ function AuditPage() {
         >
           {CATEGORY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {option.value === ''
+                ? t('audit.categories.all')
+                : t(`audit.categories.${option.value}`)}
             </option>
           ))}
         </select>
@@ -102,21 +112,23 @@ function AuditPage() {
             setActorText(event.target.value);
             setPage(1);
           }}
-          placeholder="Filter by username"
-          aria-label="Filter by username"
+          placeholder={t('audit.actorPlaceholder')}
+          aria-label={t('audit.actorLabel')}
           autoComplete="off"
         />
         <button type="button" onClick={() => query.refetch()}>
-          Refresh
+          {t('common:actions.refresh')}
         </button>
       </div>
 
-      {query.isPending && <p className="hint">Loading…</p>}
-      {query.isError && <p className="error">{query.error.message}</p>}
+      {query.isPending && (
+        <p className="hint">{t('common:status.loading')}</p>
+      )}
+      {query.isError && <p className="error">{errorMessage(query.error)}</p>}
       {data && data.entries.length === 0 && (
         <EmptyState
-          title="Nothing to show"
-          description="No audit entries match your filters yet."
+          title={t('audit.emptyTitle')}
+          description={t('audit.emptyDescription')}
         />
       )}
       {data && data.entries.length > 0 && (
@@ -125,9 +137,9 @@ function AuditPage() {
             <table className={query.isPlaceholderData ? 'stale' : undefined}>
               <thead>
                 <tr>
-                  <th>When</th>
-                  <th>Who</th>
-                  <th>What</th>
+                  <th>{t('audit.colWhen')}</th>
+                  <th>{t('audit.colWho')}</th>
+                  <th>{t('audit.colWhat')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -138,7 +150,7 @@ function AuditPage() {
                     <td>
                       {describeAudit(entry)}
                       <details className="audit-details">
-                        <summary>Details</summary>
+                        <summary>{t('audit.details')}</summary>
                         <Details entry={entry} />
                       </details>
                     </td>
@@ -154,17 +166,21 @@ function AuditPage() {
               onClick={() => setPage(page - 1)}
               disabled={page <= 1}
             >
-              Previous
+              {t('audit.previous')}
             </button>
             <span>
-              Page {page} of {totalPages} ({data.total} entries)
+              {t('audit.pageStatus', {
+                page,
+                totalPages,
+                total: data.total,
+              })}
             </span>
             <button
               type="button"
               onClick={() => setPage(page + 1)}
               disabled={page >= totalPages}
             >
-              Next
+              {t('audit.next')}
             </button>
           </div>
         </section>

@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listUsers } from '../api/users.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import TemporaryPasswordNotice from '../components/TemporaryPasswordNotice.jsx';
 import UserForm from '../components/UserForm.jsx';
 import UserRow from '../components/UserRow.jsx';
+import { errorMessage } from '../i18n/errors.js';
 
 function UsersPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { user: me, can } = useAuth();
   const [notice, setNotice] = useState(null);
 
@@ -21,8 +24,8 @@ function UsersPage() {
     return (
       <main>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to manage users."
+          title={t('users.readOnlyTitle')}
+          description={t('users.readOnlyDescription')}
         />
       </main>
     );
@@ -30,11 +33,8 @@ function UsersPage() {
 
   return (
     <main className="wide">
-      <h1>Users</h1>
-      <p className="hint">
-        Accounts are never deleted, only deactivated, so the history stays
-        accurate. You cannot change your own role or deactivate yourself.
-      </p>
+      <h1>{t('users.title')}</h1>
+      <p className="hint">{t('users.hint')}</p>
 
       {notice && (
         <TemporaryPasswordNotice
@@ -44,25 +44,27 @@ function UsersPage() {
       )}
 
       <section className="section-card">
-        <h2>Add a user</h2>
+        <h2>{t('users.addTitle')}</h2>
         <UserForm onNotice={setNotice} />
       </section>
 
       <section className="section-card">
-        <h2>All users</h2>
-        {query.isPending && <p className="hint">Loading…</p>}
-        {query.isError && <p className="error">{query.error.message}</p>}
+        <h2>{t('users.allTitle')}</h2>
+        {query.isPending && <p className="hint">{t('common:status.loading')}</p>}
+        {query.isError && (
+          <p className="error">{errorMessage(query.error)}</p>
+        )}
         {query.data && (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Username</th>
-                  <th>Full name</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Last sign-in</th>
-                  <th>Actions</th>
+                  <th>{t('users.colUsername')}</th>
+                  <th>{t('users.colFullName')}</th>
+                  <th>{t('users.colRole')}</th>
+                  <th>{t('users.colStatus')}</th>
+                  <th>{t('users.colLastLogin')}</th>
+                  <th>{t('common:table.actions')}</th>
                 </tr>
               </thead>
               <tbody>

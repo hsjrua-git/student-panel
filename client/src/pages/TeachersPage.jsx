@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   archiveTeacher,
   createTeacher,
@@ -10,10 +11,12 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { formatIsoDate } from '../lib/format.js';
 import { useDebouncedValue } from '../lib/useDebouncedValue.js';
+import { errorMessage } from '../i18n/errors.js';
 
 // A teacher's full identity record. Creation requires everything up front;
 // editing and archiving follow the same pattern as students and groups.
 function TeacherForm({ teacher, onDone }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const isEdit = teacher !== null;
   const [fullName, setFullName] = useState(teacher?.fullName ?? '');
@@ -48,7 +51,7 @@ function TeacherForm({ teacher, onDone }) {
   return (
     <form onSubmit={handleSubmit} className="edit-form">
       <label htmlFor={isEdit ? `teacher-name-${teacher.id}` : 'teacher-name'}>
-        Full name
+        {t('teachers.fullName')}
       </label>
       <input
         id={isEdit ? `teacher-name-${teacher.id}` : 'teacher-name'}
@@ -60,7 +63,7 @@ function TeacherForm({ teacher, onDone }) {
       />
 
       <label htmlFor={isEdit ? `teacher-birth-${teacher.id}` : 'teacher-birth'}>
-        Birth date
+        {t('teachers.birthDate')}
       </label>
       <input
         id={isEdit ? `teacher-birth-${teacher.id}` : 'teacher-birth'}
@@ -71,7 +74,7 @@ function TeacherForm({ teacher, onDone }) {
       />
 
       <label htmlFor={isEdit ? `teacher-nid-${teacher.id}` : 'teacher-nid'}>
-        National ID
+        {t('teachers.nationalId')}
       </label>
       <input
         id={isEdit ? `teacher-nid-${teacher.id}` : 'teacher-nid'}
@@ -87,25 +90,25 @@ function TeacherForm({ teacher, onDone }) {
       <div className="row">
         <button type="submit" disabled={save.isPending}>
           {save.isPending
-            ? 'Saving...'
+            ? t('common:actions.saving')
             : isEdit
-              ? 'Save teacher'
-              : 'Add teacher'}
+              ? t('teachers.saveEdit')
+              : t('teachers.addSubmit')}
         </button>
         {isEdit && (
           <button type="button" onClick={onDone} disabled={save.isPending}>
-            Cancel
+            {t('common:actions.cancel')}
           </button>
         )}
       </div>
       {save.isError && (
         <p className="error" role="alert">
-          {save.error.message}
+          {errorMessage(save.error)}
         </p>
       )}
       {save.isSuccess && !isEdit && (
         <p className="success" role="status">
-          Added {save.data.teacher.fullName}.
+          {t('teachers.added', { name: save.data.teacher.fullName })}
         </p>
       )}
     </form>
@@ -113,6 +116,7 @@ function TeacherForm({ teacher, onDone }) {
 }
 
 function TeachersPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { can } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -141,16 +145,14 @@ function TeachersPage() {
     <main className="wide">
       <div className="page-head">
         <div>
-          <h1>Teachers</h1>
-          <p className="hint">
-            The teaching staff, each with a full identity record.
-          </p>
+          <h1>{t('teachers.title')}</h1>
+          <p className="hint">{t('teachers.hint')}</p>
         </div>
       </div>
 
       {can('teachers.manage') && editingId === null && (
         <section className="section-card">
-          <h2>Add a teacher</h2>
+          <h2>{t('teachers.addTitle')}</h2>
           <TeacherForm teacher={null} onDone={() => {}} />
         </section>
       )}
@@ -162,8 +164,8 @@ function TeachersPage() {
             className="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name, code or national ID"
-            aria-label="Search teachers"
+            placeholder={t('teachers.searchPlaceholder')}
+            aria-label={t('teachers.searchLabel')}
           />
           <label className="hint">
             <input
@@ -171,20 +173,22 @@ function TeachersPage() {
               checked={includeArchived}
               onChange={(event) => setIncludeArchived(event.target.checked)}
             />
-            Include archived
+            {t('teachers.includeArchived')}
           </label>
         </div>
 
-        {teachersQuery.isPending && <p className="hint">Loading…</p>}
+        {teachersQuery.isPending && (
+          <p className="hint">{t('common:status.loading')}</p>
+        )}
         {teachersQuery.isError && (
           <p className="error" role="alert">
-            {teachersQuery.error.message}
+            {errorMessage(teachersQuery.error)}
           </p>
         )}
         {teachersQuery.data?.length === 0 && (
           <EmptyState
-            title="No teachers"
-            description="Add the first teacher with the form above."
+            title={t('teachers.emptyTitle')}
+            description={t('teachers.emptyDescription')}
           />
         )}
 
@@ -192,11 +196,13 @@ function TeachersPage() {
           <table>
             <thead>
               <tr>
-                <th scope="col">Code</th>
-                <th scope="col">Full name</th>
-                <th scope="col">Birth date</th>
-                <th scope="col">National ID</th>
-                {can('teachers.manage') && <th scope="col">Actions</th>}
+                <th scope="col">{t('common:table.code')}</th>
+                <th scope="col">{t('teachers.colFullName')}</th>
+                <th scope="col">{t('teachers.colBirthDate')}</th>
+                <th scope="col">{t('teachers.colNationalId')}</th>
+                {can('teachers.manage') && (
+                  <th scope="col">{t('common:table.actions')}</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -232,7 +238,7 @@ function TeachersPage() {
                             disabled={change}
                             onClick={() => restore.mutate(teacher)}
                           >
-                            Restore
+                            {t('common:actions.restore')}
                           </button>
                         ) : (
                           <>
@@ -242,7 +248,7 @@ function TeachersPage() {
                               disabled={change}
                               onClick={() => setEditingId(teacher.id)}
                             >
-                              Edit
+                              {t('common:actions.edit')}
                             </button>{' '}
                             <button
                               type="button"
@@ -250,7 +256,7 @@ function TeachersPage() {
                               disabled={change}
                               onClick={() => archive.mutate(teacher.id)}
                             >
-                              Archive
+                              {t('common:actions.archive')}
                             </button>
                           </>
                         )}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import {
@@ -9,6 +10,7 @@ import {
   listRoles,
   updateRole,
 } from '../api/roles.js';
+import { errorMessage } from '../i18n/errors.js';
 
 // The built-in Administrator is the one system role that can manage roles.
 // It is locked everywhere (no edit, rename, or delete) so an installation can
@@ -83,6 +85,7 @@ function PermissionEditor({ catalog, selected, onToggle, disabled }) {
 }
 
 function RoleEditor({ catalog, role, onDone }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const isNew = role === null;
   const [name, setName] = useState(role?.name ?? '');
@@ -121,7 +124,7 @@ function RoleEditor({ catalog, role, onDone }) {
     <form onSubmit={handleSubmit} className="role-editor">
       <div className="form-grid">
         <label>
-          Role name
+          {t('roles.editor.name')}
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -130,7 +133,7 @@ function RoleEditor({ catalog, role, onDone }) {
           />
         </label>
         <label>
-          Description
+          {t('roles.editor.description')}
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
@@ -143,8 +146,8 @@ function RoleEditor({ catalog, role, onDone }) {
       {role?.isSystem && (
         <p className="hint">
           {isAdminRole(role)
-            ? 'This is the built-in Administrator role and cannot be changed.'
-            : 'This is a built-in role. You can rename it and adjust its permissions, but it cannot be deleted.'}
+            ? t('roles.editor.adminLocked')
+            : t('roles.editor.systemEditable')}
         </p>
       )}
 
@@ -160,15 +163,19 @@ function RoleEditor({ catalog, role, onDone }) {
           className="primary"
           disabled={save.isPending || name.trim() === ''}
         >
-          {save.isPending ? 'Saving…' : isNew ? 'Create role' : 'Save changes'}
+          {save.isPending
+            ? t('common:actions.saving')
+            : isNew
+              ? t('roles.editor.create')
+              : t('roles.editor.save')}
         </button>
         <button type="button" onClick={onDone}>
-          Cancel
+          {t('common:actions.cancel')}
         </button>
       </div>
       {save.isError && (
         <p className="error" role="alert">
-          {save.error.message}
+          {errorMessage(save.error)}
         </p>
       )}
     </form>
@@ -176,6 +183,7 @@ function RoleEditor({ catalog, role, onDone }) {
 }
 
 function RolesPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { can } = useAuth();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(null); // role object, or 'new', or null
@@ -195,8 +203,8 @@ function RolesPage() {
     return (
       <main>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to manage roles."
+          title={t('roles.readOnlyTitle')}
+          description={t('roles.readOnlyDescription')}
         />
       </main>
     );
@@ -207,7 +215,7 @@ function RolesPage() {
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p>Loading…</p>
+          <p>{t('common:status.loading')}</p>
         </div>
       </main>
     );
@@ -217,8 +225,8 @@ function RolesPage() {
       <main>
         <EmptyState
           tone="danger"
-          title="Couldn't load roles"
-          description={rolesQuery.error.message}
+          title={t('roles.loadErrorTitle')}
+          description={errorMessage(rolesQuery.error)}
         />
       </main>
     );
@@ -227,11 +235,7 @@ function RolesPage() {
   const catalog = catalogQuery.data;
 
   function handleDelete(role) {
-    if (
-      window.confirm(
-        `Delete the "${role.name}" role? This cannot be undone.`
-      )
-    ) {
+    if (window.confirm(t('roles.deleteConfirm', { name: role.name }))) {
       remove.mutate(role.id);
     }
   }
@@ -239,7 +243,7 @@ function RolesPage() {
   return (
     <main className="wide">
       <div className="page-head">
-        <h1>Roles</h1>
+        <h1>{t('roles.title')}</h1>
         {editing === null && (
           <div className="page-head-actions">
             <button
@@ -247,16 +251,12 @@ function RolesPage() {
               className="primary"
               onClick={() => setEditing('new')}
             >
-              New role
+              {t('roles.newRole')}
             </button>
           </div>
         )}
       </div>
-      <p className="hint">
-        A role is a named set of permissions. Give people the role that matches
-        what they should be able to do. Ticking a permission automatically ticks
-        anything it depends on.
-      </p>
+      <p className="hint">{t('roles.hint')}</p>
 
       {editing === null ? (
         <section className="section-card">
@@ -264,11 +264,11 @@ function RolesPage() {
             <table>
               <thead>
                 <tr>
-                  <th>Role</th>
-                  <th>Description</th>
-                  <th>Permissions</th>
-                  <th>People</th>
-                  <th>Actions</th>
+                  <th>{t('roles.colRole')}</th>
+                  <th>{t('roles.colDescription')}</th>
+                  <th>{t('roles.colPermissions')}</th>
+                  <th>{t('roles.colPeople')}</th>
+                  <th>{t('common:table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -276,18 +276,20 @@ function RolesPage() {
                   <tr key={role.id}>
                     <td>
                       {role.name}
-                      {role.isSystem && <span className="badge">built-in</span>}
+                      {role.isSystem && (
+                        <span className="badge">{t('roles.builtIn')}</span>
+                      )}
                     </td>
                     <td>{role.description || '—'}</td>
                     <td>{role.permissions.length}</td>
                     <td>{role.userCount}</td>
                     <td className="actions">
                       {isAdminRole(role) ? (
-                        <span className="hint">Locked</span>
+                        <span className="hint">{t('roles.locked')}</span>
                       ) : (
                         <>
                           <button type="button" onClick={() => setEditing(role)}>
-                            Edit
+                            {t('common:actions.edit')}
                           </button>
                           {!role.isSystem && (
                             <button
@@ -297,11 +299,11 @@ function RolesPage() {
                               disabled={role.userCount > 0 || remove.isPending}
                               title={
                                 role.userCount > 0
-                                  ? 'Move its people to another role first'
+                                  ? t('roles.deleteBlocked')
                                   : undefined
                               }
                             >
-                              Delete
+                              {t('common:actions.delete')}
                             </button>
                           )}
                         </>
@@ -314,13 +316,17 @@ function RolesPage() {
           </div>
           {remove.isError && (
             <p className="error" role="alert">
-              {remove.error.message}
+              {errorMessage(remove.error)}
             </p>
           )}
         </section>
       ) : (
         <section className="section-card">
-          <h2>{editing === 'new' ? 'New role' : `Edit ${editing.name}`}</h2>
+          <h2>
+            {editing === 'new'
+              ? t('roles.newRole')
+              : t('roles.editRole', { name: editing.name })}
+          </h2>
           <RoleEditor
             catalog={catalog}
             role={editing === 'new' ? null : editing}

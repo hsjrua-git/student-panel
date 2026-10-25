@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import {
@@ -8,17 +9,19 @@ import {
   listFieldDefinitions,
   updateFieldDefinition,
 } from '../api/fields.js';
+import { errorMessage } from '../i18n/errors.js';
 
-const TYPE_LABELS = {
-  text: 'Short text',
-  long_text: 'Long text',
-  number: 'Number',
-  date: 'Date',
-  yes_no: 'Yes / No',
-  choice: 'Choice',
-};
+const FIELD_TYPES = [
+  'text',
+  'long_text',
+  'number',
+  'date',
+  'yes_no',
+  'choice',
+];
 
 function NewFieldForm() {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [label, setLabel] = useState('');
   const [fieldType, setFieldType] = useState('text');
@@ -52,7 +55,7 @@ function NewFieldForm() {
     <form onSubmit={handleSubmit}>
       <div className="form-grid">
         <label>
-          Field label
+          {t('fields.label')}
           <input
             value={label}
             onChange={(event) => setLabel(event.target.value)}
@@ -61,14 +64,14 @@ function NewFieldForm() {
           />
         </label>
         <label>
-          Type
+          {t('fields.type')}
           <select
             value={fieldType}
             onChange={(event) => setFieldType(event.target.value)}
           >
-            {Object.entries(TYPE_LABELS).map(([value, text]) => (
+            {FIELD_TYPES.map((value) => (
               <option key={value} value={value}>
-                {text}
+                {t(`fields.types.${value}`)}
               </option>
             ))}
           </select>
@@ -76,7 +79,7 @@ function NewFieldForm() {
       </div>
       {fieldType === 'choice' && (
         <label>
-          Choices (one per line)
+          {t('fields.choices')}
           <textarea
             value={choicesText}
             onChange={(event) => setChoicesText(event.target.value)}
@@ -90,20 +93,15 @@ function NewFieldForm() {
           checked={isRestricted}
           onChange={(event) => setIsRestricted(event.target.checked)}
         />
-        <span>
-          Restricted — only people allowed to see restricted fields can view
-          this
-        </span>
+        <span>{t('fields.restricted')}</span>
       </label>
-      <p className="hint">
-        The type cannot be changed after the field is created. Pick carefully.
-      </p>
+      <p className="hint">{t('fields.typeHint')}</p>
       <button type="submit" disabled={create.isPending || label.trim() === ''}>
-        {create.isPending ? 'Adding…' : 'Add field'}
+        {create.isPending ? t('fields.adding') : t('fields.submit')}
       </button>
       {create.isError && (
         <p className="error" role="alert">
-          {create.error.message}
+          {errorMessage(create.error)}
         </p>
       )}
     </form>
@@ -111,6 +109,7 @@ function NewFieldForm() {
 }
 
 function FieldRow({ field }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['field-definitions'] });
@@ -127,7 +126,11 @@ function FieldRow({ field }) {
   return (
     <tr>
       <td>{field.label}</td>
-      <td>{TYPE_LABELS[field.fieldType] ?? field.fieldType}</td>
+      <td>
+        {t(`fields.types.${field.fieldType}`, {
+          defaultValue: field.fieldType,
+        })}
+      </td>
       <td>
         {field.fieldType === 'choice' ? field.choices.join(', ') : '—'}
       </td>
@@ -141,24 +144,26 @@ function FieldRow({ field }) {
             }
             disabled={update.isPending}
           />
-          <span className="hint">Restricted</span>
+          <span className="hint">{t('fields.restrictedShort')}</span>
         </label>
       </td>
       <td className="actions">
         <button
           type="button"
           onClick={() => {
-            if (window.confirm(`Archive the "${field.label}" field?`)) {
+            if (
+              window.confirm(t('fields.archiveConfirm', { label: field.label }))
+            ) {
               archive.mutate();
             }
           }}
           disabled={archive.isPending}
         >
-          Archive
+          {t('common:actions.archive')}
         </button>
         {(update.isError || archive.isError) && (
           <p className="error" role="alert">
-            {(update.error ?? archive.error).message}
+            {errorMessage(update.error ?? archive.error)}
           </p>
         )}
       </td>
@@ -167,6 +172,7 @@ function FieldRow({ field }) {
 }
 
 function FieldsPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { can } = useAuth();
   const query = useQuery({
     queryKey: ['field-definitions'],
@@ -177,8 +183,8 @@ function FieldsPage() {
     return (
       <main>
         <EmptyState
-          title="Read-only access"
-          description="You do not have permission to manage custom fields."
+          title={t('fields.readOnlyTitle')}
+          description={t('fields.readOnlyDescription')}
         />
       </main>
     );
@@ -186,35 +192,33 @@ function FieldsPage() {
 
   return (
     <main className="wide">
-      <h1>Custom fields</h1>
-      <p className="hint">
-        Add your own fields to student records — a phone number, a join date, a
-        squad. Restricted fields are hidden from people without permission to
-        see them.
-      </p>
+      <h1>{t('fields.title')}</h1>
+      <p className="hint">{t('fields.hint')}</p>
 
       <section className="section-card">
-        <h2>Add a field</h2>
+        <h2>{t('fields.addTitle')}</h2>
         <NewFieldForm />
       </section>
 
       <section className="section-card">
-        <h2>Fields</h2>
-        {query.isPending && <p className="hint">Loading…</p>}
-        {query.isError && <p className="error">{query.error.message}</p>}
+        <h2>{t('fields.listTitle')}</h2>
+        {query.isPending && (
+          <p className="hint">{t('common:status.loading')}</p>
+        )}
+        {query.isError && <p className="error">{errorMessage(query.error)}</p>}
         {query.data && query.data.length === 0 && (
-          <p className="hint">No custom fields yet.</p>
+          <p className="hint">{t('fields.empty')}</p>
         )}
         {query.data && query.data.length > 0 && (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Label</th>
-                  <th>Type</th>
-                  <th>Choices</th>
-                  <th>Visibility</th>
-                  <th>Actions</th>
+                  <th>{t('fields.colLabel')}</th>
+                  <th>{t('fields.colType')}</th>
+                  <th>{t('fields.colChoices')}</th>
+                  <th>{t('fields.colVisibility')}</th>
+                  <th>{t('common:table.actions')}</th>
                 </tr>
               </thead>
               <tbody>

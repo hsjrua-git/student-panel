@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { listAlerts, resolveAlert, scanAlerts } from '../api/alerts.js';
 import {
   generateSessions,
@@ -21,6 +22,7 @@ import { listTeachers } from '../api/teachers.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { formatIsoDate, toIsoDate } from '../lib/format.js';
+import { errorMessage } from '../i18n/errors.js';
 
 // The generated occurrences of the schedule: each row is one planned session
 // (anchor + n * interval) that can be moved, canceled or annotated. The
@@ -33,6 +35,7 @@ function addDays(date, days) {
 }
 
 function SessionEditRow({ session, onDone }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [movedTo, setMovedTo] = useState(session.movedTo ?? '');
   const [canceled, setCanceled] = useState(session.canceledAt !== null);
@@ -58,7 +61,9 @@ function SessionEditRow({ session, onDone }) {
 
   return (
     <form onSubmit={handleSubmit} className="edit-form">
-      <label htmlFor={`moved-${session.id}`}>Takes place on</label>
+      <label htmlFor={`moved-${session.id}`}>
+        {t('sessions.edit.takesPlaceOn')}
+      </label>
       <input
         id={`moved-${session.id}`}
         type="date"
@@ -66,7 +71,11 @@ function SessionEditRow({ session, onDone }) {
         onChange={(event) => setMovedTo(event.target.value)}
         disabled={save.isPending}
       />
-      <p className="hint">Leave empty to keep the planned date ({formatIsoDate(session.plannedDate)}).</p>
+      <p className="hint">
+        {t('sessions.edit.keepPlanned', {
+          date: formatIsoDate(session.plannedDate),
+        })}
+      </p>
 
       <label className="hint">
         <input
@@ -75,10 +84,10 @@ function SessionEditRow({ session, onDone }) {
           onChange={(event) => setCanceled(event.target.checked)}
           disabled={save.isPending}
         />{' '}
-        Canceled
+        {t('sessions.edit.canceled')}
       </label>
 
-      <label htmlFor={`note-${session.id}`}>Note</label>
+      <label htmlFor={`note-${session.id}`}>{t('sessions.edit.note')}</label>
       <textarea
         id={`note-${session.id}`}
         value={note}
@@ -90,18 +99,21 @@ function SessionEditRow({ session, onDone }) {
 
       <div className="row">
         <button type="submit" disabled={save.isPending}>
-          {save.isPending ? 'Saving...' : 'Save session'}
+          {save.isPending
+            ? t('common:actions.saving')
+            : t('sessions.edit.save')}
         </button>
         <button type="button" onClick={onDone} disabled={save.isPending}>
-          Cancel
+          {t('common:actions.cancel')}
         </button>
       </div>
-      {save.isError && <p className="error">{save.error.message}</p>}
+      {save.isError && <p className="error">{errorMessage(save.error)}</p>}
     </form>
   );
 }
 
 function SessionTasksPanel({ session, templates }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -149,13 +161,20 @@ function SessionTasksPanel({ session, templates }) {
 
   return (
     <div>
-      <h3>Tasks for {formatIsoDate(session.sessionDate)} ({session.code})</h3>
-      {tasksQuery.isPending && <p className="hint">Loading…</p>}
+      <h3>
+        {t('sessions.tasksPanel.title', {
+          date: formatIsoDate(session.sessionDate),
+          code: session.code,
+        })}
+      </h3>
+      {tasksQuery.isPending && (
+        <p className="hint">{t('common:status.loading')}</p>
+      )}
       {tasksQuery.isError && (
-        <p className="error" role="alert">{tasksQuery.error.message}</p>
+        <p className="error" role="alert">{errorMessage(tasksQuery.error)}</p>
       )}
       {tasks.length === 0 && !tasksQuery.isPending && (
-        <p className="hint">No tasks yet for this session.</p>
+        <p className="hint">{t('sessions.tasksPanel.empty')}</p>
       )}
       {tasks.length > 0 && (
         <ul className="plain-list">
@@ -181,7 +200,7 @@ function SessionTasksPanel({ session, templates }) {
                 onClick={() => remove.mutate(task)}
                 disabled={busy}
               >
-                Delete
+                {t('common:actions.delete')}
               </button>
             </li>
           ))}
@@ -189,17 +208,21 @@ function SessionTasksPanel({ session, templates }) {
       )}
 
       <form onSubmit={handleAdd} className="edit-form">
-        <label htmlFor={`task-title-${session.id}`}>New task</label>
+        <label htmlFor={`task-title-${session.id}`}>
+          {t('sessions.tasksPanel.newTask')}
+        </label>
         <input
           id={`task-title-${session.id}`}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           maxLength={120}
-          placeholder="e.g. Homework check"
+          placeholder={t('sessions.tasksPanel.titlePlaceholder')}
           autoComplete="off"
           disabled={add.isPending}
         />
-        <label htmlFor={`task-desc-${session.id}`}>Description (optional)</label>
+        <label htmlFor={`task-desc-${session.id}`}>
+          {t('sessions.tasksPanel.descOptional')}
+        </label>
         <textarea
           id={`task-desc-${session.id}`}
           value={description}
@@ -209,11 +232,13 @@ function SessionTasksPanel({ session, templates }) {
           disabled={add.isPending}
         />
         <button type="submit" disabled={add.isPending || title.trim() === ''}>
-          {add.isPending ? 'Adding...' : 'Add task'}
+          {add.isPending
+            ? t('sessions.tasksPanel.adding')
+            : t('sessions.tasksPanel.add')}
         </button>
         {(add.isError || remove.isError || toggle.isError) && (
           <p className="error" role="alert">
-            {(add.error ?? remove.error ?? toggle.error)?.message}
+            {errorMessage(add.error ?? remove.error ?? toggle.error)}
           </p>
         )}
       </form>
@@ -221,12 +246,14 @@ function SessionTasksPanel({ session, templates }) {
       {templates.length > 0 && (
         <div className="row">
           <select
-            aria-label="Add from a template"
+            aria-label={t('sessions.tasksPanel.fromTemplateLabel')}
             value={templateId}
             onChange={(event) => setTemplateId(event.target.value)}
             disabled={fromTemplate.isPending}
           >
-            <option value="">From a template…</option>
+            <option value="">
+              {t('sessions.tasksPanel.fromTemplatePlaceholder')}
+            </option>
             {templates.map((template) => (
               <option key={template.id} value={template.id}>
                 {template.title}
@@ -238,10 +265,14 @@ function SessionTasksPanel({ session, templates }) {
             onClick={() => fromTemplate.mutate()}
             disabled={fromTemplate.isPending || templateId === ''}
           >
-            {fromTemplate.isPending ? 'Adding...' : 'Add from template'}
+            {fromTemplate.isPending
+              ? t('sessions.tasksPanel.adding')
+              : t('sessions.tasksPanel.addFromTemplate')}
           </button>
           {fromTemplate.isError && (
-            <p className="error" role="alert">{fromTemplate.error.message}</p>
+            <p className="error" role="alert">
+              {errorMessage(fromTemplate.error)}
+            </p>
           )}
         </div>
       )}
@@ -250,6 +281,7 @@ function SessionTasksPanel({ session, templates }) {
 }
 
 function TaskTemplatesManager({ templates }) {
+  const { t } = useTranslation(['admin', 'common']);
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -280,19 +312,17 @@ function TaskTemplatesManager({ templates }) {
 
   return (
     <section className="section-card">
-      <h2>Task templates</h2>
+      <h2>{t('sessions.templates.title')}</h2>
       {templates.length === 0 && (
-        <p className="hint">
-          No templates yet — add one below, then attach it to any session.
-        </p>
+        <p className="hint">{t('sessions.templates.empty')}</p>
       )}
       {templates.length > 0 && (
         <table>
           <thead>
             <tr>
-              <th scope="col">Title</th>
-              <th scope="col">Description</th>
-              <th scope="col">Actions</th>
+              <th scope="col">{t('sessions.templates.colTitle')}</th>
+              <th scope="col">{t('sessions.templates.colDescription')}</th>
+              <th scope="col">{t('common:table.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -311,7 +341,7 @@ function TaskTemplatesManager({ templates }) {
                       onClick={() => restore.mutate(template.id)}
                       disabled={archive.isPending || restore.isPending}
                     >
-                      Restore
+                      {t('common:actions.restore')}
                     </button>
                   ) : (
                     <button
@@ -320,7 +350,7 @@ function TaskTemplatesManager({ templates }) {
                       onClick={() => archive.mutate(template.id)}
                       disabled={archive.isPending || restore.isPending}
                     >
-                      Archive
+                      {t('common:actions.archive')}
                     </button>
                   )}
                 </td>
@@ -331,17 +361,21 @@ function TaskTemplatesManager({ templates }) {
       )}
 
       <form onSubmit={handleSubmit} className="edit-form">
-        <label htmlFor="template-title">New template</label>
+        <label htmlFor="template-title">
+          {t('sessions.templates.newTemplate')}
+        </label>
         <input
           id="template-title"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           maxLength={120}
-          placeholder="e.g. Weekly quiz"
+          placeholder={t('sessions.templates.titlePlaceholder')}
           autoComplete="off"
           disabled={add.isPending}
         />
-        <label htmlFor="template-desc">Description (optional)</label>
+        <label htmlFor="template-desc">
+          {t('sessions.templates.descOptional')}
+        </label>
         <textarea
           id="template-desc"
           value={description}
@@ -351,15 +385,18 @@ function TaskTemplatesManager({ templates }) {
           disabled={add.isPending}
         />
         <button type="submit" disabled={add.isPending || title.trim() === ''}>
-          {add.isPending ? 'Adding...' : 'Add template'}
+          {add.isPending
+            ? t('sessions.templates.adding')
+            : t('sessions.templates.add')}
         </button>
-        {add.isError && <p className="error">{add.error.message}</p>}
+        {add.isError && <p className="error">{errorMessage(add.error)}</p>}
       </form>
     </section>
   );
 }
 
 function SessionsPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const { can } = useAuth();
   const queryClient = useQueryClient();
   const today = new Date();
@@ -456,19 +493,18 @@ function SessionsPage() {
     <main className="wide">
       <div className="page-head">
         <div>
-          <h1>Sessions</h1>
-          <p className="hint">
-            The generated occurrences of the schedule: move, cancel or annotate
-            them as reality shifts.
-          </p>
+          <h1>{t('sessions.title')}</h1>
+          <p className="hint">{t('sessions.hint')}</p>
         </div>
       </div>
 
       {canManage && (
         <section className="section-card">
-          <h2>Generate sessions</h2>
+          <h2>{t('sessions.generate.title')}</h2>
           <div className="row">
-            <label htmlFor="generate-until">Create planned sessions until</label>
+            <label htmlFor="generate-until">
+              {t('sessions.generate.untilLabel')}
+            </label>
             <input
               id="generate-until"
               type="date"
@@ -480,21 +516,23 @@ function SessionsPage() {
               onClick={() => generate.mutate()}
               disabled={generate.isPending}
             >
-              {generate.isPending ? 'Generating...' : 'Generate'}
+              {generate.isPending
+                ? t('sessions.generate.generating')
+                : t('sessions.generate.button')}
             </button>
           </div>
           {generate.isError && (
             <p className="error" role="alert">
-              {generate.error.message}
+              {errorMessage(generate.error)}
             </p>
           )}
           {generate.isSuccess && (
             <p className="success" role="status">
               {generate.data.created === 0
-                ? 'Everything in that range already exists.'
-                : `Created ${generate.data.created} session${
-                    generate.data.created === 1 ? '' : 's'
-                  }.`}
+                ? t('sessions.generate.allExist')
+                : t('sessions.generate.created', {
+                    count: generate.data.created,
+                  })}
             </p>
           )}
           <div className="row">
@@ -503,27 +541,26 @@ function SessionsPage() {
               onClick={() => scan.mutate()}
               disabled={scan.isPending}
             >
-              {scan.isPending ? 'Scanning...' : 'Scan for unconfirmed sessions'}
+              {scan.isPending
+                ? t('sessions.scan.scanning')
+                : t('sessions.scan.button')}
             </button>
-            <span className="hint">
-              Flag past sessions that have no record — not canceled, no note, no
-              tasks.
-            </span>
+            <span className="hint">{t('sessions.scan.hint')}</span>
           </div>
           {scan.isError && (
             <p className="error" role="alert">
-              {scan.error.message}
+              {errorMessage(scan.error)}
             </p>
           )}
           {scan.isSuccess && (
             <p className="success" role="status">
               {scan.data.raised === 0 && scan.data.resolved === 0
-                ? 'Nothing to report — every past session has a record.'
-                : `Raised ${scan.data.raised} new alert${
-                    scan.data.raised === 1 ? '' : 's'
-                  }, resolved ${scan.data.resolved} alert${
-                    scan.data.resolved === 1 ? '' : 's'
-                  }.`}
+                ? t('sessions.scan.nothing')
+                : t('sessions.scan.result', {
+                    count: scan.data.raised,
+                    raised: scan.data.raised,
+                    resolved: scan.data.resolved,
+                  })}
             </p>
           )}
         </section>
@@ -531,14 +568,14 @@ function SessionsPage() {
 
       <section className="section-card">
         <div className="toolbar">
-          <label htmlFor="sessions-from">From</label>
+          <label htmlFor="sessions-from">{t('sessions.from')}</label>
           <input
             id="sessions-from"
             type="date"
             value={from}
             onChange={(event) => setFrom(event.target.value)}
           />
-          <label htmlFor="sessions-to">To</label>
+          <label htmlFor="sessions-to">{t('sessions.to')}</label>
           <input
             id="sessions-to"
             type="date"
@@ -547,11 +584,11 @@ function SessionsPage() {
           />
           {canPickTeachers && (
             <select
-              aria-label="Filter by teacher"
+              aria-label={t('sessions.filterTeacher')}
               value={teacherId}
               onChange={(event) => setTeacherId(event.target.value)}
             >
-              <option value="">All teachers</option>
+              <option value="">{t('sessions.allTeachers')}</option>
               {(teachersQuery.data ?? []).map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
                   {teacher.fullName}
@@ -565,7 +602,7 @@ function SessionsPage() {
               checked={includeCanceled}
               onChange={(event) => setIncludeCanceled(event.target.checked)}
             />
-            Canceled
+            {t('sessions.canceled')}
           </label>
           <label className="hint">
             <input
@@ -573,28 +610,28 @@ function SessionsPage() {
               checked={includeArchived}
               onChange={(event) => setIncludeArchived(event.target.checked)}
             />
-            Archived
+            {t('sessions.archived')}
           </label>
         </div>
 
-        {sessionsQuery.isPending && <p className="hint">Loading…</p>}
+        {sessionsQuery.isPending && (
+          <p className="hint">{t('common:status.loading')}</p>
+        )}
         {sessionsQuery.isError && (
           <p className="error" role="alert">
-            {sessionsQuery.error.message}
+            {errorMessage(sessionsQuery.error)}
           </p>
         )}
         {sessionsQuery.data?.truncated && (
-          <p className="hint">
-            Showing the first 500 sessions; narrow the date range to see more.
-          </p>
+          <p className="hint">{t('sessions.truncated')}</p>
         )}
         {sessions.length === 0 && !sessionsQuery.isPending && (
           <EmptyState
-            title="No sessions in this range"
+            title={t('sessions.emptyTitle')}
             description={
               canManage
-                ? 'Generate the planned sessions with the button above.'
-                : 'Ask an administrator to generate the schedule.'
+                ? t('sessions.emptyCanManage')
+                : t('sessions.emptyNoManage')
             }
           />
         )}
@@ -603,19 +640,21 @@ function SessionsPage() {
           <table>
             <thead>
               <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Code</th>
-                <th scope="col">Teacher</th>
-                <th scope="col">Target</th>
-                <th scope="col">Period</th>
-                <th scope="col">Note</th>
-                {canManage && <th scope="col">Actions</th>}
+                <th scope="col">{t('sessions.colDate')}</th>
+                <th scope="col">{t('common:table.code')}</th>
+                <th scope="col">{t('sessions.colTeacher')}</th>
+                <th scope="col">{t('sessions.colTarget')}</th>
+                <th scope="col">{t('sessions.colPeriod')}</th>
+                <th scope="col">{t('sessions.colNote')}</th>
+                {canManage && (
+                  <th scope="col">{t('common:table.actions')}</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {sessions.map((session) => {
                 const target = session.groupId
-                  ? `Group ${session.groupName}`
+                  ? t('sessions.targetGroup', { name: session.groupName })
                   : session.studentName ?? '—';
                 const openAlert = openAlertsBySessionId.get(session.id) ?? null;
                 if (editingId === session.id) {
@@ -644,12 +683,18 @@ function SessionsPage() {
                       {session.movedTo && (
                         <span className="hint">
                           {' '}
-                          (moved from {formatIsoDate(session.plannedDate)})
+                          {t('sessions.movedFrom', {
+                            date: formatIsoDate(session.plannedDate),
+                          })}
                         </span>
                       )}
-                      {session.canceledAt && <span className="hint"> — canceled</span>}
+                      {session.canceledAt && (
+                        <span className="hint">{t('sessions.canceledMark')}</span>
+                      )}
                       {openAlert && (
-                        <span className="badge warn">Unconfirmed</span>
+                        <span className="badge warn">
+                          {t('sessions.unconfirmed')}
+                        </span>
                       )}
                     </td>
                     <td>
@@ -658,7 +703,11 @@ function SessionsPage() {
                     <td>{session.teacherName}</td>
                     <td>{target}</td>
                     <td>
-                      {session.periodNumber ? `№ ${session.periodNumber}` : '—'}
+                      {session.periodNumber
+                        ? t('sessions.periodValue', {
+                            number: session.periodNumber,
+                          })
+                        : '—'}
                     </td>
                     <td>{session.note ?? '—'}</td>
                     {canManage && (
@@ -670,7 +719,9 @@ function SessionsPage() {
                             setTasksForId(tasksForId === session.id ? null : session.id)
                           }
                         >
-                          Tasks ({session.taskCount})
+                          {t('sessions.tasksButton', {
+                            count: session.taskCount,
+                          })}
                         </button>{' '}
                         <button
                           type="button"
@@ -678,7 +729,7 @@ function SessionsPage() {
                           onClick={() => setEditingId(session.id)}
                           disabled={busy}
                         >
-                          Edit
+                          {t('common:actions.edit')}
                         </button>{' '}
                         {session.canceledAt ? (
                           <button
@@ -689,7 +740,7 @@ function SessionsPage() {
                             }
                             disabled={busy}
                           >
-                            Restore
+                            {t('common:actions.restore')}
                           </button>
                         ) : (
                           <button
@@ -700,7 +751,7 @@ function SessionsPage() {
                             }
                             disabled={busy}
                           >
-                            Cancel
+                            {t('common:actions.cancel')}
                           </button>
                         )}{' '}
                         {session.archivedAt ? (
@@ -710,7 +761,7 @@ function SessionsPage() {
                             onClick={() => restore.mutate(session)}
                             disabled={busy}
                           >
-                            Unarchive
+                            {t('common:actions.unarchive')}
                           </button>
                         ) : (
                           <button
@@ -719,7 +770,7 @@ function SessionsPage() {
                             onClick={() => archive.mutate(session)}
                             disabled={busy}
                           >
-                            Archive
+                            {t('common:actions.archive')}
                           </button>
                         )}{' '}
                         {openAlert && (
@@ -729,7 +780,7 @@ function SessionsPage() {
                             onClick={() => resolve.mutate(openAlert)}
                             disabled={busy || resolve.isPending}
                           >
-                            Resolve alert
+                            {t('sessions.resolveAlert')}
                           </button>
                         )}
                       </td>
