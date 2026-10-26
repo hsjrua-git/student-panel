@@ -7,9 +7,11 @@
 // route's router.param('id') uuid guard becomes an isUuid check returning
 // NOT_FOUND at the top of each id-taking function, matching the 404 it produced.
 //
-// The route's local parseName is pure and moves here verbatim. The nested-move
-// cycle check reuses descendantGroupIds (which includes the group itself, so a
-// self-move is caught too).
+// Groups now carry a NOT NULL unique code (auto-generated when omitted) and a
+// sort order; both are accepted on create and update exactly as the route does.
+// The route's local parseName/parseCode/parseSortOrder are pure and move here
+// verbatim. The nested-move cycle check reuses descendantGroupIds (which
+// includes the group itself, so a self-move is caught too).
 
 import { getDb } from '../db.js';
 import { ServiceError } from '../errors.js';
@@ -17,6 +19,7 @@ import { getLocalActor } from '../context.js';
 import { recordAudit } from '../../lib/audit.js';
 import { descendantGroupIds } from '../../lib/groups.js';
 import { isUuid } from '../../lib/ids.js';
+import { generateCode } from '../../lib/studentCode.js';
 
 function parseName(input) {
   if (typeof input !== 'string') return { error: 'Group name is required.' };
@@ -27,9 +30,28 @@ function parseName(input) {
   return { value };
 }
 
+function parseCode(input) {
+  if (input === undefined || input === null || String(input).trim() === '') {
+    return { value: null }; // auto-generate
+  }
+  const code = String(input).trim();
+  if (code.length < 1 || code.length > 40) {
+    return { error: 'Group code must be 1 to 40 characters.' };
+  }
+  return { value: code };
+}
+
+function parseSortOrder(input) {
+  if (!Number.isInteger(input) || input < 0) {
+    return { error: 'Sort order must be a whole number from 0.' };
+  }
+  return { value: input };
+}
+
 async function loadGroup(db, id) {
   const result = await db.query(
-    `SELECT id, name, parent_id AS "parentId", archived_at AS "archivedAt"
+    `SELECT id, code, name, sort_order AS "sortOrder",
+            parent_id AS "parentId", archived_at AS "archivedAt"
      FROM student_groups WHERE id = $1`,
     [id],
   );
@@ -71,14 +93,16 @@ export async function listGroups(options = {}) {
 
   const result = await db.query(
     `SELECT g.id,
+            g.code,
             g.name,
+            g.sort_order AS "sortOrder",
             g.parent_id  AS "parentId",
             g.archived_at AS "archivedAt",
             (SELECT count(*)::int FROM student_group_members m
              WHERE m.group_id = g.id) AS "memberCount"
      FROM student_groups g
      WHERE $1 OR g.archived_at IS NULL
-     ORDER BY lower(g.name)`,
+     ORDER BY g.sort_order, lower(g.name)`,
     [includeArchived],
   );
   return { groups: result.rows };
@@ -95,7 +119,8 @@ export async function getGroupMembers(id) {
   const result = await db.query(
     `SELECT s.id,
             s.full_name    AS "fullName",
-            s.student_code AS "studentCode"
+            s.student_code AS "studentCode",
+            m.id           AS "membershipId"
      FROM student_group_members m
      JOIN students s ON s.id = m.student_id AND s.deleted_at IS NULL
      WHERE m.group_id = $1
@@ -105,13 +130,18 @@ export async function getGroupMembers(id) {
   return { students: result.rows };
 }
 
-// Create a group. `input` = { name, parentId? }. A parent, if given, must exist
-// and be live. Duplicate sibling names collide (CONFLICT).
+// Create a group. `input` = { name, code?, sortOrder?, parentId? }. A parent,
+// if given, must exist and be live. Duplicate sibling names collide (CONFLICT);
+// an omitted code is auto-generated.
 export async function createGroup(input = {}) {
   const db = getDb();
 
   const name = parseName(input.name);
   if (name.error) throw ServiceError.validation(name.error);
+  const code = parseCode(input.code);
+  if (code.error) throw ServiceError.validation(code.error);
+  const sortOrder = parseSortOrder(input.sortOrder ?? 0);
+  if (sortOrder.error) throw ServiceError.validation(sortOrder.error);
 
   const parentId = input.parentId ?? null;
   if (parentId !== null && !isUuid(parentId)) {
@@ -130,10 +160,11 @@ export async function createGroup(input = {}) {
       }
     }
     const inserted = await client.query(
-      `INSERT INTO student_groups (name, parent_id, created_by)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, parent_id AS "parentId", archived_at AS "archivedAt"`,
-      [name.value, parentId, actor.userId],
+      `INSERT INTO student_groups (name, code, sort_order, parent_id, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, code, name, sort_order AS "sortOrder",
+                 parent_id AS "parentId", archived_at AS "archivedAt"`,
+      [name.value, code.value ?? generateCode(), sortOrder.value, parentId, actor.userId],
     );
     const group = inserted.rows[0];
     await recordAudit(client, {
@@ -157,9 +188,10 @@ export async function createGroup(input = {}) {
   }
 }
 
-// Update a group. `changes` may include name, parentId (null = top level), and
-// archived. Moving a group under itself or a descendant is rejected (cycle);
-// archiving a group that still has live subgroups is rejected.
+// Update a group. `changes` may include name, code (it cannot be cleared),
+// sortOrder, parentId (null = top level), and archived. Moving a group under
+// itself or a descendant is rejected (cycle); archiving a group that still has
+// live subgroups is rejected.
 export async function updateGroup(id, changes = {}) {
   const db = getDb();
   if (!isUuid(id)) throw ServiceError.notFound('Group not found.');
@@ -175,6 +207,19 @@ export async function updateGroup(id, changes = {}) {
       throw ServiceError.validation('Choose a valid parent group.');
     }
     updates.parentId = changes.parentId;
+  }
+  if ('code' in changes) {
+    const code = parseCode(changes.code);
+    if (code.error) throw ServiceError.validation(code.error);
+    if (code.value === null) {
+      throw ServiceError.validation('A group code cannot be cleared.');
+    }
+    updates.code = code.value;
+  }
+  if ('sortOrder' in changes) {
+    const sortOrder = parseSortOrder(changes.sortOrder);
+    if (sortOrder.error) throw ServiceError.validation(sortOrder.error);
+    updates.sortOrder = sortOrder.value;
   }
   if ('archived' in changes) {
     if (typeof changes.archived !== 'boolean') {
@@ -226,6 +271,14 @@ export async function updateGroup(id, changes = {}) {
     if ('name' in updates) {
       values.push(updates.name);
       sets.push(`name = $${values.length}`);
+    }
+    if ('code' in updates) {
+      values.push(updates.code);
+      sets.push(`code = $${values.length}`);
+    }
+    if ('sortOrder' in updates) {
+      values.push(updates.sortOrder);
+      sets.push(`sort_order = $${values.length}`);
     }
     if ('parentId' in updates) {
       values.push(updates.parentId);

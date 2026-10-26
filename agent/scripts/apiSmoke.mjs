@@ -35,11 +35,10 @@ const CHECKS = [
   { get: () => ['/api/task-templates'] },
   { get: () => ['/api/alerts'] },
   { get: () => ['/api/parameters'] },
-  { get: () => ['/api/periods'] },
-  { get: () => ['/api/parameter-changes'] },
-  { get: () => ['/api/evaluations?studentId=00000000-0000-4000-8000-000000000000'] },
-  { get: () => ['/api/results?periodNumber=1'] },
   { get: () => ['/api/dashboard/trends'] },
+  { get: () => ['/api/dashboard/summary'] },
+  { get: () => ['/api/export/cube'] },
+  { get: () => ['/api/evaluations?studentId=00000000-0000-4000-8000-000000000000'] },
   { get: () => ['/api/roles'] },
   { get: () => ['/api/users'] },
   { get: () => ['/api/audit?page=1'] },
@@ -114,24 +113,25 @@ try {
   const panel = new Panel({ baseUrl: config.panelBaseUrl, username, password });
   await panel.login();
 
-  // Resolve ids the id-dependent checks need.
-  const [students, products, periods] = await Promise.all([
+  // Resolve ids the id-dependent checks need. Periods are per assignment now,
+  // so the assignment list drives the evaluation/results/period checks.
+  const [students, products, assignments, sessions] = await Promise.all([
     panel.request('/api/students?pageSize=1').then((d) => d.students ?? []),
     panel.request('/api/cafe/products').then((d) => d.products ?? []),
-    panel.request('/api/periods').then((d) => d),
+    panel.request('/api/assignments').then((d) => d.assignments ?? []),
+    panel.request(`/api/sessions?from=${monthAgo}&to=${today}`).then((d) => d.sessions ?? []),
   ]);
   const studentId = students[0]?.id;
   const productId = products[0]?.id;
-  const anchor = periods.anchorDate ?? today;
-  const periodNumber = periods.current ?? 1;
+  const assignmentId = assignments[0]?.id;
+  const sessionId = sessions[0]?.id;
 
   const idChecks = [];
   if (studentId) {
     idChecks.push(
       { get: () => [`/api/students/${studentId}`] },
-      { get: () => [`/api/evaluations?studentId=${studentId}&periodNumber=${periodNumber}`] },
+      { get: () => [`/api/evaluations?studentId=${studentId}`] },
       { get: () => [`/api/cafe/balances/${studentId}`] },
-      { get: () => [`/api/results?periodNumber=${periodNumber}`] },
     );
   }
   if (productId) {
@@ -143,8 +143,29 @@ try {
       expectFail: true, // a product is not an account — 404 is correct
     });
   }
-  if (anchor) {
-    idChecks.push({ get: () => [`/api/evaluations?studentId=${studentId ?? '00000000-0000-4000-8000-000000000000'}`] });
+  if (assignmentId) {
+    idChecks.push(
+      { get: () => [`/api/periods?assignmentId=${assignmentId}`] },
+      { get: () => [`/api/evaluations?assignmentId=${assignmentId}`] },
+      { get: () => [`/api/dashboard/summary?assignmentId=${assignmentId}`] },
+      { get: () => [`/api/dashboard/trends?dimension=quantity`] },
+      { get: () => [`/api/export/cube?assignmentId=${assignmentId}&periods=1`] },
+    );
+    // The results grid only exists once a period has sessions; pick a real seq.
+    const periods = await panel
+      .request(`/api/periods?assignmentId=${assignmentId}`)
+      .then((d) => d.periods ?? [])
+      .catch(() => []);
+    const liveSeq = periods.find((p) => (p.sessionCount ?? 0) > 0)?.seq;
+    if (liveSeq !== undefined) {
+      idChecks.push(
+        { get: () => [`/api/results?assignmentId=${assignmentId}&seq=${liveSeq}&dimension=quality`] },
+        { get: () => [`/api/results?assignmentId=${assignmentId}&seq=${liveSeq}&dimension=quantity`] },
+      );
+    }
+  }
+  if (sessionId) {
+    idChecks.push({ get: () => [`/api/evaluations?sessionId=${sessionId}`] });
   }
 
   const failures = [];

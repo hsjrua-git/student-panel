@@ -3,9 +3,38 @@ import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
 import { descendantGroupIds } from '../lib/groups.js';
 import { isUuid } from '../lib/ids.js';
+import { generateCode } from '../lib/studentCode.js';
 
 const router = Router();
 const UNIQUE_VIOLATION = '23505';
+
+// A group code may be given; otherwise one is generated. 1..40 chars, as the
+// schema's group_code_ck enforces.
+function parseCode(input) {
+  if (input === undefined || input === null || String(input).trim() === '') {
+    return { value: null }; // auto-generate
+  }
+  const code = String(input).trim();
+  if (code.length < 1 || code.length > 40) {
+    return {
+      error: 'Group code must be 1 to 40 characters.',
+      code: 'VALIDATION_INVALID_LENGTH',
+      params: { min: 1, max: 40 },
+    };
+  }
+  return { value: code };
+}
+
+function parseSortOrder(input) {
+  if (!Number.isInteger(input) || input < 0) {
+    return {
+      error: 'Sort order must be a whole number from 0.',
+      code: 'VALIDATION_INVALID_TYPE',
+      params: { field: 'sortOrder' },
+    };
+  }
+  return { value: input };
+}
 
 function parseName(input) {
   if (typeof input !== 'string') {
@@ -56,14 +85,16 @@ router.get('/', async (req, res) => {
 
   const result = await pool.query(
     `SELECT g.id,
+            g.code,
             g.name,
+            g.sort_order AS "sortOrder",
             g.parent_id  AS "parentId",
             g.archived_at AS "archivedAt",
             (SELECT count(*)::int FROM student_group_members m
              WHERE m.group_id = g.id AND m.left_on IS NULL) AS "memberCount"
      FROM student_groups g
      WHERE $1 OR g.archived_at IS NULL
-     ORDER BY lower(g.name)`,
+     ORDER BY g.sort_order, lower(g.name)`,
     [includeArchived]
   );
   res.json({ groups: result.rows });
@@ -71,7 +102,8 @@ router.get('/', async (req, res) => {
 
 async function loadGroup(db, id) {
   const result = await db.query(
-    `SELECT id, name, parent_id AS "parentId", archived_at AS "archivedAt"
+    `SELECT id, code, name, sort_order AS "sortOrder",
+            parent_id AS "parentId", archived_at AS "archivedAt"
      FROM student_groups WHERE id = $1`,
     [id]
   );
@@ -93,6 +125,21 @@ router.post('/', async (req, res) => {
     return res
       .status(400)
       .json({ error: name.error, code: name.code, params: name.params });
+  }
+
+  const code = parseCode(req.body?.code);
+  if (code.error) {
+    return res
+      .status(400)
+      .json({ error: code.error, code: code.code, params: code.params });
+  }
+  const sortOrder = parseSortOrder(req.body?.sortOrder ?? 0);
+  if (sortOrder.error) {
+    return res.status(400).json({
+      error: sortOrder.error,
+      code: sortOrder.code,
+      params: sortOrder.params,
+    });
   }
 
   const parentId = req.body?.parentId ?? null;
@@ -118,10 +165,11 @@ router.post('/', async (req, res) => {
       }
     }
     const inserted = await client.query(
-      `INSERT INTO student_groups (name, parent_id, created_by)
-       VALUES ($1, $2, $3)
-       RETURNING id, name, parent_id AS "parentId", archived_at AS "archivedAt"`,
-      [name.value, parentId, req.user.id]
+      `INSERT INTO student_groups (name, code, sort_order, parent_id, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, code, name, sort_order AS "sortOrder",
+                 parent_id AS "parentId", archived_at AS "archivedAt"`,
+      [name.value, code.value ?? generateCode(), sortOrder.value, parentId, req.user.id]
     );
     const group = inserted.rows[0];
     await recordAudit(client, {
@@ -169,6 +217,33 @@ router.patch('/:id', async (req, res) => {
       });
     }
     updates.parentId = body.parentId;
+  }
+  if ('code' in body) {
+    const code = parseCode(body.code);
+    if (code.error) {
+      return res
+        .status(400)
+        .json({ error: code.error, code: code.code, params: code.params });
+    }
+    if (code.value === null) {
+      return res.status(400).json({
+        error: 'A group code cannot be cleared.',
+        code: 'VALIDATION_REQUIRED',
+        params: { field: 'code' },
+      });
+    }
+    updates.code = code.value;
+  }
+  if ('sortOrder' in body) {
+    const sortOrder = parseSortOrder(body.sortOrder);
+    if (sortOrder.error) {
+      return res.status(400).json({
+        error: sortOrder.error,
+        code: sortOrder.code,
+        params: sortOrder.params,
+      });
+    }
+    updates.sortOrder = sortOrder.value;
   }
   if ('archived' in body) {
     if (typeof body.archived !== 'boolean') {
@@ -236,6 +311,14 @@ router.patch('/:id', async (req, res) => {
       values.push(updates.name);
       sets.push(`name = $${values.length}`);
     }
+    if ('code' in updates) {
+      values.push(updates.code);
+      sets.push(`code = $${values.length}`);
+    }
+    if ('sortOrder' in updates) {
+      values.push(updates.sortOrder);
+      sets.push(`sort_order = $${values.length}`);
+    }
     if ('parentId' in updates) {
       values.push(updates.parentId);
       sets.push(`parent_id = $${values.length}`);
@@ -247,7 +330,8 @@ router.patch('/:id', async (req, res) => {
     const updated = await client.query(
       `UPDATE student_groups SET ${sets.join(', ')}
        WHERE id = $${values.length}
-       RETURNING id, name, parent_id AS "parentId", archived_at AS "archivedAt"`,
+       RETURNING id, code, name, sort_order AS "sortOrder",
+                 parent_id AS "parentId", archived_at AS "archivedAt"`,
       values
     );
 
@@ -331,6 +415,7 @@ router.get('/:id/members', async (req, res) => {
     `SELECT s.id,
             s.full_name    AS "fullName",
             s.student_code AS "studentCode",
+            m.id           AS "membershipId",
             m.added_at::date   AS "joinedOn",
             m.left_on          AS "leftOn"
      FROM student_group_members m

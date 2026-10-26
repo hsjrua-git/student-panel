@@ -9,14 +9,17 @@ const MAX_SESSIONS_PER_ASSIGN = 200;
 
 const TASK_COLUMNS = `
   id,
-  session_id  AS "sessionId",
-  template_id AS "templateId",
+  session_id    AS "sessionId",
+  template_id   AS "templateId",
+  parameter_id  AS "parameterId",
+  membership_id AS "membershipId",
   title,
   description,
+  extra,
   done,
-  done_at     AS "doneAt",
-  sort_order  AS "sortOrder",
-  created_at  AS "createdAt"
+  done_at       AS "doneAt",
+  sort_order    AS "sortOrder",
+  created_at    AS "createdAt"
 `;
 
 router.param('id', (req, res, next, value) => {
@@ -77,13 +80,16 @@ router.post('/', async (req, res) => {
   }
 
   const result = await pool.query(
-    `INSERT INTO tasks (session_id, title, description, sort_order)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO tasks (session_id, parameter_id, membership_id, title, description, extra, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING ${TASK_COLUMNS}`,
     [
       sessionId,
+      parsed.value.parameterId ?? null,
+      parsed.value.membershipId ?? null,
       parsed.value.title,
       parsed.value.description ?? null,
+      JSON.stringify(parsed.value.extra ?? {}),
       parsed.value.sortOrder ?? 0,
     ]
   );
@@ -118,7 +124,8 @@ router.post('/from-template', async (req, res) => {
   try {
     await client.query('BEGIN');
     const template = await client.query(
-      `SELECT id, title, description, sort_order AS "sortOrder"
+      `SELECT id, title, description, parameter_id AS "parameterId",
+              extra, sort_order AS "sortOrder"
        FROM task_templates
        WHERE id = $1 AND archived_at IS NULL`,
       [templateId]
@@ -132,15 +139,17 @@ router.post('/from-template', async (req, res) => {
     }
 
     const result = await client.query(
-      `INSERT INTO tasks (session_id, template_id, title, description, sort_order)
-       SELECT s.id, $1, $2, $3, $4
+      `INSERT INTO tasks (session_id, template_id, parameter_id, membership_id, title, description, extra, sort_order)
+       SELECT s.id, $1, $2, NULL, $3, $4, $5, $6
        FROM sessions s
-       WHERE s.id = ANY($5::uuid[]) AND s.archived_at IS NULL
+       WHERE s.id = ANY($7::uuid[]) AND s.archived_at IS NULL
        RETURNING id`,
       [
         templateId,
+        template.rows[0].parameterId,
         template.rows[0].title,
         template.rows[0].description,
+        template.rows[0].extra,
         template.rows[0].sortOrder,
         sessionIds,
       ]
@@ -193,6 +202,18 @@ router.patch('/:id', async (req, res) => {
   if ('description' in parsed.value) {
     values.push(parsed.value.description);
     sets.push(`description = $${values.length}`);
+  }
+  if ('parameterId' in parsed.value) {
+    values.push(parsed.value.parameterId);
+    sets.push(`parameter_id = $${values.length}`);
+  }
+  if ('membershipId' in parsed.value) {
+    values.push(parsed.value.membershipId);
+    sets.push(`membership_id = $${values.length}`);
+  }
+  if ('extra' in parsed.value) {
+    values.push(JSON.stringify(parsed.value.extra));
+    sets.push(`extra = $${values.length}::jsonb`);
   }
   if ('sortOrder' in parsed.value) {
     values.push(parsed.value.sortOrder);

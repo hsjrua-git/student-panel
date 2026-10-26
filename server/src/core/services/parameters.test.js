@@ -1,9 +1,13 @@
-// Service-layer test for parameters and their period-scoped changes — real
-// service functions against a fresh in-memory PGlite.
+// Service-layer test for parameters — real service functions against a fresh
+// in-memory PGlite.
 //
 //   node --test src/core/services/parameters.test.js
 //
-// Each test gets its own in-memory database.
+// Each test gets its own in-memory database. Under the schema-4 model a
+// parameter is identified by a NOT NULL unique code, its bounds are integers
+// shared by both dimensions, and the period-scoped change log is gone; what
+// remains is list/create/update with the range-lock guardrail and audit
+// snapshots.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,15 +16,11 @@ import path from 'node:path';
 
 import { createPglitePool } from '../../db/pglite.js';
 import { initDb } from '../db.js';
+import { resetLocalUser } from '../context.js';
 import {
   listParameters,
   createParameter,
   updateParameter,
-  listParameterChanges,
-  parameterChangeImpact,
-  upsertParameterChange,
-  deleteParameterChange,
-  parametersForPeriod,
 } from './parameters.js';
 
 const migrationsDir = path.join(import.meta.dirname, '..', '..', 'db', 'migrations');
@@ -54,6 +54,7 @@ async function freshDb() {
   }
 
   initDb(pool);
+  resetLocalUser(); // audit tolerates a null user id; no seeded user needed
   return pool;
 }
 
@@ -65,239 +66,154 @@ async function expectCode(code, fn) {
   });
 }
 
-// Insert a student directly (student_code must match ^[2-9A-HJ-NP-Z]{8}$).
-async function addStudent(pool, code, fullName) {
-  const result = await pool.query(
-    `INSERT INTO students (student_code, full_name)
-     VALUES ($1, $2) RETURNING id`,
-    [code, fullName],
-  );
-  return result.rows[0].id;
-}
-
-async function addEvaluation(pool, studentId, parameterId, periodNumber, value) {
-  // evaluations.locks_at is NOT NULL (migration 007) with no default; a real
-  // save computes it, but for these read-side tests any future instant works.
-  await pool.query(
-    `INSERT INTO evaluations (student_id, parameter_id, period_number, value, locks_at)
-     VALUES ($1, $2, $3, $4, now() + interval '7 days')`,
-    [studentId, parameterId, periodNumber, value],
-  );
-}
-
-test('create seeds an add-change at startPeriod; list is ordered; guards', async () => {
+test('createParameter: validates, mints the sort order, and audits', async () => {
   const pool = await freshDb();
   try {
-    const p1 = await createParameter({
-      name: '  Neat  ness ',
-      unit: 'pts',
+    // Validation: code and name are required.
+    await expectCode('VALIDATION', () => createParameter({ name: 'No code' }));
+    await expectCode('VALIDATION', () => createParameter({ code: 'f', name: '' }));
+
+    const first = await createParameter({
+      code: 'focus',
+      name: 'Focus',
       minValue: 0,
       maxValue: 10,
-      startPeriod: 3,
     });
-    assert.match(p1.id, /^[0-9a-f-]{36}$/i);
-    assert.equal(p1.name, 'Neat ness'); // whitespace normalised
-    assert.equal(p1.unit, 'pts');
-    assert.equal(p1.minValue, 0);
-    assert.equal(p1.maxValue, 10);
-    assert.equal(p1.sortOrder, 1);
+    assert.equal(first.code, 'focus');
+    assert.equal(first.sortOrder, 1);
+    assert.equal(first.archivedAt, null);
 
-    // A 'from_here_on'/'add' change was seeded at startPeriod.
-    const { changes } = await listParameterChanges();
-    assert.equal(changes.length, 1);
-    assert.deepEqual(
-      {
-        parameterId: changes[0].parameterId,
-        periodNumber: changes[0].periodNumber,
-        scope: changes[0].scope,
-        action: changes[0].action,
-      },
-      { parameterId: p1.id, periodNumber: 3, scope: 'from_here_on', action: 'add' },
+    const second = await createParameter({ code: 'speed', name: 'Speed' });
+    assert.equal(second.sortOrder, 2); // auto-incremented
+    assert.equal(second.minValue, null); // open bounds are allowed
+
+    // Unique violations on name OR code read as a conflict.
+    await expectCode('CONFLICT', () =>
+      createParameter({ code: 'other', name: 'Focus' })
+    );
+    await expectCode('CONFLICT', () =>
+      createParameter({ code: 'focus', name: 'Other' })
     );
 
-    const p2 = await createParameter({ name: 'Attendance', startPeriod: 1 });
-    assert.equal(p2.sortOrder, 2);
-    assert.equal(p2.unit, null);
-
-    const { parameters } = await listParameters();
-    assert.deepEqual(parameters.map((p) => p.name), ['Neat ness', 'Attendance']);
-
-    // Duplicate name (case-insensitive, whitespace-normalised) collides.
-    await expectCode('CONFLICT', () => createParameter({ name: 'neat  ness', startPeriod: 1 }));
-    await expectCode('CONFLICT', () => createParameter({ name: 'attendance', startPeriod: 1 }));
-
-    // Validation: empty name, min > max, bad startPeriod.
-    await expectCode('VALIDATION', () => createParameter({ name: '', startPeriod: 1 }));
+    // min above max is a DB check → a friendly validation error.
     await expectCode('VALIDATION', () =>
-      createParameter({ name: 'Bad', minValue: 9, maxValue: 1, startPeriod: 1 }),
+      createParameter({ code: 'back', name: 'Backwards', minValue: 10, maxValue: 0 })
     );
-    await expectCode('VALIDATION', () => createParameter({ name: 'NoPeriod' }));
-    await expectCode('VALIDATION', () =>
-      createParameter({ name: 'ZeroPeriod', startPeriod: 0 }),
+
+    const audit = await pool.query(
+      "SELECT action, entity_id AS \"entityId\", new_data AS \"newData\" FROM audit_log WHERE action = 'parameter.create' ORDER BY id"
     );
+    assert.equal(audit.rows.length, 2);
+    assert.equal(audit.rows[0].entityId, first.id);
+    assert.equal(audit.rows[0].newData.code, 'focus');
   } finally {
     await pool.end();
   }
 });
 
-test('update: rename/unit/sortOrder; range locked after scores; guards', async () => {
+test('listParameters: active only by default, archived on request', async () => {
+  const pool = await freshDb();
+  try {
+    const p = await createParameter({ code: 'focus', name: 'Focus' });
+    await updateParameter(p.id, { archived: true });
+    await createParameter({ code: 'speed', name: 'Speed' });
+
+    const active = await listParameters();
+    assert.deepEqual(active.parameters.map((row) => row.code), ['speed']);
+
+    const all = await listParameters({ includeArchived: true });
+    assert.equal(all.parameters.length, 2);
+    assert.ok(all.parameters.find((row) => row.code === 'focus').archivedAt);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('updateParameter: guards, snapshots, and the range lock', async () => {
   const pool = await freshDb();
   try {
     const p = await createParameter({
+      code: 'focus',
       name: 'Focus',
       minValue: 0,
-      maxValue: 5,
-      startPeriod: 1,
+      maxValue: 10,
     });
 
-    const renamed = await updateParameter(p.id, { name: 'Focus level', unit: 'x', sortOrder: 9 });
-    assert.equal(renamed.name, 'Focus level');
-    assert.equal(renamed.unit, 'x');
-    assert.equal(renamed.sortOrder, 9);
+    // A recorded evaluation sits at 9 — inside [0, 10] but outside any
+    // narrowing attempt.
+    const teacher = (
+      await pool.query(
+        `INSERT INTO teachers (code, full_name, birth_date, national_id)
+         VALUES ('T1000001', 'Ms. Tester', '1990-05-01', '0012345678') RETURNING id`
+      )
+    ).rows[0].id;
+    const interval = (
+      await pool.query(
+        `INSERT INTO intervals (name, every) VALUES ('w', '7 days') RETURNING id`
+      )
+    ).rows[0].id;
+    const group = (
+      await pool.query(
+        `INSERT INTO student_groups (name, code) VALUES ('G', 'GA') RETURNING id`
+      )
+    ).rows[0].id;
+    const assignmentId = (
+      await pool.query(
+        `INSERT INTO assignments (code, teacher_id, interval_id, group_id, anchor_date)
+         VALUES ('A1', $1, $2, $3, '2024-01-06') RETURNING id`,
+        [teacher, interval, group]
+      )
+    ).rows[0].id;
+    const session = (
+      await pool.query(
+        `INSERT INTO sessions (assignment_id, seq, code, planned_date)
+         VALUES ($1, 1, 'S1', '2024-01-06') RETURNING id`,
+        [assignmentId]
+      )
+    ).rows[0].id;
+    await pool.query(
+      `INSERT INTO evaluations (session_id, parameter_id, membership_id, quality_value, locks_at)
+       VALUES ($1, $2, NULL, 9, now() + interval '7 days')`,
+      [session, p.id]
+    );
 
-    // Setting min/max to the SAME values is allowed even after scores exist
-    // (no real range change).
-    const sid = await addStudent(pool, 'ABCDEFGH', 'Ada Lovelace');
-    await addEvaluation(pool, sid, p.id, 1, 3);
-    const unchanged = await updateParameter(p.id, { minValue: 0, maxValue: 5 });
-    assert.equal(unchanged.minValue, 0);
-
-    // Actually changing the range after a score exists is refused.
-    await expectCode('CONFLICT', () => updateParameter(p.id, { maxValue: 8 }));
-
-    // Guards.
     await expectCode('VALIDATION', () => updateParameter(p.id, {}));
-    await expectCode('VALIDATION', () => updateParameter(p.id, { name: '' }));
-    await expectCode('NOT_FOUND', () => updateParameter('not-a-uuid', { name: 'Z' }));
     await expectCode('NOT_FOUND', () =>
-      updateParameter('00000000-0000-4000-8000-000000000000', { name: 'Z' }),
+      updateParameter(crypto.randomUUID(), { name: 'x' })
     );
+    await expectCode('VALIDATION', () =>
+      updateParameter(p.id, { archived: 'yes' })
+    );
+
+    // Narrowing below the recorded 9 is refused before the write.
+    await expectCode('CONFLICT', () =>
+      updateParameter(p.id, { minValue: 2, maxValue: 8 })
+    );
+
+    // A rename + widen works and snapshots old vs new.
+    const updated = await updateParameter(p.id, {
+      name: 'Focus renamed',
+      maxValue: 12,
+    });
+    assert.equal(updated.name, 'Focus renamed');
+    assert.equal(updated.maxValue, 12);
+
+    const audit = (
+      await pool.query(
+        "SELECT old_data AS \"oldData\", new_data AS \"newData\" FROM audit_log WHERE action = 'parameter.update'"
+      )
+    ).rows[0];
+    assert.equal(audit.oldData.name, 'Focus');
+    assert.equal(audit.newData.name, 'Focus renamed');
+    assert.equal(audit.oldData.maxValue, 10);
+    assert.equal(audit.newData.maxValue, 12);
+
+    // Archiving works; un-archiving restores.
+    const archived = await updateParameter(p.id, { archived: true });
+    assert.ok(archived.archivedAt);
+    const restored = await updateParameter(p.id, { archived: false });
+    assert.equal(restored.archivedAt, null);
   } finally {
     await pool.end();
   }
 });
-
-test('parameter changes: upsert replaces, FK 404, delete, guards', async () => {
-  const pool = await freshDb();
-  try {
-    const p = await createParameter({ name: 'Effort', startPeriod: 1 });
-
-    // Upsert a one-off removal at period 2.
-    const change = await upsertParameterChange({
-      parameterId: p.id,
-      periodNumber: 2,
-      scope: 'this_period_only',
-      action: 'remove',
-    });
-    assert.equal(change.action, 'remove');
-    const firstId = change.id;
-
-    // Upserting the same (parameter, period, scope) updates in place.
-    const updated = await upsertParameterChange({
-      parameterId: p.id,
-      periodNumber: 2,
-      scope: 'this_period_only',
-      action: 'add',
-    });
-    assert.equal(updated.id, firstId); // same row, updated action
-    assert.equal(updated.action, 'add');
-
-    // A valid-but-missing parameter id is a FK violation → NOT_FOUND.
-    await expectCode('NOT_FOUND', () =>
-      upsertParameterChange({
-        parameterId: '00000000-0000-4000-8000-000000000000',
-        periodNumber: 1,
-        scope: 'from_here_on',
-        action: 'add',
-      }),
-    );
-
-    // Validation of each field.
-    await expectCode('VALIDATION', () =>
-      upsertParameterChange({ parameterId: 'nope', periodNumber: 1, scope: 'from_here_on', action: 'add' }),
-    );
-    await expectCode('VALIDATION', () =>
-      upsertParameterChange({ parameterId: p.id, periodNumber: 0, scope: 'from_here_on', action: 'add' }),
-    );
-    await expectCode('VALIDATION', () =>
-      upsertParameterChange({ parameterId: p.id, periodNumber: 1, scope: 'sometimes', action: 'add' }),
-    );
-    await expectCode('VALIDATION', () =>
-      upsertParameterChange({ parameterId: p.id, periodNumber: 1, scope: 'from_here_on', action: 'toggle' }),
-    );
-
-    // Delete the change (the seeded add@1 and the one-off@2 exist → 2 rows).
-    assert.equal((await listParameterChanges()).changes.length, 2);
-    await deleteParameterChange(firstId);
-    assert.equal((await listParameterChanges()).changes.length, 1);
-
-    // Deleting again / a missing id / a bad uuid → NOT_FOUND.
-    await expectCode('NOT_FOUND', () => deleteParameterChange(firstId));
-    await expectCode('NOT_FOUND', () => deleteParameterChange('not-a-uuid'));
-  } finally {
-    await pool.end();
-  }
-});
-
-test('impact: counts scores a removal would hide (read-only)', async () => {
-  const pool = await freshDb();
-  try {
-    const p = await createParameter({ name: 'Tidiness', startPeriod: 1 });
-    const sid = await addStudent(pool, 'ABCDEFGH', 'Grace Hopper');
-    await addEvaluation(pool, sid, p.id, 2, 4); // a score in period 2
-
-    // Removing the parameter from period 2 onward hides that score.
-    const impact = await parameterChangeImpact({
-      parameterId: p.id,
-      periodNumber: '2', // query params arrive as strings
-      scope: 'from_here_on',
-      action: 'remove',
-    });
-    assert.deepEqual(impact, { affectedScores: 1, periods: [2] });
-
-    // Re-adding at the same point hides nothing.
-    const none = await parameterChangeImpact({
-      parameterId: p.id,
-      periodNumber: 2,
-      scope: 'from_here_on',
-      action: 'add',
-    });
-    assert.deepEqual(none, { affectedScores: 0, periods: [] });
-
-    // The impact preview writes nothing.
-    assert.equal((await listParameterChanges()).changes.length, 1);
-
-    await expectCode('VALIDATION', () =>
-      parameterChangeImpact({ parameterId: 'nope', periodNumber: 1, scope: 'from_here_on', action: 'add' }),
-    );
-    await expectCode('VALIDATION', () =>
-      parameterChangeImpact({ parameterId: p.id, periodNumber: 'x', scope: 'from_here_on', action: 'add' }),
-    );
-  } finally {
-    await pool.end();
-  }
-});
-
-test('parametersForPeriod filters to the parameters active in a period', async () => {
-  const pool = await freshDb();
-  try {
-    // Alpha is active from period 1; Beta only from period 3.
-    const alpha = await createParameter({ name: 'Alpha', startPeriod: 1 });
-    const beta = await createParameter({ name: 'Beta', startPeriod: 3 });
-
-    const p1 = await parametersForPeriod(1);
-    assert.equal(p1.periodNumber, 1);
-    assert.deepEqual(p1.parameters.map((p) => p.name), ['Alpha']);
-
-    const p3 = await parametersForPeriod(3);
-    assert.deepEqual(p3.parameters.map((p) => p.name), ['Alpha', 'Beta']);
-    assert.ok(p3.parameters.some((p) => p.id === beta.id));
-    assert.ok(p3.parameters.some((p) => p.id === alpha.id));
-
-    await expectCode('VALIDATION', () => parametersForPeriod('nope'));
-    await expectCode('VALIDATION', () => parametersForPeriod(0));
-  } finally {
-    await pool.end();
-  }
-});
-

@@ -4,8 +4,8 @@ export const MAX_ENTRIES = 5000;
 export const MAX_COMMENT = 500;
 const MAX_ABS_VALUE = 1_000_000_000;
 
-// A note is optional. Returns the cleaned note (or null) — treat missing,
-// null, or blank all as "no note".
+// A comment is optional. Returns the cleaned comment (or null) — treat
+// missing, null, or blank all as "no comment". `undefined` signals invalid.
 export function normalizeComment(raw) {
   if (raw === null || raw === undefined) return null;
   if (typeof raw !== 'string') return undefined; // signals invalid
@@ -13,6 +13,35 @@ export function normalizeComment(raw) {
   return value === '' ? null : value;
 }
 
+function checkDimensionValue(entry, field) {
+  if (!(field in entry)) {
+    return `Every entry needs ${field} (an integer or null).`;
+  }
+  const value = entry[field];
+  if (value === null) return null;
+  if (!Number.isInteger(value)) {
+    return `${field} must be a whole number or null.`;
+  }
+  if (Math.abs(value) > MAX_ABS_VALUE) {
+    return `${field} is outside the supported range.`;
+  }
+  return null;
+}
+
+function checkDimensionComment(entry, field) {
+  if (!(field in entry)) return null;
+  const comment = normalizeComment(entry[field]);
+  if (comment === undefined) {
+    return `${field} must be text or empty.`;
+  }
+  if (comment !== null && comment.length > MAX_COMMENT) {
+    return `${field} is too long (the maximum is ${MAX_COMMENT} characters).`;
+  }
+  return null;
+}
+
+// Shape check only — no database. `selected` is the cell's existence: the row
+// is the expectation, so an entry always carries it explicitly.
 export function validateShape(entries) {
   if (!Array.isArray(entries) || entries.length === 0) {
     return 'entries must be a non-empty list.';
@@ -22,47 +51,36 @@ export function validateShape(entries) {
   }
 
   for (const entry of entries) {
-    if (!isUuid(entry?.studentId)) {
-      return 'Every entry needs a valid studentId.';
+    if (entry === null || typeof entry !== 'object') {
+      return 'Every entry must be an object.';
+    }
+    if (entry.membershipId !== null && !isUuid(entry.membershipId)) {
+      return 'Every entry needs a membershipId (an ID, or null for the whole group).';
     }
     if (!isUuid(entry.parameterId)) {
       return 'Every entry needs a valid parameterId.';
     }
-
-    // Every entry must carry an explicit `value` — a number, or null to clear
-    // the cell. A missing key is a malformed request (the client always sends
-    // one), so reject it rather than silently treating it as null.
-    if (!('value' in entry)) {
-      return 'Every entry needs a value (a number or null).';
+    if (typeof entry.selected !== 'boolean') {
+      return 'Every entry needs selected (true = keep the row, false = remove it).';
     }
-    const { value } = entry;
-    const isNumber = typeof value === 'number' && Number.isFinite(value);
-    if (value !== null && !isNumber) {
-      return 'Every value must be a number or null.';
+    for (const field of ['qualityValue', 'quantityValue']) {
+      const error = checkDimensionValue(entry, field);
+      if (error) return error;
     }
-    if (isNumber && Math.abs(value) > MAX_ABS_VALUE) {
-      return 'A value is outside the supported range.';
-    }
-
-    if ('comment' in entry) {
-      const comment = normalizeComment(entry.comment);
-      if (comment === undefined) {
-        return 'A note must be text or empty.';
-      }
-      if (comment !== null && comment.length > MAX_COMMENT) {
-        return `A note is too long (the maximum is ${MAX_COMMENT} characters).`;
-      }
+    for (const field of ['qualityComment', 'quantityComment']) {
+      const error = checkDimensionComment(entry, field);
+      if (error) return error;
     }
   }
   return null;
 }
 
-export function findProblems({
-  entries,
-  usedParameters,
-  knownStudentIds,
-  periodNumber,
-}) {
+// Semantic problems. `memberships` maps membershipId → student info for the
+// assignment's valid targets (open memberships of its group, or its single
+// member); `parameters` maps parameterId → { name, minValue, maxValue }.
+// Applicability is the evaluator's explicit cell selection — there is no
+// parameter-use log to check against — so any known parameter is fair game.
+export function findProblems({ entries, parameters, memberships }) {
   const problems = [];
   const seen = new Set();
 
@@ -70,36 +88,40 @@ export function findProblems({
     function report(message) {
       problems.push({
         index,
-        studentId: entry.studentId,
+        membershipId: entry.membershipId,
         parameterId: entry.parameterId,
         message,
       });
     }
 
-    const key = `${entry.studentId}:${entry.parameterId}`;
+    const key = `${entry.membershipId ?? 'group'}:${entry.parameterId}`;
     if (seen.has(key)) {
-      report('This student and parameter appear more than once.');
+      report('This target and parameter appear more than once.');
       return;
     }
     seen.add(key);
 
-    if (!knownStudentIds.has(entry.studentId)) {
-      report('Student not found.');
+    if (entry.membershipId !== null && !memberships.has(entry.membershipId)) {
+      report('This target is not part of the assignment.');
       return;
     }
 
-    const parameter = usedParameters.get(entry.parameterId);
+    const parameter = parameters.get(entry.parameterId);
     if (!parameter) {
-      report(`This parameter is not used in Period ${periodNumber}.`);
+      report('Parameter not found.');
       return;
     }
 
-    if (entry.value === null) return;
-
-    if (parameter.minValue !== null && entry.value < parameter.minValue) {
-      report(`${parameter.name} must be at least ${parameter.minValue}.`);
-    } else if (parameter.maxValue !== null && entry.value > parameter.maxValue) {
-      report(`${parameter.name} must be at most ${parameter.maxValue}.`);
+    for (const [field, value] of [
+      ['qualityValue', entry.qualityValue],
+      ['quantityValue', entry.quantityValue],
+    ]) {
+      if (value === null) continue;
+      if (parameter.minValue !== null && value < parameter.minValue) {
+        report(`${parameter.name} must be at least ${parameter.minValue}.`);
+      } else if (parameter.maxValue !== null && value > parameter.maxValue) {
+        report(`${parameter.name} must be at most ${parameter.maxValue}.`);
+      }
     }
   });
 

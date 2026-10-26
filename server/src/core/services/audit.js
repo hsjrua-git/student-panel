@@ -3,8 +3,9 @@
 // On-device equivalent of routes/audit.js. A pure read: no audit of its own,
 // no req.user. Conversion is mechanical — pool→getDb(), the two 400s become
 // ServiceError.validation, and the query string is coerced explicitly by the
-// caller-facing args. The category/actor whitelisting and the details.changes
-// truncation are preserved verbatim.
+// caller-facing args. The category whitelisting and the details.changes
+// truncation are preserved verbatim; the rows now also carry the schema-4
+// row snapshots (old_data/new_data).
 //
 // Writes still come from lib/audit.js (recordAudit), driven by the services
 // that mutate; this only reads what they recorded.
@@ -15,7 +16,12 @@ import { ServiceError } from '../errors.js';
 const CATEGORIES = [
   'student',
   'parameter',
-  'parameter_change',
+  'teacher',
+  'interval',
+  'assignment',
+  'session',
+  'task',
+  'alert',
   'settings',
   'scores',
   'user',
@@ -70,18 +76,16 @@ export async function getAuditEntries(filters = {}) {
               a.entity_type     AS "entityType",
               a.entity_id       AS "entityId",
               a.details,
+              a.old_data        AS "oldData",
+              a.new_data        AS "newData",
               s.full_name       AS "studentName",
               s.student_code    AS "studentCode",
-              p.name            AS "parameterName",
-              cp.name           AS "changeParameterName"
+              p.name            AS "parameterName"
        FROM audit_log a
        LEFT JOIN students s
          ON a.entity_type = 'student' AND s.id::text = a.entity_id
        LEFT JOIN parameters p
          ON a.entity_type = 'parameter' AND p.id::text = a.entity_id
-       LEFT JOIN parameters cp
-         ON a.entity_type = 'parameter_change'
-        AND cp.id::text = a.details->'result'->>'parameterId'
        ${where}
        ORDER BY a.occurred_at DESC, a.id DESC
        LIMIT ${PAGE_SIZE} OFFSET $${values.length + 1}`,

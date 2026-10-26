@@ -1,89 +1,47 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
+import { isUuid } from '../lib/ids.js';
+import { userCan } from '../middleware/auth.js';
 import {
-  isSaturday,
-  isValidIsoDate,
-  periodDates,
-  periodForDate,
-  todayIso,
+  listAssignmentPeriods,
+  syncAssignmentPeriods,
 } from '../lib/periods.js';
-import { parametersUsedInPeriod } from '../lib/parameterUse.js';
 
 const router = Router();
-const ANCHOR_KEY = 'period_anchor_date';
 
-async function readAnchor() {
-  const result = await pool.query(
-    'SELECT value FROM settings WHERE key = $1',
-    [ANCHOR_KEY]
-  );
-  return result.rows[0]?.value ?? null;
-}
-
-router.get('/settings/period-anchor', async (req, res) => {
-  res.json({ anchorDate: await readAnchor() });
-});
-
-router.put('/settings/period-anchor', async (req, res) => {
-  const anchorDate = req.body?.anchorDate;
-  if (!isValidIsoDate(anchorDate)) {
-    return res.status(400).json({
-      error: 'anchorDate must be a real date written as YYYY-MM-DD.',
-      code: 'VALIDATION_INVALID_DATE',
-      params: { field: 'anchorDate' },
-    });
-  }
-  if (!isSaturday(anchorDate)) {
-    return res.status(400).json({
-      error: 'The anchor date must be a Saturday.',
-      code: 'PERIODS_ANCHOR_NOT_SATURDAY',
-    });
-  }
-
-  if ((await readAnchor()) !== anchorDate) {
-    const scores = await pool.query('SELECT 1 FROM evaluations LIMIT 1');
-    if (scores.rowCount > 0) {
-      return res.status(409).json({
-        error: 'The anchor date cannot be changed after scores exist.',
-        code: 'PERIODS_ANCHOR_LOCKED',
-      });
-    }
-  }
-
-  await pool.query(
-    `INSERT INTO settings (key, value)
-     VALUES ($1, $2)
-     ON CONFLICT (key) DO UPDATE
-       SET value = EXCLUDED.value, updated_at = now()`,
-    [ANCHOR_KEY, anchorDate]
-  );
-  res.json({ anchorDate });
-});
-
+// The period calendar of one assignment (there is no school-wide period
+// anymore). Periods are materialized on the fly, so a fresh assignment with
+// generated sessions lists its periods immediately. The answered-cell count
+// is score-derived: it is stripped for callers without scores.view.
 router.get('/periods', async (req, res) => {
-  const today = todayIso();
-  const anchorDate = await readAnchor();
-  if (!anchorDate) {
-    return res.json({ anchorDate: null, today, current: null, periods: [] });
-  }
-
-  const changesResult = await pool.query(
-    `SELECT parameter_id  AS "parameterId",
-            period_number AS "periodNumber",
-            scope,
-            action
-     FROM parameter_changes`
-  );
-
-  const current = periodForDate(anchorDate, today);
-  const periods = [];
-  for (let number = 1; number <= (current ?? 0); number++) {
-    periods.push({
-      ...periodDates(anchorDate, number),
-      parameterIds: parametersUsedInPeriod(changesResult.rows, number),
+  const { assignmentId } = req.query;
+  if (!isUuid(assignmentId)) {
+    return res.status(400).json({
+      error: 'assignmentId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'assignmentId' },
     });
   }
-  res.json({ anchorDate, today, current, periods });
+
+  const assignment = await pool.query(
+    'SELECT id FROM assignments WHERE id = $1',
+    [assignmentId]
+  );
+  if (assignment.rowCount === 0) {
+    return res.status(404).json({
+      error: 'Assignment not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'assignment' },
+    });
+  }
+
+  await syncAssignmentPeriods(pool, assignmentId);
+  const periods = await listAssignmentPeriods(pool, assignmentId);
+  res.json({
+    periods: userCan(req, 'scores.view')
+      ? periods
+      : periods.map(({ answeredCount, ...rest }) => rest),
+  });
 });
 
 export default router;

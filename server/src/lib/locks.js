@@ -3,27 +3,56 @@ export const LATE_LOCK_DAYS = 1;
 export const MIN_REASON = 5;
 export const MAX_REASON = 300;
 
-export function lockDaysFor({ periodNumber, currentPeriod }) {
-  return periodNumber === currentPeriod ? NORMAL_LOCK_DAYS : LATE_LOCK_DAYS;
+// The lock window anchors to the SESSION's effective date now (it anchored to
+// the write moment in the period model): a session happening this week — or
+// still in the future — gets the full 7-day window from its date; an older
+// session's rows lock after 1 day. `sessionDate`/`today` are ISO dates.
+export function lockDaysFor({ sessionDate, today }) {
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const day = (iso) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return Date.UTC(y, m - 1, d) / MS_PER_DAY;
+  };
+  return day(sessionDate) + NORMAL_LOCK_DAYS >= day(today)
+    ? NORMAL_LOCK_DAYS
+    : LATE_LOCK_DAYS;
+}
+
+// The timestamp a row's locks_at gets: the session's effective date plus its
+// window. Returns an ISO string so pg stores it exactly.
+export function locksAtFor({ sessionDate, today }) {
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const day = (iso) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return Date.UTC(y, m - 1, d) / MS_PER_DAY;
+  };
+  const at = (day(sessionDate) + lockDaysFor({ sessionDate, today })) * MS_PER_DAY;
+  return new Date(at).toISOString();
+}
+
+// A cell key covers the whole target now: the membership (or the literal
+// `group` for the whole-group row) plus the parameter.
+export function cellKey(membershipId, parameterId) {
+  return `${membershipId ?? 'group'}:${parameterId}`;
 }
 
 export function findLockedChanges({ entries, existing }) {
   const locked = [];
   entries.forEach((entry, index) => {
-    const row = existing.get(`${entry.studentId}:${entry.parameterId}`);
+    const row = existing.get(cellKey(entry.membershipId, entry.parameterId));
     if (!row || !row.isLocked) return;
-    const valueChanged = entry.value !== row.value;
-    // Only weigh the note if the entry actually carries one (CSV import does
-    // not touch notes, so it must not look like a note was cleared).
-    const commentChanged =
-      'comment' in entry &&
-      (entry.comment ?? null) !== (row.comment ?? null);
-    if (!valueChanged && !commentChanged) return;
+    const changed =
+      (entry.selected ?? true) !== (row.selected ?? true) ||
+      entry.qualityValue !== row.qualityValue ||
+      entry.quantityValue !== row.quantityValue ||
+      (entry.qualityComment ?? null) !== (row.qualityComment ?? null) ||
+      (entry.quantityComment ?? null) !== (row.quantityComment ?? null);
+    if (!changed) return;
     locked.push({
       index,
-      studentId: entry.studentId,
+      membershipId: entry.membershipId,
       parameterId: entry.parameterId,
-      lockedAt: row.lockedAt,
+      lockedAt: row.locksAt,
     });
   });
   return locked;

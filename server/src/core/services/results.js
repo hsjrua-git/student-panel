@@ -1,131 +1,169 @@
-// Results (per-period roll-up) — service layer (framework-free).
+// Results (assignment-period grid) — service layer (framework-free).
 //
-// On-device equivalent of routes/results.js: a single read that assembles one
-// period's scores into the table the Results page renders. No audit, no
-// req.user (it was a pure GET), so the conversion is just pool→getDb(), status
-// codes→ServiceError, and query-string coercion done explicitly.
+// On-device equivalent of routes/results.js under the schema-4 model: one
+// assignment period's grid — rows are the assignment's targets (whole-group
+// row first, then members; an individual assignment has exactly its member),
+// columns are parameters, cells carry both dimensions plus the answered
+// state, and `previous` carries the same cells from the assignment's previous
+// period (seq − 1) for the change columns. No audit, no req.user (it was a
+// pure GET), so the conversion is pool→getDb(), status codes→ServiceError,
+// and query-string coercion done explicitly.
 //
-// `input` = { periodNumber, groupId? }. Returns
-// { periodNumber, startDate, endDate, ...buildResults(...), total, truncated }.
+// `input` = { assignmentId, seq, dimension? }. Returns
+// { assignment, period, dimension, parameters, ...buildResults(...), hasPrevious }.
 
 import { getDb } from '../db.js';
 import { ServiceError } from '../errors.js';
-import {
-  MAX_PERIOD,
-  isValidPeriodNumber,
-  parametersUsedInPeriod,
-} from '../../lib/parameterUse.js';
-import { periodDates, periodForDate, todayIso } from '../../lib/periods.js';
-import { MAX_RESULT_STUDENTS, buildResults } from '../../lib/results.js';
-import { descendantGroupIds } from '../../lib/groups.js';
 import { isUuid } from '../../lib/ids.js';
-
-const PERIOD_MESSAGE = `must be a whole number from 1 to ${MAX_PERIOD}.`;
+import {
+  assignPeriods,
+  listAssignmentPeriods,
+  syncAssignmentPeriods,
+} from '../../lib/periods.js';
+import { buildResults } from '../../lib/results.js';
 
 export async function getResults(input = {}) {
   const db = getDb();
-  const { periodNumber: rawPeriod, groupId } = input;
+  const { assignmentId, seq: rawSeq, dimension = 'quality' } = input;
 
-  const periodNumber = Number(rawPeriod);
-  if (!Number.isInteger(periodNumber) || !isValidPeriodNumber(periodNumber)) {
-    throw ServiceError.validation(`periodNumber ${PERIOD_MESSAGE}`);
+  if (!isUuid(assignmentId)) {
+    throw ServiceError.validation('assignmentId must be a valid ID.');
   }
-  if (groupId !== undefined && !isUuid(groupId)) {
-    throw ServiceError.validation('groupId must be a valid ID.');
+  const seq = Number(rawSeq);
+  if (!Number.isInteger(seq) || seq < 1) {
+    throw ServiceError.validation('seq must be a whole number from 1.');
   }
-
-  // Optional "student belongs to this group tree" SQL condition.
-  let groupFilter = '';
-  const groupValues = [];
-  if (groupId !== undefined) {
-    const groupIds = await descendantGroupIds(db, groupId);
-    groupValues.push(groupIds);
-    groupFilter = ` AND id IN (SELECT student_id FROM student_group_members
-                    WHERE group_id = ANY($1::uuid[]))`;
+  if (dimension !== 'quality' && dimension !== 'quantity') {
+    throw ServiceError.validation('dimension must be "quality" or "quantity".');
   }
 
-  const anchorResult = await db.query(
-    'SELECT value FROM settings WHERE key = $1',
-    ['period_anchor_date'],
+  const assignmentResult = await db.query(
+    `SELECT a.id,
+            a.code          AS "assignmentCode",
+            a.name          AS "assignmentName",
+            a.group_id      AS "groupId",
+            g.name          AS "groupName",
+            a.membership_id AS "assignmentMembershipId",
+            t.full_name     AS "teacherName"
+     FROM assignments a
+     JOIN teachers t ON t.id = a.teacher_id
+     LEFT JOIN student_groups g ON g.id = a.group_id
+     WHERE a.id = $1`,
+    [assignmentId]
   );
-  const anchorDate = anchorResult.rows[0]?.value;
-  if (!anchorDate) {
-    throw ServiceError.conflict('Set the period start date first.');
+  const assignment = assignmentResult.rows[0];
+  if (!assignment) {
+    throw ServiceError.notFound('Assignment not found.');
   }
 
-  const current = periodForDate(anchorDate, todayIso());
-  if (current === null || periodNumber > current) {
-    throw ServiceError.validation(`Period ${periodNumber} has not started yet.`);
+  await syncAssignmentPeriods(db, assignmentId);
+  const periods = await listAssignmentPeriods(db, assignmentId);
+  const period = periods.find(
+    (candidate) => candidate.seq === seq && candidate.archivedAt === null
+  );
+  if (!period || period.sessionCount === 0) {
+    throw ServiceError.validation(
+      `Period ${seq} of this assignment has no sessions yet.`,
+      { code: 'PERIODS_NOT_STARTED', params: { seq } }
+    );
   }
 
-  const [
-    changesResult,
-    parametersResult,
-    studentsResult,
-    countResult,
-    evaluationsResult,
-  ] = await Promise.all([
+  // Which sessions belong to the requested (and previous) bucket.
+  const sessionsResult = await db.query(
+    `SELECT id,
+            session_date::text AS "sessionDate",
+            canceled_at        AS "canceledAt",
+            archived_at        AS "archivedAt"
+     FROM sessions
+     WHERE assignment_id = $1`,
+    [assignmentId]
+  );
+  const buckets = assignPeriods(sessionsResult.rows);
+  const sessionToSeq = new Map(
+    [...buckets].filter(([, bucketSeq]) => bucketSeq === seq || bucketSeq === seq - 1)
+  );
+  const sessionIds = [...sessionToSeq.keys()];
+
+  const [targetsResult, parametersResult, evaluationsResult] = await Promise.all([
     db.query(
-      `SELECT parameter_id  AS "parameterId",
-              period_number AS "periodNumber",
-              scope,
-              action
-       FROM parameter_changes`,
+      `SELECT ms.id          AS "membershipId",
+              s.id           AS "studentId",
+              s.full_name    AS "fullName",
+              s.student_code AS "studentCode"
+       FROM assignments a
+       JOIN student_group_members ms
+         ON (a.group_id IS NOT NULL AND ms.group_id = a.group_id)
+         OR (a.membership_id IS NOT NULL AND ms.id = a.membership_id)
+       JOIN students s ON s.id = ms.student_id
+       WHERE a.id = $1
+         AND ms.left_on IS NULL AND s.deleted_at IS NULL
+       ORDER BY lower(s.full_name)`,
+      [assignmentId]
     ),
     db.query(
-      `SELECT id,
-              name,
-              unit,
-              min_value::float8 AS "minValue",
-              max_value::float8 AS "maxValue"
+      `SELECT id, code, name,
+              min_value AS "minValue", max_value AS "maxValue"
        FROM parameters
-       ORDER BY sort_order, lower(name)`,
+       WHERE archived_at IS NULL
+       ORDER BY sort_order, lower(name)`
     ),
-    db.query(
-      `SELECT id,
-              full_name    AS "fullName",
-              student_code AS "studentCode"
-       FROM students
-       WHERE deleted_at IS NULL${groupFilter}
-       ORDER BY lower(full_name), id
-       LIMIT $${groupValues.length + 1}`,
-      [...groupValues, MAX_RESULT_STUDENTS],
-    ),
-    db.query(
-      `SELECT count(*)::int AS total FROM students
-       WHERE deleted_at IS NULL${groupFilter}`,
-      groupValues,
-    ),
-    db.query(
-      `SELECT student_id    AS "studentId",
-              parameter_id  AS "parameterId",
-              period_number AS "periodNumber",
-              value::float8 AS value
-       FROM evaluations
-       WHERE period_number = ANY($1::int[]) AND value IS NOT NULL`,
-      [[periodNumber, periodNumber - 1]],
-    ),
+    sessionIds.length === 0
+      ? Promise.resolve({ rows: [] })
+      : db.query(
+          `SELECT session_id    AS "sessionId",
+                  membership_id AS "membershipId",
+                  parameter_id  AS "parameterId",
+                  quality_value    AS "qualityValue",
+                  quantity_value   AS "quantityValue",
+                  quality_comment  AS "qualityComment",
+                  quantity_comment AS "quantityComment"
+           FROM evaluations
+           WHERE session_id = ANY($1::uuid[]) AND archived_at IS NULL`,
+          [sessionIds]
+        ),
   ]);
 
-  const usedIds = new Set(
-    parametersUsedInPeriod(changesResult.rows, periodNumber),
-  );
+  const targets = assignment.assignmentMembershipId
+    ? targetsResult.rows.filter(
+        (target) => target.membershipId === assignment.assignmentMembershipId
+      )
+    : targetsResult.rows;
+
+  const evaluations = evaluationsResult.rows
+    .map((row) => ({
+      ...row,
+      periodSeq: sessionToSeq.get(row.sessionId) ?? null,
+    }))
+    .filter((row) => row.periodSeq !== null);
+
   const built = buildResults({
-    periodNumber,
+    seq,
+    period,
+    assignment,
     parameters: parametersResult.rows,
-    usedIds,
-    students: studentsResult.rows,
-    evaluations: evaluationsResult.rows,
+    targets,
+    groupName: assignment.groupName,
+    evaluations,
   });
-  const dates = periodDates(anchorDate, periodNumber);
-  const total = countResult.rows[0].total;
 
   return {
-    periodNumber,
-    startDate: dates.startDate,
-    endDate: dates.endDate,
+    assignment: {
+      id: assignment.id,
+      code: assignment.assignmentCode,
+      name: assignment.assignmentName,
+      teacherName: assignment.teacherName,
+    },
+    period: {
+      id: period.id,
+      seq: period.seq,
+      startDate: period.startDate,
+      endDate: period.endDate,
+    },
+    dimension,
+    parameters: parametersResult.rows,
     ...built,
-    total,
-    truncated: total > studentsResult.rows.length,
+    hasPrevious: periods.some(
+      (candidate) => candidate.seq === seq - 1 && candidate.sessionCount > 0
+    ),
   };
 }

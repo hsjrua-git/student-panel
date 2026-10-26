@@ -3,16 +3,12 @@ import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
 import { isUuid } from '../lib/ids.js';
 import {
+  cellKey,
   findLockedChanges,
-  lockDaysFor,
+  locksAtFor,
   parseOverrideReason,
 } from '../lib/locks.js';
-import { periodForDate, todayIso } from '../lib/periods.js';
-import {
-  MAX_PERIOD,
-  isValidPeriodNumber,
-  parametersUsedInPeriod,
-} from '../lib/parameterUse.js';
+import { todayIso } from '../lib/periods.js';
 import { userCan } from '../middleware/auth.js';
 import {
   findProblems,
@@ -23,24 +19,86 @@ import { previewCells, previewCounts } from '../lib/scorePreview.js';
 
 const router = Router();
 
+// The assignment's valid evaluation targets: for a group assignment every
+// open membership of the group (plus the whole-group row), for an individual
+// assignment exactly its own member. Maps membershipId → student info.
+async function loadTargets(db, assignment) {
+  if (assignment.assignmentMembershipId) {
+    const result = await db.query(
+      `SELECT ms.id            AS "membershipId",
+              s.id             AS "studentId",
+              s.full_name      AS "fullName",
+              s.student_code   AS "studentCode"
+       FROM student_group_members ms
+       JOIN students s ON s.id = ms.student_id
+       WHERE ms.id = $1 AND s.deleted_at IS NULL`,
+      [assignment.assignmentMembershipId]
+    );
+    return new Map(result.rows.map((row) => [row.membershipId, row]));
+  }
+  const result = await db.query(
+    `SELECT ms.id         AS "membershipId",
+            s.id          AS "studentId",
+            s.full_name   AS "fullName",
+            s.student_code AS "studentCode"
+     FROM student_group_members ms
+     JOIN students s ON s.id = ms.student_id
+     WHERE ms.group_id = $1 AND ms.left_on IS NULL AND s.deleted_at IS NULL
+     ORDER BY lower(s.full_name)`,
+    [assignment.groupId]
+  );
+  return new Map(result.rows.map((row) => [row.membershipId, row]));
+}
+
+const EVALUATION_SELECT = `
+  SELECT e.id,
+         e.session_id                    AS "sessionId",
+         s.assignment_id                 AS "assignmentId",
+         s.code                          AS "sessionCode",
+         s.session_date::text            AS "sessionDate",
+         e.parameter_id                  AS "parameterId",
+         e.membership_id                 AS "membershipId",
+         ms.student_id::text             AS "studentId",
+         e.quality_value                 AS "qualityValue",
+         e.quantity_value                AS "quantityValue",
+         e.quality_comment               AS "qualityComment",
+         e.quantity_comment              AS "quantityComment",
+         e.locks_at                      AS "locksAt",
+         (e.locks_at <= now())           AS "isLocked",
+         e.updated_at                    AS "updatedAt"
+  FROM evaluations e
+  JOIN sessions s ON s.id = e.session_id
+  LEFT JOIN student_group_members ms ON ms.id = e.membership_id
+`;
+
+// History and grid reads. Filters combine; at least one is required so the
+// endpoint can never become a full-table dump.
 router.get('/evaluations', async (req, res) => {
-  const { studentId, parameterId, periodNumber } = req.query;
-  const includeCleared = req.query.includeCleared === '1';
-  const conditions = includeCleared
-    ? []
-    : ['(value IS NOT NULL OR comment IS NOT NULL)'];
+  const { sessionId, assignmentId, studentId, parameterId } = req.query;
+  const conditions = ['e.archived_at IS NULL'];
   const values = [];
 
-  if (studentId !== undefined) {
-    if (!isUuid(studentId)) {
+  if (sessionId !== undefined) {
+    if (!isUuid(sessionId)) {
       return res.status(400).json({
-        error: 'studentId must be a valid ID.',
+        error: 'sessionId must be a valid ID.',
         code: 'VALIDATION_INVALID_FORMAT',
-        params: { field: 'studentId' },
+        params: { field: 'sessionId' },
       });
     }
-    values.push(studentId);
-    conditions.push(`student_id = $${values.length}`);
+    values.push(sessionId);
+    conditions.push(`e.session_id = $${values.length}`);
+  }
+  if (assignmentId !== undefined) {
+    if (!isUuid(assignmentId)) {
+      return res.status(400).json({
+        error: 'assignmentId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'assignmentId' },
+      });
+    }
+    values.push(assignmentId);
+    conditions.push(`s.assignment_id = $${values.length}`);
   }
   if (parameterId !== undefined) {
     if (!isUuid(parameterId)) {
@@ -51,41 +109,40 @@ router.get('/evaluations', async (req, res) => {
       });
     }
     values.push(parameterId);
-    conditions.push(`parameter_id = $${values.length}`);
+    conditions.push(`e.parameter_id = $${values.length}`);
   }
-  if (periodNumber !== undefined) {
-    const isDigits =
-      typeof periodNumber === 'string' && /^\d+$/.test(periodNumber);
-    if (!isDigits || !isValidPeriodNumber(Number(periodNumber))) {
+  if (studentId !== undefined) {
+    if (!isUuid(studentId)) {
       return res.status(400).json({
-        error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
-        code: 'VALIDATION_INVALID_RANGE',
-        params: { min: 1, max: MAX_PERIOD },
+        error: 'studentId must be a valid ID.',
+        code: 'VALIDATION_INVALID_FORMAT',
+        params: { field: 'studentId' },
       });
     }
-    values.push(Number(periodNumber));
-    conditions.push(`period_number = $${values.length}`);
+    // The student's own member rows AND the whole-group rows of any group
+    // they are (or were) a member of — both kinds concern them.
+    values.push(studentId);
+    conditions.push(
+      `(e.membership_id IN (SELECT id FROM student_group_members WHERE student_id = $${values.length})
+        OR (e.membership_id IS NULL AND EXISTS (
+              SELECT 1 FROM assignments a2
+              JOIN student_group_members m2 ON m2.group_id = a2.group_id
+              WHERE a2.id = s.assignment_id AND m2.student_id = $${values.length})))`
+    );
   }
 
   if (values.length === 0) {
     return res.status(400).json({
-      error: 'Add at least one filter: studentId, parameterId or periodNumber.',
+      error:
+        'Add at least one filter: sessionId, assignmentId, studentId or parameterId.',
       code: 'EVALUATIONS_FILTER_REQUIRED',
     });
   }
 
   const result = await pool.query(
-    `SELECT student_id          AS "studentId",
-            parameter_id        AS "parameterId",
-            period_number       AS "periodNumber",
-            value::float8       AS value,
-            comment,
-            updated_at          AS "updatedAt",
-            locks_at            AS "lockedAt",
-            (locks_at <= now()) AS "isLocked"
-     FROM evaluations
+    `${EVALUATION_SELECT}
      WHERE ${conditions.join(' AND ')}
-     ORDER BY period_number, student_id, parameter_id
+     ORDER BY s.session_date, s.seq, e.parameter_id, e.membership_id NULLS FIRST
      LIMIT 20000`,
     values
   );
@@ -94,7 +151,7 @@ router.get('/evaluations', async (req, res) => {
 
 router.put('/evaluations/bulk', async (req, res) => {
   const {
-    periodNumber,
+    sessionId,
     entries,
     overrideReason: reasonInput,
     dryRun = false,
@@ -113,11 +170,11 @@ router.put('/evaluations/bulk', async (req, res) => {
       code: 'VALIDATION_INVALID_CHOICE',
     });
   }
-  if (!isValidPeriodNumber(periodNumber)) {
+  if (!isUuid(sessionId)) {
     return res.status(400).json({
-      error: `periodNumber must be a whole number from 1 to ${MAX_PERIOD}.`,
-      code: 'VALIDATION_INVALID_RANGE',
-      params: { min: 1, max: MAX_PERIOD },
+      error: 'sessionId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'sessionId' },
     });
   }
   const shapeError = validateShape(entries);
@@ -127,98 +184,87 @@ router.put('/evaluations/bulk', async (req, res) => {
       code: 'EVALUATIONS_INVALID_SHAPE',
     });
   }
-  // Normalise any notes now so every later comparison uses the clean value.
+  // Normalise comments now so every later comparison uses the clean value.
   for (const entry of entries) {
-    if ('comment' in entry) entry.comment = normalizeComment(entry.comment);
+    if ('qualityComment' in entry) {
+      entry.qualityComment = normalizeComment(entry.qualityComment);
+    }
+    if ('quantityComment' in entry) {
+      entry.quantityComment = normalizeComment(entry.quantityComment);
+    }
   }
 
-  const anchorResult = await pool.query(
-    'SELECT value FROM settings WHERE key = $1',
-    ['period_anchor_date']
+  const sessionResult = await pool.query(
+    `SELECT s.id,
+            s.code                  AS "sessionCode",
+            s.session_date::text    AS "sessionDate",
+            s.canceled_at           AS "canceledAt",
+            s.archived_at           AS "archivedAt",
+            a.group_id              AS "groupId",
+            a.membership_id         AS "assignmentMembershipId",
+            a.code                  AS "assignmentCode",
+            a.name                  AS "assignmentName"
+     FROM sessions s
+     JOIN assignments a ON a.id = s.assignment_id
+     WHERE s.id = $1`,
+    [sessionId]
   );
-  const anchorDate = anchorResult.rows[0]?.value;
-  if (!anchorDate) {
+  const session = sessionResult.rows[0];
+  if (!session) {
+    return res.status(404).json({
+      error: 'Session not found.',
+      code: 'NOT_FOUND',
+      params: { entity: 'session' },
+    });
+  }
+  if (session.canceledAt || session.archivedAt) {
     return res.status(409).json({
-      error: 'Set the period anchor date first.',
-      code: 'PERIODS_ANCHOR_NOT_SET',
+      error: 'This session is canceled or archived; its cells cannot change.',
+      code: 'SESSIONS_NOT_ACTIVE',
     });
   }
 
-  const current = periodForDate(anchorDate, todayIso());
-  if (current === null) {
-    return res.status(409).json({
-      error: 'Period 1 has not started yet.',
-      code: 'PERIODS_NOT_STARTED',
-    });
-  }
-  if (periodNumber > current) {
-    return res.status(400).json({
-      error: `Period ${periodNumber} has not started yet. The current period is ${current}.`,
-      code: 'PERIODS_NOT_STARTED',
-      params: { period: periodNumber, current },
-    });
-  }
-
-  const studentIds = [...new Set(entries.map((entry) => entry.studentId))];
-  const [changesResult, parametersResult, studentsResult] = await Promise.all([
+  const [targets, parametersResult] = await Promise.all([
+    loadTargets(pool, session),
     pool.query(
-      `SELECT parameter_id  AS "parameterId",
-              period_number AS "periodNumber",
-              scope,
-              action
-       FROM parameter_changes`
-    ),
-    pool.query(
-      `SELECT id,
-              name,
-              min_value::float8 AS "minValue",
-              max_value::float8 AS "maxValue"
+      `SELECT id, name, min_value AS "minValue", max_value AS "maxValue"
        FROM parameters`
     ),
-    pool.query(
-      `SELECT id,
-              full_name    AS "fullName",
-              student_code AS "studentCode"
-       FROM students
-       WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
-      [studentIds]
-    ),
   ]);
-
-  const usedIds = new Set(
-    parametersUsedInPeriod(changesResult.rows, periodNumber)
-  );
-  const usedParameters = new Map(
-    parametersResult.rows
-      .filter((parameter) => usedIds.has(parameter.id))
-      .map((parameter) => [parameter.id, parameter])
-  );
-  const studentsById = new Map(
-    studentsResult.rows.map((student) => [student.id, student])
+  const parameters = new Map(
+    parametersResult.rows.map((parameter) => [parameter.id, parameter])
   );
 
-  const problems = findProblems({
-    entries,
-    usedParameters,
-    knownStudentIds: new Set(studentsById.keys()),
-    periodNumber,
-  });
+  // An individual assignment's rows must target its own member (never the
+  // whole group — a one-student schedule has no "group" to evaluate).
+  if (session.assignmentMembershipId && entries.some((e) => e.membershipId === null)) {
+    return res.status(400).json({
+      error:
+        'This assignment targets a single student; whole-group rows are not allowed.',
+      code: 'EVALUATIONS_TARGET_MISMATCH',
+    });
+  }
+
+  const problems = findProblems({ entries, parameters, memberships: targets });
 
   if (dryRun) {
     const existingResult = await pool.query(
-      `SELECT student_id          AS "studentId",
+      `SELECT membership_id       AS "membershipId",
               parameter_id        AS "parameterId",
-              value::float8       AS value,
-              comment,
-              locks_at            AS "lockedAt",
+              quality_value       AS "qualityValue",
+              quantity_value      AS "quantityValue",
+              quality_comment     AS "qualityComment",
+              quantity_comment    AS "quantityComment",
+              locks_at            AS "locksAt",
               (locks_at <= now()) AS "isLocked"
        FROM evaluations
-       WHERE period_number = $1 AND student_id = ANY($2::uuid[])`,
-      [periodNumber, studentIds]
+       WHERE session_id = $1 AND archived_at IS NULL
+       FOR UPDATE`,
+      [sessionId]
     );
-    const existingMap = new Map(
+    const existing = new Map(
       existingResult.rows.map((row) => [
-        `${row.studentId}:${row.parameterId}`,
+        cellKey(row.membershipId, row.parameterId),
         row,
       ])
     );
@@ -228,13 +274,13 @@ router.put('/evaluations/bulk', async (req, res) => {
     const canViewScores = userCan(req, 'scores.view');
     const cells = previewCells({
       entries,
-      existing: existingMap,
+      existing,
       problemIndexes: new Set(problems.map((problem) => problem.index)),
       canViewScores,
     });
     return res.json({
       dryRun: true,
-      periodNumber,
+      sessionId,
       cells,
       problems,
       counts: previewCounts(cells, problems),
@@ -250,8 +296,12 @@ router.put('/evaluations/bulk', async (req, res) => {
     });
   }
 
-  const lockDays = lockDaysFor({ periodNumber, currentPeriod: current });
+  const locksAt = locksAtFor({
+    sessionDate: session.sessionDate,
+    today: todayIso(),
+  });
   const changes = [];
+  const snapshots = { old: [], new: [] };
   let overrideReason = null;
 
   const client = await pool.connect();
@@ -259,35 +309,40 @@ router.put('/evaluations/bulk', async (req, res) => {
     await client.query('BEGIN');
 
     const existingResult = await client.query(
-      `SELECT student_id          AS "studentId",
+      `SELECT id,
+              membership_id       AS "membershipId",
               parameter_id        AS "parameterId",
-              value::float8       AS value,
-              comment,
-              locks_at            AS "lockedAt",
+              quality_value       AS "qualityValue",
+              quantity_value      AS "quantityValue",
+              quality_comment     AS "qualityComment",
+              quantity_comment    AS "quantityComment",
+              locks_at            AS "locksAt",
               (locks_at <= now()) AS "isLocked"
        FROM evaluations
-       WHERE period_number = $1 AND student_id = ANY($2::uuid[])
-       ORDER BY student_id, parameter_id
+       WHERE session_id = $1 AND archived_at IS NULL
+       ORDER BY membership_id NULLS FIRST, parameter_id
        FOR UPDATE`,
-      [periodNumber, studentIds]
+      [sessionId]
     );
     const existing = new Map(
       existingResult.rows.map((row) => [
-        `${row.studentId}:${row.parameterId}`,
+        cellKey(row.membershipId, row.parameterId),
         row,
       ])
     );
 
     const lockedChanges = findLockedChanges({ entries, existing });
     const overriddenKeys = new Set(
-      lockedChanges.map((item) => `${item.studentId}:${item.parameterId}`)
+      lockedChanges.map((item) =>
+        cellKey(item.membershipId, item.parameterId)
+      )
     );
 
     if (lockedChanges.length > 0) {
       const lockedProblems = (message) =>
         lockedChanges.map((item) => ({
           index: item.index,
-          studentId: item.studentId,
+          membershipId: item.membershipId,
           parameterId: item.parameterId,
           message,
         }));
@@ -314,60 +369,85 @@ router.put('/evaluations/bulk', async (req, res) => {
     }
 
     for (const entry of entries) {
-      const key = `${entry.studentId}:${entry.parameterId}`;
+      const key = cellKey(entry.membershipId, entry.parameterId);
       const row = existing.get(key);
-      const hasComment = 'comment' in entry;
-      const newValue = entry.value ?? null;
-      // If the entry does not carry a note, leave the existing note untouched.
-      const newComment = hasComment ? (entry.comment ?? null) : row?.comment ?? null;
-      const hasContent = newValue !== null || newComment !== null;
+      const to = {
+        selected: entry.selected,
+        qualityValue: entry.qualityValue ?? null,
+        quantityValue: entry.quantityValue ?? null,
+        qualityComment: entry.qualityComment ?? null,
+        quantityComment: entry.quantityComment ?? null,
+      };
+      const before = row
+        ? {
+            selected: true,
+            qualityValue: row.qualityValue,
+            quantityValue: row.quantityValue,
+            qualityComment: row.qualityComment,
+            quantityComment: row.quantityComment,
+          }
+        : null;
 
-      const result = !hasContent
-        ? await client.query(
-            `UPDATE evaluations
-             SET value = NULL, comment = NULL, updated_at = now()
-             WHERE student_id = $1 AND parameter_id = $2
-               AND period_number = $3
-               AND (value IS NOT NULL OR comment IS NOT NULL)`,
-            [entry.studentId, entry.parameterId, periodNumber]
-          )
-        : await client.query(
-            `INSERT INTO evaluations
-               (student_id, parameter_id, period_number, value, comment, locks_at)
-             VALUES ($1, $2, $3, $4, $5, now() + make_interval(days => $6))
-             ON CONFLICT (student_id, parameter_id, period_number)
-             DO UPDATE SET value = EXCLUDED.value,
-                           comment = EXCLUDED.comment,
-                           updated_at = now()
-             WHERE evaluations.value IS DISTINCT FROM EXCLUDED.value
-                OR evaluations.comment IS DISTINCT FROM EXCLUDED.comment`,
-            [
-              entry.studentId,
-              entry.parameterId,
-              periodNumber,
-              newValue,
-              newComment,
-              lockDays,
-            ]
-          );
+      let result;
+      if (!entry.selected) {
+        // Unselect: drop the row entirely (a stored row IS the expectation).
+        if (!row) continue;
+        result = await client.query(
+          'DELETE FROM evaluations WHERE id = $1',
+          [row.id]
+        );
+      } else {
+        result = await client.query(
+          `INSERT INTO evaluations
+             (session_id, parameter_id, membership_id,
+              quality_value, quantity_value, quality_comment, quantity_comment,
+              locks_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (session_id, parameter_id, membership_id) DO UPDATE
+             SET quality_value    = EXCLUDED.quality_value,
+                 quantity_value   = EXCLUDED.quantity_value,
+                 quality_comment  = EXCLUDED.quality_comment,
+                 quantity_comment = EXCLUDED.quantity_comment,
+                 locks_at         = EXCLUDED.locks_at,
+                 updated_at       = now()
+           WHERE evaluations.quality_value    IS DISTINCT FROM EXCLUDED.quality_value
+              OR evaluations.quantity_value   IS DISTINCT FROM EXCLUDED.quantity_value
+              OR evaluations.quality_comment  IS DISTINCT FROM EXCLUDED.quality_comment
+              OR evaluations.quantity_comment IS DISTINCT FROM EXCLUDED.quantity_comment`,
+          [
+            sessionId,
+            entry.parameterId,
+            entry.membershipId,
+            to.qualityValue,
+            to.quantityValue,
+            to.qualityComment,
+            to.quantityComment,
+            locksAt,
+          ]
+        );
+      }
 
       if (result.rowCount > 0) {
-        const student = studentsById.get(entry.studentId);
-        const fromValue = row?.value ?? null;
-        const fromComment = row?.comment ?? null;
+        const target = entry.membershipId
+          ? targets.get(entry.membershipId)
+          : null;
+        const parameter = parameters.get(entry.parameterId);
         changes.push({
-          studentId: entry.studentId,
-          student: student.fullName,
-          studentCode: student.studentCode,
+          membershipId: entry.membershipId,
+          student: target ? target.fullName : null,
+          studentCode: target ? target.studentCode : null,
           parameterId: entry.parameterId,
-          parameter: usedParameters.get(entry.parameterId).name,
-          from: fromValue,
-          to: newValue,
-          ...(fromComment !== newComment
-            ? { note: { from: fromComment, to: newComment } }
-            : {}),
+          parameter: parameter.name,
+          from: before,
+          to,
           override: overriddenKeys.has(key),
         });
+        snapshots.old.push(
+          before ? { key, ...before } : { key, existed: false }
+        );
+        snapshots.new.push(
+          entry.selected ? { key, ...to } : { key, deleted: true }
+        );
       }
     }
 
@@ -376,27 +456,38 @@ router.put('/evaluations/bulk', async (req, res) => {
         userId: req.user.id,
         actor: req.user.username,
         action: 'scores.save',
-        entityType: 'period',
-        entityId: String(periodNumber),
+        entityType: 'session',
+        entityId: sessionId,
         details: {
-          periodNumber,
+          sessionId,
+          sessionCode: session.sessionCode,
+          assignmentCode: session.assignmentCode,
           count: changes.length,
           changes,
           ...(source === 'import' ? { source: 'import' } : {}),
           ...(overrideReason ? { overrideReason } : {}),
         },
+        oldData: { cells: snapshots.old },
+        newData: { cells: snapshots.new },
       });
     }
 
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
+    // The range trigger speaks in check_violation; translate the common case.
+    if (err.code === '23514') {
+      return res.status(400).json({
+        error: 'A value is outside the parameter range. Nothing was saved.',
+        code: 'EVALUATIONS_INVALID_ENTRIES',
+      });
+    }
     throw err;
   } finally {
     client.release();
   }
 
-  res.json({ periodNumber, changed: changes.length });
+  res.json({ sessionId, changed: changes.length });
 });
 
 export default router;

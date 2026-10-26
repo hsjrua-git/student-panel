@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
-import { MAX_PERIOD, isValidPeriodNumber } from '../lib/parameterUse.js';
-import { periodDates, periodForDate, todayIso } from '../lib/periods.js';
+import { SESSIONS_PER_PERIOD } from '../lib/periods.js';
+import { isValidIsoDate } from '../lib/periods.js';
 import { descendantGroupIds } from '../lib/groups.js';
 import { isUuid } from '../lib/ids.js';
 import { MAX_EXPORT_STUDENTS, buildCube } from '../lib/exportCube.js';
@@ -25,21 +25,31 @@ function normalizeList(raw) {
   return [];
 }
 
-// The cube: any student × parameter × period slice in one request. Both GET
+// The cube: any student × parameter × (assignment, period) slice in one
+// request; a session-date range can narrow it further. Both GET
 // (comma-separated ids in the query string) and POST (id arrays in the body,
-// for selections too large for a URL) run this. Note: custom student fields are
-// deliberately NOT part of the scores cube — the roster export on the Students
-// page already covers those, and leaving them out keeps this route clear of the
-// `fields.view_restricted` gate.
+// for selections too large for a URL) run this. Whole-group evaluation rows
+// expand to one cell per current member (a member's own row shadows the group
+// row), so the cube stays strictly student-shaped. Custom student fields are
+// deliberately NOT part of the scores cube — the roster export on the
+// Students page already covers those, and leaving them out keeps this route
+// clear of the `fields.view_restricted` gate.
 async function handleCube(req, res) {
   const source = req.method === 'POST' ? req.body ?? {} : req.query;
 
-  const { groupId } = source;
+  const { groupId, assignmentId } = source;
   if (groupId !== undefined && !isUuid(groupId)) {
     return res.status(400).json({
       error: 'groupId must be a valid ID.',
       code: 'VALIDATION_INVALID_FORMAT',
       params: { field: 'groupId' },
+    });
+  }
+  if (assignmentId !== undefined && !isUuid(assignmentId)) {
+    return res.status(400).json({
+      error: 'assignmentId must be a valid ID.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'assignmentId' },
     });
   }
 
@@ -76,44 +86,35 @@ async function handleCube(req, res) {
   }
   const selectedParameterIds = parameterIds.length > 0 ? parameterIds : null;
 
-  const anchorResult = await pool.query(
-    'SELECT value FROM settings WHERE key = $1',
-    ['period_anchor_date']
-  );
-  const anchorDate = anchorResult.rows[0]?.value;
-  if (!anchorDate) {
-    return res.status(409).json({
-      error: 'Set the period start date first.',
-      code: 'PERIODS_ANCHOR_NOT_SET',
+  const { from, to } = source;
+  if (from !== undefined && !isValidIsoDate(from)) {
+    return res.status(400).json({
+      error: 'from must be a date (YYYY-MM-DD).',
+      code: 'VALIDATION_INVALID_DATE',
+      params: { field: 'from' },
     });
   }
-  const current = periodForDate(anchorDate, todayIso());
-  if (!current) {
+  if (to !== undefined && !isValidIsoDate(to)) {
     return res.status(400).json({
-      error: 'No periods have started yet.',
-      code: 'PERIODS_NOT_STARTED',
+      error: 'to must be a date (YYYY-MM-DD).',
+      code: 'VALIDATION_INVALID_DATE',
+      params: { field: 'to' },
     });
   }
 
-  // Requested periods: an explicit list, or "all" (1..current) when omitted or
-  // the literal string "all". Every listed period must exist and have started.
-  const periodsRaw = source.periods;
-  let periods;
-  if (periodsRaw === undefined || periodsRaw === 'all') {
-    periods = Array.from({ length: current }, (_, index) => index + 1);
-  } else {
-    const list = normalizeList(periodsRaw);
-    const numbers = [];
-    for (const value of list) {
-      if (!/^\d+$/.test(value) || !isValidPeriodNumber(Number(value))) {
-        return res.status(400).json({
-          error: `Each period must be a whole number from 1 to ${MAX_PERIOD}.`,
-          code: 'VALIDATION_INVALID_RANGE',
-          params: { min: 1, max: MAX_PERIOD },
-        });
-      }
-      numbers.push(Number(value));
+  // Period narrowing (per assignment seq) only makes sense with one assignment.
+  let seqs = null;
+  if (source.periods !== undefined) {
+    if (assignmentId === undefined) {
+      return res.status(400).json({
+        error: 'periods requires assignmentId (seq numbers are per assignment).',
+        code: 'VALIDATION_REQUIRED',
+        params: { field: 'assignmentId' },
+      });
     }
+    const numbers = normalizeList(source.periods)
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value >= 1);
     if (numbers.length === 0) {
       return res.status(400).json({
         error: 'Select at least one period.',
@@ -121,15 +122,7 @@ async function handleCube(req, res) {
         params: { field: 'periods' },
       });
     }
-    const tooNew = numbers.find((number) => number > current);
-    if (tooNew !== undefined) {
-      return res.status(400).json({
-        error: `Period ${tooNew} has not started yet.`,
-        code: 'PERIODS_NOT_STARTED',
-        params: { period: tooNew },
-      });
-    }
-    periods = [...new Set(numbers)].sort((a, b) => a - b);
+    seqs = [...new Set(numbers)].sort((a, b) => a - b);
   }
 
   // Build the roster filter. A specific selection wins over a group; otherwise
@@ -138,99 +131,167 @@ async function handleCube(req, res) {
   const values = [];
   if (studentIds.length > 0) {
     values.push(studentIds);
-    filters.push(`id = ANY($${values.length}::uuid[])`);
+    filters.push(`s.id = ANY($${values.length}::uuid[])`);
   } else if (groupId !== undefined) {
     const groupIds = await descendantGroupIds(pool, groupId);
     values.push(groupIds);
     filters.push(
-      `id IN (SELECT student_id FROM student_group_members
-              WHERE group_id = ANY($${values.length}::uuid[]) AND left_on IS NULL)`
+      `s.id IN (SELECT student_id FROM student_group_members
+                WHERE group_id = ANY($${values.length}::uuid[]) AND left_on IS NULL)`
     );
   }
-  const where = ['deleted_at IS NULL', ...filters].join(' AND ');
+  const rosterWhere = ['s.deleted_at IS NULL', ...filters].join(' AND ');
 
   const [studentsResult, countResult] = await Promise.all([
     pool.query(
-      `SELECT id,
-              full_name    AS "fullName",
-              student_code AS "studentCode"
-       FROM students
-       WHERE ${where}
-       ORDER BY lower(full_name), id
+      `SELECT s.id,
+              s.full_name    AS "fullName",
+              s.student_code AS "studentCode"
+       FROM students s
+       WHERE ${rosterWhere}
+       ORDER BY lower(s.full_name), s.id
        LIMIT $${values.length + 1}`,
       [...values, MAX_EXPORT_STUDENTS]
     ),
-    pool.query(
-      `SELECT count(*)::int AS total FROM students WHERE ${where}`,
-      values
-    ),
+    pool.query(`SELECT count(*)::int AS total FROM students s WHERE ${rosterWhere}`, values),
   ]);
-
   const rosterIds = studentsResult.rows.map((student) => student.id);
 
-  // Fetch scored cells for the requested periods AND each period − 1 (for the
-  // client's "change vs previous" deltas), scoped to the roster (and the
-  // selected parameters, when pinned) to keep the result bounded.
-  const periodsUnion = new Set();
-  for (const number of periods) {
-    periodsUnion.add(number);
-    if (number - 1 >= 1) periodsUnion.add(number - 1);
+  // Cell filters: the scope filters run against the `expanded` output (the
+  // branches have already excluded archived rows/canceled+archived sessions
+  // via the bucketed join), so the outer query never touches raw tables.
+  const cellValues = [SESSIONS_PER_PERIOD, rosterIds];
+  const cellFilters = [
+    `cell_student.id = ANY($2::uuid[])`,
+  ];
+  if (assignmentId !== undefined) {
+    cellValues.push(assignmentId);
+    cellFilters.push(`expanded."assignmentId" = $${cellValues.length}`);
   }
-
-  const evalValues = [rosterIds, [...periodsUnion]];
-  let evalParamFilter = '';
+  if (seqs) {
+    cellValues.push(seqs);
+    cellFilters.push(`expanded.seq = ANY($${cellValues.length}::int[])`);
+  }
+  if (from !== undefined) {
+    cellValues.push(from);
+    cellFilters.push(`expanded."sessionDate" >= $${cellValues.length}::date`);
+  }
+  if (to !== undefined) {
+    cellValues.push(to);
+    cellFilters.push(`expanded."sessionDate" <= $${cellValues.length}::date`);
+  }
   if (selectedParameterIds) {
-    evalValues.push(selectedParameterIds);
-    evalParamFilter = ` AND parameter_id = ANY($${evalValues.length}::uuid[])`;
+    cellValues.push(selectedParameterIds);
+    cellFilters.push(`expanded."parameterId" = ANY($${cellValues.length}::uuid[])`);
   }
 
-  const [changesResult, parametersResult, evaluationsResult] = await Promise.all([
-    pool.query(
-      `SELECT parameter_id  AS "parameterId",
-              period_number AS "periodNumber",
-              scope,
-              action
-       FROM parameter_changes`
-    ),
-    pool.query(
-      `SELECT id,
-              name,
-              unit,
-              min_value::float8 AS "minValue",
-              max_value::float8 AS "maxValue"
-       FROM parameters
-       ORDER BY sort_order, lower(name)`
-    ),
-    pool.query(
-      `SELECT student_id    AS "studentId",
-              parameter_id  AS "parameterId",
-              period_number AS "periodNumber",
-              value::float8 AS value
-       FROM evaluations
-       WHERE student_id = ANY($1::uuid[])
-         AND period_number = ANY($2::int[])
-         AND value IS NOT NULL${evalParamFilter}`,
-      evalValues
-    ),
-  ]);
+  const cellsResult = await pool.query(
+    `WITH bucketed AS (
+       SELECT s.id AS session_id,
+              s.assignment_id,
+              (ROW_NUMBER() OVER (PARTITION BY s.assignment_id
+                                  ORDER BY s.session_date, s.seq) - 1)
+                / $1::int + 1 AS seq
+       FROM sessions s
+       WHERE s.canceled_at IS NULL AND s.archived_at IS NULL
+     ),
+     expanded AS (
+       -- Whole-group rows: one cell per current member of the target group,
+       -- except where the member has their own row for the same cell.
+       SELECT e.id, e.parameter_id   AS "parameterId",
+              e.quality_value   AS "qualityValue",
+              e.quantity_value  AS "quantityValue",
+              ms.id AS "membershipId", ms.student_id AS "studentId",
+              s.assignment_id   AS "assignmentId",
+              bucket.seq, s.session_date::text AS "sessionDate",
+              true AS "viaGroup"
+       FROM evaluations e
+       JOIN sessions s ON s.id = e.session_id
+       JOIN bucketed bucket ON bucket.session_id = s.id
+       JOIN assignments a ON a.id = s.assignment_id
+       JOIN student_group_members ms
+         ON ms.group_id = a.group_id AND ms.left_on IS NULL
+       WHERE e.archived_at IS NULL
+         AND e.membership_id IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM evaluations own
+           WHERE own.session_id = e.session_id
+             AND own.parameter_id = e.parameter_id
+             AND own.membership_id = ms.id
+             AND own.archived_at IS NULL)
+       UNION ALL
+       SELECT e.id, e.parameter_id,
+              e.quality_value,
+              e.quantity_value, e.membership_id,
+              ms.student_id, s.assignment_id, bucket.seq,
+              s.session_date::text, false
+       FROM evaluations e
+       JOIN sessions s ON s.id = e.session_id
+       JOIN bucketed bucket ON bucket.session_id = s.id
+       JOIN student_group_members ms ON ms.id = e.membership_id
+       WHERE e.archived_at IS NULL
+         AND e.membership_id IS NOT NULL
+     )
+     SELECT expanded."parameterId"   AS "parameterId",
+            expanded."studentId"     AS "studentId",
+            expanded."assignmentId"  AS "assignmentId",
+            expanded.seq             AS "periodSeq",
+            expanded."sessionDate",
+            expanded."qualityValue"  AS quality,
+            expanded."quantityValue" AS quantity,
+            expanded."viaGroup"
+     FROM expanded
+     JOIN students cell_student ON cell_student.id = expanded."studentId"
+     WHERE ${cellFilters.join(' AND ')}
+     ORDER BY expanded."sessionDate", expanded."parameterId"`,
+    cellValues
+  );
+
+  // Metadata: the assignments and period buckets present in the slice.
+  const assignmentsResult = await pool.query(
+    `SELECT DISTINCT a.id, a.code, a.name
+     FROM assignments a
+     JOIN sessions s ON s.assignment_id = a.id
+     WHERE ($1::uuid IS NULL OR a.id = $1)`,
+    [assignmentId ?? null]
+  );
+  const periodsResult = await pool.query(
+    `WITH bucketed AS (
+       SELECT s.assignment_id,
+              (ROW_NUMBER() OVER (PARTITION BY s.assignment_id
+                                  ORDER BY s.session_date, s.seq) - 1)
+                / $1::int + 1 AS seq,
+              s.session_date
+       FROM sessions s
+       WHERE s.canceled_at IS NULL AND s.archived_at IS NULL
+         AND ($2::uuid IS NULL OR s.assignment_id = $2)
+     )
+     SELECT assignment_id AS "assignmentId", seq,
+            min(session_date)::text AS "startDate",
+            max(session_date)::text AS "endDate"
+     FROM bucketed
+     GROUP BY assignment_id, seq
+     ORDER BY assignment_id, seq`,
+    [SESSIONS_PER_PERIOD, assignmentId ?? null]
+  );
 
   const cube = buildCube({
-    periods,
-    parameters: parametersResult.rows,
-    changes: changesResult.rows,
+    parameters: (await pool.query(
+      `SELECT id, code, name,
+              min_value AS "minValue", max_value AS "maxValue",
+              archived_at AS "archivedAt"
+       FROM parameters
+       ORDER BY sort_order, lower(name)`
+    )).rows,
     students: studentsResult.rows,
-    evaluations: evaluationsResult.rows,
+    assignments: assignmentsResult.rows,
+    periods: periodsResult.rows,
+    cells: cellsResult.rows,
     selectedParameterIds,
-    periodDatesFor: (number) => {
-      const dates = periodDates(anchorDate, number);
-      return { startDate: dates.startDate, endDate: dates.endDate };
-    },
   });
 
   const total = countResult.rows[0].total;
   res.json({
-    anchorDate,
-    current,
     ...cube,
     total,
     truncated: total > rosterIds.length,

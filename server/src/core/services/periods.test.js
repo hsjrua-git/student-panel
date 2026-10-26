@@ -1,9 +1,11 @@
-// Service-layer test for the period calendar and its anchor date — real service
+// Service-layer test for the assignment period calendar — real service
 // functions against a fresh in-memory PGlite.
 //
 //   node --test src/core/services/periods.test.js
 //
-// Each test gets its own in-memory database.
+// Each test gets its own in-memory database. There is no school-wide period
+// anymore: every assignment buckets its own non-canceled sessions (4 per
+// period, in date order) into periods 1, 2, 3…, materialized on demand.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,12 +14,10 @@ import path from 'node:path';
 
 import { createPglitePool } from '../../db/pglite.js';
 import { initDb } from '../db.js';
-import { getPeriodAnchor, setPeriodAnchor, listPeriods } from './periods.js';
-import { createParameter } from './parameters.js';
+import { listPeriods } from './periods.js';
 
 const migrationsDir = path.join(import.meta.dirname, '..', '..', 'db', 'migrations');
-const SATURDAY = '2024-01-06'; // a real Saturday
-const SUNDAY = '2024-01-07';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function freshDb() {
   const pool = createPglitePool(); // in-memory
@@ -59,81 +59,116 @@ async function expectCode(code, fn) {
   });
 }
 
-async function addStudent(pool, code, fullName) {
-  const result = await pool.query(
-    `INSERT INTO students (student_code, full_name)
-     VALUES ($1, $2) RETURNING id`,
-    [code, fullName],
-  );
-  return result.rows[0].id;
+// A teacher + interval + group assignment with `count` weekly sessions.
+async function seedAssignment(pool, { sessions = 0, canceled = [] } = {}) {
+  const teacher = (
+    await pool.query(
+      `INSERT INTO teachers (code, full_name, birth_date, national_id)
+       VALUES ('T1000001', 'Ms. Tester', '1990-05-01', '0012345678')
+       RETURNING id`
+    )
+  ).rows[0].id;
+  const interval = (
+    await pool.query(
+      `INSERT INTO intervals (name, every) VALUES ('هفتگی', '7 days') RETURNING id`
+    )
+  ).rows[0].id;
+  const group = (
+    await pool.query(
+      `INSERT INTO student_groups (name, code) VALUES ('Group A', 'GA') RETURNING id`
+    )
+  ).rows[0].id;
+  const assignmentId = (
+    await pool.query(
+      `INSERT INTO assignments (code, teacher_id, interval_id, group_id, anchor_date)
+       VALUES ('A1', $1, $2, $3, '2024-01-06') RETURNING id`,
+      [teacher, interval, group],
+    )
+  ).rows[0].id;
+  const start = Date.UTC(2024, 0, 6);
+  for (let index = 0; index < sessions; index++) {
+    const date = new Date(start + index * 7 * DAY_MS).toISOString().slice(0, 10);
+    await pool.query(
+      `INSERT INTO sessions (assignment_id, seq, code, planned_date, canceled_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [assignmentId, index + 1, `S${index + 1}`, date, canceled.includes(index) ? new Date() : null],
+    );
+  }
+  return assignmentId;
 }
 
-test('anchor: unset by default, validated, and settable', async () => {
+test('listPeriods: validates the id and 404s an unknown assignment', async () => {
   const pool = await freshDb();
   try {
-    assert.deepEqual(await getPeriodAnchor(), { anchorDate: null });
-
-    await expectCode('VALIDATION', () => setPeriodAnchor('nonsense'));
-    await expectCode('VALIDATION', () => setPeriodAnchor('2024-02-30')); // not a real date
-    await expectCode('VALIDATION', () => setPeriodAnchor(SUNDAY)); // not a Saturday
-
-    const set = await setPeriodAnchor(SATURDAY);
-    assert.deepEqual(set, { anchorDate: SATURDAY });
-    assert.deepEqual(await getPeriodAnchor(), { anchorDate: SATURDAY });
-
-    // Re-setting to a different Saturday before any scores exist is fine.
-    const moved = await setPeriodAnchor('2024-01-13');
-    assert.deepEqual(moved, { anchorDate: '2024-01-13' });
+    await expectCode('VALIDATION', () => listPeriods('nope'));
+    await expectCode('NOT_FOUND', () =>
+      listPeriods('00000000-0000-4000-8000-000000000000')
+    );
   } finally {
     await pool.end();
   }
 });
 
-test('anchor cannot change after scores exist, but re-setting the same value is a no-op', async () => {
+test('listPeriods: buckets sessions 4 per period in date order, skipping canceled', async () => {
   const pool = await freshDb();
   try {
-    await setPeriodAnchor(SATURDAY);
+    // 9 sessions, one canceled → 8 effective sessions = 2 periods.
+    const assignmentId = await seedAssignment(pool, {
+      sessions: 9,
+      canceled: [8], // the LAST session, so order stays clean
+    });
 
-    const p = await createParameter({ name: 'Focus', startPeriod: 1 });
-    const sid = await addStudent(pool, 'ABCDEFGH', 'Alan Turing');
+    const { periods } = await listPeriods(assignmentId);
+    assert.equal(periods.length, 2);
+    assert.deepEqual(
+      periods.map((period) => period.seq),
+      [1, 2]
+    );
+    assert.equal(periods[0].sessionCount, 4);
+    assert.equal(periods[1].sessionCount, 4);
+    // Period 1 spans the first four Saturdays.
+    assert.equal(periods[0].startDate, '2024-01-06');
+    assert.equal(periods[0].endDate, '2024-01-27');
+    assert.equal(periods[1].startDate, '2024-02-03');
+    // No cells answered yet.
+    assert.equal(periods[0].answeredCount, 0);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('listPeriods: answeredCount reflects saved cells and the sync is idempotent', async () => {
+  const pool = await freshDb();
+  try {
+    const assignmentId = await seedAssignment(pool, { sessions: 4 });
+    const session = (
+      await pool.query(
+        `SELECT id FROM sessions WHERE assignment_id = $1 ORDER BY seq LIMIT 1`,
+        [assignmentId],
+      )
+    ).rows[0];
+    const parameter = (
+      await pool.query(
+        `INSERT INTO parameters (code, name, min_value, max_value)
+         VALUES ('focus', 'Focus', 0, 10) RETURNING id`
+      )
+    ).rows[0];
+
     await pool.query(
-      `INSERT INTO evaluations (student_id, parameter_id, period_number, value, locks_at)
-       VALUES ($1, $2, 1, 5, now() + interval '7 days')`,
-      [sid, p.id],
+      `INSERT INTO evaluations (session_id, parameter_id, membership_id, quality_value, locks_at)
+       VALUES ($1, $2, NULL, 6, now() + interval '7 days')`,
+      [session.id, parameter.id],
     );
 
-    // Changing it now is refused.
-    await expectCode('CONFLICT', () => setPeriodAnchor('2024-01-13'));
-    // But re-affirming the current value still succeeds.
-    assert.deepEqual(await setPeriodAnchor(SATURDAY), { anchorDate: SATURDAY });
-  } finally {
-    await pool.end();
-  }
-});
-
-test('listPeriods: empty without an anchor, calendar with one', async () => {
-  const pool = await freshDb();
-  try {
-    const empty = await listPeriods();
-    assert.equal(empty.anchorDate, null);
-    assert.equal(empty.current, null);
-    assert.deepEqual(empty.periods, []);
-    assert.match(empty.today, /^\d{4}-\d{2}-\d{2}$/);
-
-    await setPeriodAnchor(SATURDAY);
-    const p = await createParameter({ name: 'Alpha', startPeriod: 1 });
-
-    const calendar = await listPeriods();
-    assert.equal(calendar.anchorDate, SATURDAY);
-    assert.ok(Number.isInteger(calendar.current) && calendar.current >= 1);
-    assert.equal(calendar.periods.length, calendar.current);
-
-    // Period 1 starts on the anchor and carries the parameter active from it.
-    const first = calendar.periods[0];
-    assert.equal(first.number, 1);
-    assert.equal(first.startDate, SATURDAY);
-    assert.equal(first.endDate, '2024-01-12'); // seven-day window, inclusive
-    assert.deepEqual(first.parameterIds, [p.id]);
+    const first = await listPeriods(assignmentId);
+    assert.equal(first.periods[0].answeredCount, 1);
+    // Syncing again neither duplicates nor renumbers.
+    const second = await listPeriods(assignmentId);
+    assert.deepEqual(second.periods, first.periods);
+    assert.equal(
+      (await pool.query('SELECT count(*)::int AS n FROM periods')).rows[0].n,
+      1,
+    );
   } finally {
     await pool.end();
   }

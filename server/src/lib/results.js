@@ -1,51 +1,91 @@
-export const MAX_RESULT_STUDENTS = 5000;
+// The assignment-period results grid (schema-4 model). Rows are the
+// assignment's evaluation targets — the whole-group row first, then its
+// members (or the single member of an individual assignment) — and columns
+// are parameters. Each cell carries BOTH dimensions plus its answered state;
+// `previous` holds the selected dimension's value from the assignment's
+// previous period (seq − 1) for the change columns.
+//
+// Pure so it can be unit tested without a database; the route owns the SQL
+// and resolves which sessions belong to the requested (and previous) bucket.
 
 export function buildResults({
-  periodNumber,
+  seq,
+  period,
+  assignment,
   parameters,
-  usedIds,
-  students,
+  targets,
+  groupName,
   evaluations,
 }) {
-  const activeIds = new Set(students.map((student) => student.id));
-  const current = new Map();
-  const previous = new Map();
-  const scoredHere = new Set();
+  const cellMap = new Map();
+  const previousMap = new Map();
 
   for (const item of evaluations) {
-    if (!activeIds.has(item.studentId)) continue;
-    const key = `${item.studentId}:${item.parameterId}`;
-    if (item.periodNumber === periodNumber) {
-      current.set(key, item.value);
-      scoredHere.add(item.parameterId);
-    } else if (item.periodNumber === periodNumber - 1) {
-      previous.set(key, item.value);
+    const key = `${item.membershipId ?? 'group'}:${item.parameterId}`;
+    const cell = {
+      quality: item.qualityValue,
+      quantity: item.quantityValue,
+      answered:
+        item.qualityValue !== null ||
+        item.quantityValue !== null ||
+        item.qualityComment !== null ||
+        item.quantityComment !== null,
+    };
+    if (item.periodSeq === seq) {
+      cellMap.set(key, cell);
+    } else if (item.periodSeq === seq - 1) {
+      previousMap.set(key, cell);
     }
   }
 
-  const shown = parameters
-    .filter(
-      (parameter) =>
-        usedIds.has(parameter.id) || scoredHere.has(parameter.id)
-    )
-    .map((parameter) => ({ ...parameter, inUse: usedIds.has(parameter.id) }));
+  // The whole-group row leads a group assignment's grid; an individual
+  // assignment has exactly its member.
+  const rows = [];
+  if (assignment.groupId) {
+    rows.push({
+      membershipId: null,
+      studentId: null,
+      fullName: groupName,
+      studentCode: null,
+      isGroup: true,
+      cells: pickCells(null, cellMap, parameters),
+      previous: pickPrevious(null, previousMap, parameters),
+    });
+  }
+  for (const target of targets) {
+    rows.push({
+      membershipId: target.membershipId,
+      studentId: target.studentId,
+      fullName: target.fullName,
+      studentCode: target.studentCode,
+      isGroup: false,
+      cells: pickCells(target.membershipId, cellMap, parameters),
+      previous: pickPrevious(target.membershipId, previousMap, parameters),
+    });
+  }
 
-  const rows = students.map((student) => {
-    const values = {};
-    const before = {};
-    for (const parameter of shown) {
-      const key = `${student.id}:${parameter.id}`;
-      if (current.has(key)) values[parameter.id] = current.get(key);
-      if (previous.has(key)) before[parameter.id] = previous.get(key);
-    }
-    return {
-      id: student.id,
-      fullName: student.fullName,
-      studentCode: student.studentCode,
-      values,
-      previous: before,
+  return { rows };
+}
+
+function pickCells(membershipId, cellMap, parameters) {
+  const cells = {};
+  for (const parameter of parameters) {
+    const cell = cellMap.get(`${membershipId ?? 'group'}:${parameter.id}`);
+    if (cell) cells[parameter.id] = cell;
+  }
+  return cells;
+}
+
+function pickPrevious(membershipId, previousMap, parameters) {
+  const previous = {};
+  for (const parameter of parameters) {
+    const cell = previousMap.get(`${membershipId ?? 'group'}:${parameter.id}`);
+    if (!cell) continue;
+    // `previous` keeps the per-dimension values; the client picks the column.
+    previous[parameter.id] = {
+      quality: cell.quality,
+      quantity: cell.quantity,
     };
-  });
-
-  return { parameters: shown, students: rows };
+  }
+  return previous;
 }

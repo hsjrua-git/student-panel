@@ -23,6 +23,7 @@ const ASSIGNMENT_COLUMNS = `
   sf.full_name    AS "studentName",
   msg.name        AS "studentGroupName",
   a.anchor_date   AS "anchorDate",
+  a.sort_order    AS "sortOrder",
   a.archived_at   AS "archivedAt",
   a.created_at    AS "createdAt"
 `;
@@ -184,7 +185,7 @@ router.get('/', async (req, res) => {
     `SELECT ${ASSIGNMENT_COLUMNS}
      ${ASSIGNMENT_FROM}
      WHERE ${where}
-     ORDER BY a.archived_at IS NOT NULL, lower(coalesce(a.name, a.code)), a.code`,
+     ORDER BY a.archived_at IS NOT NULL, a.sort_order, lower(coalesce(a.name, a.code)), a.code`,
     values
   );
   res.json({ assignments: result.rows });
@@ -212,8 +213,8 @@ router.post('/', async (req, res) => {
     try {
       const result = await pool.query(
         `INSERT INTO assignments
-           (code, name, teacher_id, interval_id, group_id, membership_id, anchor_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::date)
+           (code, name, teacher_id, interval_id, group_id, membership_id, anchor_date, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8)
          RETURNING id`,
         [
           assignment.code ?? generateCode(),
@@ -223,6 +224,7 @@ router.post('/', async (req, res) => {
           assignment.groupId ?? null,
           assignment.membershipId ?? null,
           assignment.anchorDate,
+          assignment.sortOrder ?? 0,
         ]
       );
       const full = await pool.query(
@@ -323,6 +325,7 @@ router.patch('/:id', async (req, res) => {
     groupId: ['group_id', null],
     membershipId: ['membership_id', null],
     anchorDate: ['anchor_date', '::date'],
+    sortOrder: ['sort_order', null],
   };
   const sets = [];
   const values = [];

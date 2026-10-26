@@ -38,9 +38,6 @@ const RULES = [
   { method: 'DELETE', pattern: /^\/api\/cafe\/suppliers\/[^/]+$/, action: 'cafe_supplier.deactivate', entityType: 'cafe_supplier' },
   { method: 'POST', pattern: /^\/api\/parameters$/, action: 'parameter.create', entityType: 'parameter' },
   { method: 'PATCH', pattern: /^\/api\/parameters\/[^/]+$/, action: 'parameter.update', entityType: 'parameter' },
-  { method: 'POST', pattern: /^\/api\/parameter-changes$/, action: 'parameter_change.create', entityType: 'parameter_change' },
-  { method: 'DELETE', pattern: /^\/api\/parameter-changes\/[^/]+$/, action: 'parameter_change.delete', entityType: 'parameter_change' },
-  { method: 'PUT', pattern: /^\/api\/settings\/period-anchor$/, action: 'settings.period_anchor', entityType: 'setting' },
   { method: 'POST', pattern: /^\/api\/auth\/logout$/, action: 'auth.logout', entityType: 'user' },
   { method: 'POST', pattern: /^\/api\/auth\/change-password$/, action: 'auth.password_change', entityType: 'user' },
 ];
@@ -57,6 +54,7 @@ const RECORDED_BY_THEIR_OWN_ROUTES = [
   /^\/api\/sessions\/generate$/,
   /^\/api\/tasks\/from-template$/,
   /^\/api\/alerts\/scan$/,
+  /^\/api\/parameters(\/|$)/,
   /^\/api\/cafe\/purchases$/,
   /^\/api\/cafe\/sales(\/|$)/,
   /^\/api\/cafe\/balances$/,

@@ -2,7 +2,9 @@ import { Router } from 'express';
 import pool from '../db/pool.js';
 import { recordAudit } from '../lib/audit.js';
 import { isUuid } from '../lib/ids.js';
-import { isValidIsoDate, periodForDate } from '../lib/periods.js';
+import { isValidIsoDate, todayIso } from '../lib/periods.js';
+import { locksAtFor } from '../lib/locks.js';
+import { assignPeriods, syncAssignmentPeriods } from '../lib/periods.js';
 import { generateSessions } from '../lib/sessions.js';
 
 const router = Router();
@@ -39,14 +41,25 @@ const SESSION_FROM = `
   LEFT JOIN students sf ON sf.id = ms.student_id
 `;
 
-// The weekly-period calendar anchor, so each session can be labelled with the
-// evaluation period its date falls into (the existing periods are untouched;
-// this is a derived bridge).
-async function readPeriodAnchor(db) {
-  const result = await db.query(
-    `SELECT value FROM settings WHERE key = 'period_anchor_date'`
-  );
-  return result.rows[0]?.value ?? null;
+// Label each session with its assignment's period seq (the deterministic
+// 4-sessions-per-period bucketing; canceled/archived sessions sit outside
+// every period and get null).
+function withPeriodSeqs(sessions) {
+  const byAssignment = new Map();
+  for (const session of sessions) {
+    if (!byAssignment.has(session.assignmentId)) {
+      byAssignment.set(session.assignmentId, []);
+    }
+    byAssignment.get(session.assignmentId).push(session);
+  }
+  const labels = new Map();
+  for (const rows of byAssignment.values()) {
+    for (const [id, seq] of assignPeriods(rows)) labels.set(id, seq);
+  }
+  return sessions.map((session) => ({
+    ...session,
+    periodSeq: labels.get(session.id) ?? null,
+  }));
 }
 
 router.param('id', (req, res, next, value) => {
@@ -125,11 +138,7 @@ router.get('/', async (req, res) => {
     values
   );
 
-  const anchor = await readPeriodAnchor(pool);
-  const sessions = result.rows.slice(0, MAX_LISTED).map((session) => ({
-    ...session,
-    periodNumber: anchor ? periodForDate(anchor, session.sessionDate) : null,
-  }));
+  const sessions = withPeriodSeqs(result.rows.slice(0, MAX_LISTED));
 
   res.json({ sessions, truncated: result.rows.length > MAX_LISTED });
 });
@@ -159,6 +168,15 @@ router.post('/generate', async (req, res) => {
     await client.query('BEGIN');
     const created = await generateSessions(client, { until, assignmentId });
     if (created > 0) {
+      // New sessions fill out the period buckets — materialize them.
+      for (const row of (await client.query(
+        `SELECT id FROM assignments
+         WHERE archived_at IS NULL
+           ${assignmentId ? 'AND id = $1' : ''}`,
+        assignmentId ? [assignmentId] : []
+      )).rows) {
+        await syncAssignmentPeriods(client, row.id);
+      }
       await recordAudit(client, {
         userId: req.user.id,
         actor: req.user.username,
@@ -245,7 +263,8 @@ router.patch('/:id', async (req, res) => {
     `UPDATE sessions
      SET ${sets.join(', ')}
      WHERE id = $${values.length}
-     RETURNING id`,
+     RETURNING id, assignment_id,
+               session_date::text AS "sessionDate"`,
     values
   );
   if (result.rowCount === 0) {
@@ -255,19 +274,40 @@ router.patch('/:id', async (req, res) => {
       params: { entity: 'session' },
     });
   }
+  const updated = result.rows[0];
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // A move changes the effective date: the lock windows of still-unlocked
+    // rows re-anchor to the new date (locked ones keep their old window —
+    // changing them already needs an override).
+    if ('movedTo' in body) {
+      await client.query(
+        `UPDATE evaluations
+         SET locks_at = $1
+         WHERE session_id = $2 AND locks_at > now()`,
+        [
+          locksAtFor({ sessionDate: updated.sessionDate, today: todayIso() }),
+          req.params.id,
+        ]
+      );
+    }
+    // Any operational change can re-bucket the assignment's periods.
+    await syncAssignmentPeriods(client, updated.assignment_id);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
   const full = await pool.query(
     `SELECT ${SESSION_COLUMNS} ${SESSION_FROM} WHERE s.id = $1`,
     [req.params.id]
   );
-  const anchor = await readPeriodAnchor(pool);
-  res.json({
-    session: {
-      ...full.rows[0],
-      periodNumber: anchor
-        ? periodForDate(anchor, full.rows[0].sessionDate)
-        : null,
-    },
-  });
+  res.json({ session: withPeriodSeqs(full.rows)[0] });
 });
 
 export default router;

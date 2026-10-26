@@ -1,5 +1,5 @@
 const MAX_NAME = 60;
-const MAX_UNIT = 20;
+const MAX_CODE = 40;
 
 export function parseParameterInput(body, { partial = false } = {}) {
   const input = body ?? {};
@@ -20,32 +20,28 @@ export function parseParameterInput(body, { partial = false } = {}) {
     values.name = name;
   }
 
-  if ('unit' in input) {
-    if (input.unit === null || input.unit === '') {
-      values.unit = null;
-    } else if (
-      typeof input.unit === 'string' &&
-      input.unit.trim().length <= MAX_UNIT
-    ) {
-      values.unit = input.unit.trim();
-    } else {
+  if (!partial || 'code' in input) {
+    const code =
+      typeof input.code === 'string' ? input.code.trim().replace(/\s+/g, '-') : '';
+    if (code.length < 1 || code.length > MAX_CODE) {
       return {
-        error: `Unit must be text of at most ${MAX_UNIT} characters.`,
-        code: 'VALIDATION_TOO_LONG',
-        params: { max: MAX_UNIT },
+        error: `Code must be between 1 and ${MAX_CODE} characters.`,
+        code: 'VALIDATION_INVALID_LENGTH',
+        params: { min: 1, max: MAX_CODE },
       };
     }
+    values.code = code;
   }
 
   for (const key of ['minValue', 'maxValue']) {
     if (key in input) {
       if (input[key] === null) {
         values[key] = null;
-      } else if (typeof input[key] === 'number' && Number.isFinite(input[key])) {
+      } else if (Number.isInteger(input[key])) {
         values[key] = input[key];
       } else {
         return {
-          error: `${key} must be a number or null.`,
+          error: `${key} must be a whole number or null.`,
           code: 'VALIDATION_INVALID_TYPE',
           params: { field: key },
         };

@@ -113,6 +113,45 @@ export function parseTaskFields(body, { partial = false } = {}) {
     updates.sortOrder = body.sortOrder;
   }
 
+  // Optional targeting (schema-4): a task or template may point at a
+  // parameter and/or a single member. `extra` carries free-form JSON.
+  const UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  for (const key of ['parameterId', 'membershipId']) {
+    if (key in body) {
+      const value = body[key];
+      if (value === null || value === '') {
+        updates[key] = null;
+      } else if (typeof value === 'string' && UUID_PATTERN.test(value)) {
+        updates[key] = value;
+      } else {
+        return {
+          error: `${key} must be a valid ID or null.`,
+          code: 'VALIDATION_INVALID_FORMAT',
+          params: { field: key },
+        };
+      }
+    }
+  }
+  if ('extra' in body) {
+    const extra = body.extra;
+    if (extra === null || extra === undefined) {
+      updates.extra = {};
+    } else if (
+      typeof extra === 'object' &&
+      !Array.isArray(extra) &&
+      Object.keys(extra).every((k) => typeof k === 'string')
+    ) {
+      updates.extra = extra;
+    } else {
+      return {
+        error: 'extra must be a JSON object.',
+        code: 'VALIDATION_INVALID_TYPE',
+        params: { field: 'extra' },
+      };
+    }
+  }
+
   return { value: updates };
 }
 
@@ -211,6 +250,17 @@ export function parseAssignmentBody(body, { partial = false } = {}) {
       };
     }
     updates.archived = body.archived;
+  }
+
+  if ('sortOrder' in body) {
+    if (!Number.isInteger(body.sortOrder) || body.sortOrder < 0) {
+      return {
+        error: 'Sort order must be a whole number from 0.',
+        code: 'VALIDATION_INVALID_TYPE',
+        params: { field: 'sortOrder' },
+      };
+    }
+    updates.sortOrder = body.sortOrder;
   }
 
   if (Object.keys(updates).length === 0) {

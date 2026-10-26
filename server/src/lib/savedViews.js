@@ -1,8 +1,8 @@
 import { isUuid } from './ids.js';
-import { MAX_PERIOD, isValidPeriodNumber } from './parameterUse.js';
 
 export const MAX_VIEWS_PER_USER = 50;
 export const OPERATORS = ['lt', 'lte', 'gt', 'gte', 'eq', 'missing', 'present'];
+export const DIMENSIONS = ['quality', 'quantity'];
 
 const VALUE_OPERATORS = new Set(['lt', 'lte', 'gt', 'gte', 'eq']);
 const MAX_FILTERS = 10;
@@ -52,17 +52,20 @@ function parseFilter(input) {
   const { value } = input;
   if (
     typeof value !== 'number' ||
-    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
     Math.abs(value) > MAX_ABS_VALUE
   ) {
     return {
-      error: 'This filter needs a number as its value.',
+      error: 'This filter needs a whole number as its value.',
       code: 'VALIDATION_INVALID_TYPE',
     };
   }
   return { value: { parameterId: input.parameterId, op: input.op, value } };
 }
 
+// A saved view pins one assignment's grid: which period (null = the
+// assignment's latest), which dimension feeds the value columns and filters,
+// the visible columns, their filters, the sort and the search text.
 export function parseViewConfig(input) {
   if (input === null || typeof input !== 'object' || Array.isArray(input)) {
     return {
@@ -71,23 +74,32 @@ export function parseViewConfig(input) {
     };
   }
 
-  const { periodMode = 'current' } = input;
-  if (periodMode !== 'current' && periodMode !== 'fixed') {
+  if (!isUuid(input.assignmentId)) {
     return {
-      error: 'periodMode must be "current" or "fixed".',
-      code: 'VALIDATION_INVALID_CHOICE',
+      error: 'A view needs a valid assignmentId.',
+      code: 'VALIDATION_INVALID_FORMAT',
+      params: { field: 'assignmentId' },
     };
   }
-  let periodNumber = null;
-  if (periodMode === 'fixed') {
-    if (!isValidPeriodNumber(input.periodNumber)) {
+
+  let seq = null;
+  if (input.seq !== undefined && input.seq !== null) {
+    if (!Number.isInteger(input.seq) || input.seq < 1) {
       return {
-        error: `A fixed period must be a whole number from 1 to ${MAX_PERIOD}.`,
+        error: 'seq must be a whole number from 1 (or null for the latest).',
         code: 'VALIDATION_INVALID_RANGE',
-        params: { min: 1, max: MAX_PERIOD },
+        params: { min: 1 },
       };
     }
-    periodNumber = input.periodNumber;
+    seq = input.seq;
+  }
+
+  const dimension = input.dimension ?? 'quality';
+  if (!DIMENSIONS.includes(dimension)) {
+    return {
+      error: `dimension must be one of: ${DIMENSIONS.join(', ')}.`,
+      code: 'VALIDATION_INVALID_CHOICE',
+    };
   }
 
   const parameterIds = input.parameterIds ?? [];
@@ -154,8 +166,9 @@ export function parseViewConfig(input) {
 
   return {
     value: {
-      periodMode,
-      periodNumber,
+      assignmentId: input.assignmentId,
+      seq,
+      dimension,
       parameterIds,
       filters,
       sort: { key: sort.key, direction: sort.direction },
