@@ -4,32 +4,28 @@ import { useTranslation } from 'react-i18next';
 import { createParameter } from '../api/parameters.js';
 import { errorMessage } from '../i18n/errors.js';
 import { parseOptionalNumber } from '../lib/numbers.js';
-import { usePeriods } from '../lib/usePeriods.js';
 
+// A parameter is identified by a unique code and carries the integer range
+// both dimensions share. There is no unit and no per-period activation
+// anymore — applicability is the evaluator's cell selection.
 function ParameterForm() {
   const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
-  const { data: periods } = usePeriods();
 
+  const [code, setCode] = useState('');
   const [name, setName] = useState('');
-  const [unit, setUnit] = useState('');
   const [minText, setMinText] = useState('');
   const [maxText, setMaxText] = useState('');
-  const [startText, setStartText] = useState(null);
   const [problem, setProblem] = useState(null);
-
-  const shownStart = startText ?? String(periods?.current ?? 1);
 
   const mutation = useMutation({
     mutationFn: createParameter,
     onSuccess: () => {
+      setCode('');
       setName('');
-      setUnit('');
       setMinText('');
       setMaxText('');
-      setStartText(null);
       queryClient.invalidateQueries({ queryKey: ['parameters'] });
-      queryClient.invalidateQueries({ queryKey: ['parameter-changes'] });
     },
   });
 
@@ -43,8 +39,8 @@ function ParameterForm() {
 
     const min = parseOptionalNumber(minText);
     const max = parseOptionalNumber(maxText);
-    const startPeriod = Number(shownStart);
 
+    if (code.trim() === '') return fail(t('parameters.problemCode'));
     if (name.trim() === '') return fail(t('parameters.problemName'));
     if (min.error || max.error) {
       return fail(t('parameters.problemNumbers'));
@@ -52,23 +48,29 @@ function ParameterForm() {
     if (min.value !== null && max.value !== null && min.value > max.value) {
       return fail(t('parameters.problemRange'));
     }
-    if (!Number.isInteger(startPeriod) || startPeriod < 1) {
-      return fail(t('parameters.problemStart'));
-    }
 
     setProblem(null);
     mutation.mutate({
+      code: code.trim(),
       name,
-      unit: unit.trim() === '' ? null : unit,
       minValue: min.value,
       maxValue: max.value,
-      startPeriod,
     });
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="form-grid">
+        <label>
+          {t('parameters.codeLabel')}
+          <input
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            placeholder={t('parameters.codePlaceholder')}
+            maxLength={40}
+            autoComplete="off"
+          />
+        </label>
         <label>
           {t('common:table.name')}
           <input
@@ -80,20 +82,10 @@ function ParameterForm() {
           />
         </label>
         <label>
-          {t('parameters.unitLabel')}
-          <input
-            value={unit}
-            onChange={(event) => setUnit(event.target.value)}
-            placeholder={t('parameters.unitPlaceholder')}
-            maxLength={20}
-            autoComplete="off"
-          />
-        </label>
-        <label>
           {t('parameters.minLabel')}
           <input
             type="number"
-            step="any"
+            step="1"
             value={minText}
             onChange={(event) => setMinText(event.target.value)}
           />
@@ -102,19 +94,9 @@ function ParameterForm() {
           {t('parameters.maxLabel')}
           <input
             type="number"
-            step="any"
+            step="1"
             value={maxText}
             onChange={(event) => setMaxText(event.target.value)}
-          />
-        </label>
-        <label>
-          {t('parameters.usedFrom')}
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={shownStart}
-            onChange={(event) => setStartText(event.target.value)}
           />
         </label>
       </div>
@@ -135,10 +117,7 @@ function ParameterForm() {
       )}
       {mutation.isSuccess && (
         <p className="success" role="status">
-          {t('parameters.addedFromPeriod', {
-            name: mutation.data.name,
-            period: mutation.variables.startPeriod,
-          })}
+          {t('parameters.added', { name: mutation.data.name })}
         </p>
       )}
     </form>

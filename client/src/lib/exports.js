@@ -1,5 +1,5 @@
 import { buildHistory, visibleRows } from './history.js';
-import { changeOf } from './resultsView.js';
+import { changeOf, valueOf } from './resultsView.js';
 import i18n from '../i18n/index.js';
 import { describeAudit } from './audit.js';
 
@@ -43,43 +43,53 @@ export function createdStudentsCsvRows(created) {
   ];
 }
 
-export function resultsCsvRows({ periodNumber, columns, rows, showChange }) {
-  const withChange = showChange && periodNumber > 1;
+// One assignment period's grid, in the viewed dimension. `rows` are the
+// server's target rows (cells keyed by parameter, both dimensions present).
+export function resultsCsvRows({ period, columns, rows, dimension, showChange }) {
+  const seq = period?.seq ?? 1;
+  const withChange = showChange && seq > 1;
 
-  const header = ['Period', 'Student code', 'Full name'];
+  const header = [`Period ${seq}`, 'Student code', 'Full name'];
   for (const parameter of columns) {
     header.push(parameter.name);
     if (withChange) header.push(`${parameter.name} (change vs previous period)`);
   }
 
   const body = rows.map((row) => {
-    const cells = [periodNumber, row.studentCode, row.fullName];
+    const cells = [seq, row.studentCode, row.fullName];
     for (const parameter of columns) {
-      cells.push(row.values[parameter.id] ?? null);
-      if (withChange) cells.push(changeOf(row, parameter.id));
+      const value = valueOf(row, parameter.id, dimension);
+      cells.push(value === undefined ? null : value);
+      if (withChange) cells.push(changeOf(row, parameter.id, dimension));
     }
     return cells;
   });
   return [header, ...body];
 }
 
-export function historyCsvRows({ evaluations, periods, parameters }) {
-  const history = buildHistory({ evaluations, periods, parameters });
-  const rows = visibleRows(history.rows, evaluations, false);
+// The student's session timeline: one row per session, one quality/quantity
+// pair per parameter (the student's own cell, else the whole-group cell).
+export function historyCsvRows({ evaluations, parameters, assignmentsById }) {
+  const history = buildHistory({ evaluations, parameters });
+  const rows = visibleRows(history.rows, false);
 
   const header = [
-    'Period',
-    'Start date',
-    'End date',
-    ...history.columns.map((column) => column.name),
+    'Session date',
+    'Assignment',
+    ...history.columns.flatMap((column) => [
+      `${column.name} (quality)`,
+      `${column.name} (quantity)`,
+    ]),
   ];
   const body = rows.map((row) => [
-    row.periodNumber,
-    row.startDate,
-    row.endDate,
-    ...history.columns.map((column) => {
+    row.sessionDate,
+    assignmentsById.get(row.assignmentId)?.name ??
+      assignmentsById.get(row.assignmentId)?.code ??
+      row.sessionCode,
+    ...history.columns.flatMap((column) => {
       const cell = row.cells[column.id];
-      return cell.state === 'value' ? cell.value : null;
+      if (cell.state !== 'value' || !cell.answered) return [null, null];
+      return [cell.quality, cell.quantity];
     }),
   ]);
   return [header, ...body];
@@ -111,17 +121,17 @@ export function cubeLongRows(cube, { includeDelta = false } = {}) {
     'Student code',
     'Full name',
     'Parameter',
-    'Value',
+    `Value (${cube.dimension})`,
     ...(includeDelta ? ['Change vs previous period'] : []),
   ];
   const body = [];
   for (const period of cube.periods) {
     for (const student of cube.students) {
       for (const parameter of cube.parameters) {
-        const cell = cube.cellAt(student.id, parameter.id, period.number);
+        const cell = cube.cellAt(student.id, parameter.id, period.key);
         if (cell.value === null) continue;
         body.push([
-          period.number,
+          period.label,
           period.startDate,
           period.endDate,
           student.studentCode,
@@ -153,11 +163,11 @@ function cubeMatrixRows(cube, valueFor) {
   for (const period of cube.periods) {
     for (const student of cube.students) {
       const values = cube.parameters.map((parameter) =>
-        valueFor(student.id, parameter.id, period.number)
+        valueFor(student.id, parameter.id, period.key)
       );
       if (values.every((value) => value === null)) continue;
       body.push([
-        period.number,
+        period.label,
         period.startDate,
         period.endDate,
         student.studentCode,
@@ -185,33 +195,6 @@ export function deltaRows(cube) {
   );
 }
 
-const SCOPE_LABELS = {
-  from_here_on: 'From this period on',
-  this_period_only: 'This period only',
-};
-const ACTION_LABELS = { add: 'Added', remove: 'Removed' };
-
-// The parameter tracking / activation log: each row is one change to when a
-// parameter is in use. `changes` is the shape from GET /api/parameter-changes
-// (it already carries `parameterName`); an optional id→parameter map lets a
-// caller override the label. Ordering is preserved from the caller.
-export function trackingLogRows(changes, parametersById = null) {
-  const header = ['Parameter', 'Period', 'Scope', 'Action', 'Recorded (UTC)'];
-  const body = changes.map((change) => [
-    parametersById?.get(change.parameterId)?.name ??
-      change.parameterName ??
-      change.parameterId,
-    change.periodNumber,
-    SCOPE_LABELS[change.scope] ?? change.scope,
-    ACTION_LABELS[change.action] ?? change.action,
-    change.createdAt ?? null,
-  ]);
-  return [header, ...body];
-}
-
-// Categories and action sentences resolve through the same admin-namespace
-// keys the Audit page renders with, so an exported file reads exactly like
-// the page in either language. Both fall back to the raw code.
 function categoryLabel(value) {
   return i18n.t(`admin:audit.categories.${value}`, { defaultValue: value });
 }
@@ -227,9 +210,6 @@ function auditText(entry) {
     .join(i18n.t('admin:audit.joiner'));
 }
 
-// The full edit audit trail. `entries` is the shape from GET /api/audit; the
-// human-readable description reuses `describeAudit` so the file reads exactly
-// like the Audit page.
 export function auditTrailRows(entries) {
   const header = ['When (UTC)', 'User', 'Category', 'Action', 'Description'];
   const body = entries.map((entry) => {
@@ -262,7 +242,7 @@ export function cubeJson(cube, { scope = null } = {}) {
         .map((period) => {
           const values = {};
           for (const parameter of cube.parameters) {
-            const cell = cube.cellAt(student.id, parameter.id, period.number);
+            const cell = cube.cellAt(student.id, parameter.id, period.key);
             if (cell.value === null && cell.delta === null) continue;
             values[parameter.id] = {
               value: cell.value,
@@ -270,7 +250,7 @@ export function cubeJson(cube, { scope = null } = {}) {
               delta: cell.delta,
             };
           }
-          return { period: period.number, values };
+          return { period: period.label, values };
         })
         .filter((entry) => Object.keys(entry.values).length > 0),
     })),

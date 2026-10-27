@@ -1,35 +1,66 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Papa from 'papaparse';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { listPeriodParameters, saveEvaluations } from '../api/evaluations.js';
+import { saveEvaluations } from '../api/evaluations.js';
+import { listGroupMembers } from '../api/groups.js';
 import { listParameters } from '../api/parameters.js';
 import { fetchAllStudents } from '../api/students.js';
+import { listAssignments } from '../api/schedule.js';
+import { listSessions } from '../api/sessions.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import EmptyState from '../components/EmptyState.jsx';
 import ExportButton from '../components/ExportButton.jsx';
 import ImportSteps from '../components/ImportSteps.jsx';
-import PeriodPicker from '../components/PeriodPicker.jsx';
 import { LockIcon, UploadIcon } from '../components/icons.jsx';
 import { scoreTemplateCsvRows } from '../lib/exports.js';
-import { formatIsoDate, formatStudentCode } from '../lib/format.js';
+import { formatIsoDate, formatStudentCode, toIsoDate } from '../lib/format.js';
 import { prepareRows } from '../lib/importNames.js';
 import {
   MAX_SCORE_CELLS,
   buildImport,
   guessLayout,
   looksLikeScoreHeader,
-  nameKey,
   normalizeCode,
   planImport,
   reasonValid,
 } from '../lib/scoreImport.js';
-import { usePeriods } from '../lib/usePeriods.js';
 
 const EMPTY = [];
 const MAX_FILE_BYTES = 2_000_000;
+
+// Mirrors the server's period rule (lib/periods.js SESSIONS_PER_PERIOD): every
+// 4 non-canceled sessions of an assignment, in date order, form period 1, 2…
+const SESSIONS_PER_PERIOD = 4;
+
+function periodSeqBySession(sessions) {
+  const ordered = sessions
+    .filter((session) => !session.canceledAt && !session.archivedAt)
+    .sort((a, b) =>
+      a.sessionDate < b.sessionDate
+        ? -1
+        : a.sessionDate > b.sessionDate
+          ? 1
+          : (a.seq ?? 0) - (b.seq ?? 0)
+    );
+  const seqs = new Map();
+  ordered.forEach((session, index) =>
+    seqs.set(session.id, Math.floor(index / SESSIONS_PER_PERIOD) + 1)
+  );
+  return seqs;
+}
+
+// How many file columns a mapped parameter occupies (its quality and/or
+// quantity column) — the review table shows one sub-column per dimension.
+function dimensionCount(columns) {
+  if (!columns) return 0;
+  return (
+    (columns.qualityColumn !== null ? 1 : 0) +
+    (columns.quantityColumn !== null ? 1 : 0)
+  );
+}
 
 function columnLabel(t, index, headerCells) {
   const header = headerCells ? String(headerCells[index] ?? '').trim() : '';
@@ -121,90 +152,186 @@ function ImportScoresPage() {
   const { t } = useTranslation(['students', 'common']);
   const queryClient = useQueryClient();
   const { can } = useAuth();
-  const periodsQuery = usePeriods();
-  const periods = periodsQuery.data;
 
-  const [chosenPeriod, setChosenPeriod] = useState(null);
+  const [assignmentId, setAssignmentId] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
   const [fileName, setFileName] = useState('');
   const [rows, setRows] = useState([]);
   const [parseError, setParseError] = useState(null);
   const [hasHeader, setHasHeader] = useState(true);
   const [codeChoice, setCodeChoice] = useState(null);
   const [nameChoice, setNameChoice] = useState(undefined);
-  const [mappingChoice, setMappingChoice] = useState({});
+  const [qualityChoice, setQualityChoice] = useState({});
+  const [quantityChoice, setQuantityChoice] = useState({});
   const [skipProblems, setSkipProblems] = useState(false);
   const [reason, setReason] = useState('');
   const [stage, setStage] = useState('choose');
   const [preview, setPreview] = useState(null);
   const [done, setDone] = useState(null);
 
-  const periodNumber = chosenPeriod ?? periods?.current ?? null;
+  const check = useMutation({ mutationFn: saveEvaluations });
+  const run = useMutation({ mutationFn: saveEvaluations });
 
-  const paramsQuery = useQuery({
-    queryKey: ['period-parameters', periodNumber],
-    queryFn: () => listPeriodParameters(periodNumber),
-    enabled: periodNumber !== null,
-  });
-  const allParamsQuery = useQuery({
+  const parametersQuery = useQuery({
     queryKey: ['parameters'],
     queryFn: listParameters,
   });
+  const parameters = useMemo(
+    () => (parametersQuery.data ?? EMPTY).filter((p) => !p.archivedAt),
+    [parametersQuery.data]
+  );
+
   const studentsQuery = useQuery({
     queryKey: ['students-all'],
     queryFn: fetchAllStudents,
     enabled: can('scores.enter'),
   });
 
-  const check = useMutation({ mutationFn: saveEvaluations });
-  const run = useMutation({ mutationFn: saveEvaluations });
+  const assignmentsQuery = useQuery({
+    queryKey: ['assignments'],
+    queryFn: listAssignments,
+  });
+  const assignments = assignmentsQuery.data ?? EMPTY;
 
-  const periodParameters = paramsQuery.data ?? EMPTY;
+  // Default assignment: the first one. Derived (not an effect) so the picker
+  // falls back to it whenever the user has not explicitly chosen.
+  const effectiveAssignmentId = assignmentId ?? assignments[0]?.id ?? null;
+  const assignment =
+    assignments.find((item) => item.id === effectiveAssignmentId) ?? null;
 
-  const guess = useMemo(
-    () =>
-      hasHeader && rows.length > 0
-        ? guessLayout(rows[0].cells, periodParameters)
-        : { codeColumn: null, nameColumn: null, mapping: {} },
-    [hasHeader, rows, periodParameters]
-  );
-  const codeColumn = codeChoice ?? guess.codeColumn ?? 0;
-  const nameColumn = nameChoice === undefined ? guess.nameColumn : nameChoice;
-  const mapping = useMemo(
-    () => ({ ...guess.mapping, ...mappingChoice }),
-    [guess, mappingChoice]
-  );
+  const sessionsQuery = useQuery({
+    queryKey: ['sessions', { assignmentId: effectiveAssignmentId }],
+    queryFn: () =>
+      listSessions({ assignmentId: effectiveAssignmentId, includeCanceled: true }),
+    enabled: effectiveAssignmentId !== null,
+  });
+  const sessionsRaw = sessionsQuery.data?.sessions;
+  const sessions = useMemo(() => sessionsRaw ?? EMPTY, [sessionsRaw]);
+  const periodSeqs = useMemo(() => periodSeqBySession(sessions), [sessions]);
+
+  // Default session: the first session of today or later, else the last usable
+  // one. Derived (not an effect), like the assignment default above.
+  const defaultSessionId = useMemo(() => {
+    const usable = sessions.filter((session) => !session.canceledAt);
+    if (usable.length === 0) return null;
+    const today = toIsoDate(new Date());
+    return (
+      usable.find((session) => session.sessionDate >= today) ??
+      usable[usable.length - 1]
+    ).id;
+  }, [sessions]);
+  const effectiveSessionId = sessionId ?? defaultSessionId;
+  const chosenSession =
+    sessions.find((item) => item.id === effectiveSessionId) ?? null;
+
+  const membersQuery = useQuery({
+    queryKey: ['group-members', assignment?.groupId],
+    queryFn: () => listGroupMembers(assignment.groupId),
+    enabled: assignment?.groupId != null,
+  });
+
+  // Only the session's own assignment targets are resolvable: a code that is
+  // not one of them gets the lib's "not part of this session's assignment"
+  // row problem. A group assignment uses its open members; an individual
+  // assignment is exactly its one member (its code comes from the students
+  // list, which the template needs anyway).
+  const targets = useMemo(() => {
+    if (!assignment) return EMPTY;
+    if (assignment.groupId) {
+      return (membersQuery.data ?? EMPTY)
+        .filter((member) => !member.leftOn)
+        .map((member) => ({
+          id: member.id,
+          membershipId: member.membershipId,
+          fullName: member.fullName,
+          studentCode: member.studentCode,
+        }));
+    }
+    const student = (studentsQuery.data ?? EMPTY).find(
+      (item) => item.id === assignment.studentId
+    );
+    if (!student) return EMPTY;
+    return [
+      {
+        id: student.id,
+        membershipId: assignment.membershipId,
+        fullName: assignment.studentName ?? student.fullName,
+        studentCode: student.studentCode,
+      },
+    ];
+  }, [assignment, membersQuery.data, studentsQuery.data]);
 
   const studentsByCode = useMemo(
     () =>
       new Map(
-        (studentsQuery.data ?? EMPTY).map((student) => [
-          normalizeCode(student.studentCode),
-          student,
-        ])
+        targets
+          .filter((target) => target.studentCode)
+          .map((target) => [normalizeCode(target.studentCode), target])
       ),
-    [studentsQuery.data]
+    [targets]
   );
 
+  const guess = useMemo(
+    () =>
+      hasHeader && rows.length > 0
+        ? guessLayout(rows[0].cells, parameters)
+        : { codeColumn: null, nameColumn: null, mapping: {} },
+    [hasHeader, rows, parameters]
+  );
+  const codeColumn = codeChoice ?? guess.codeColumn ?? 0;
+  const nameColumn = nameChoice === undefined ? guess.nameColumn : nameChoice;
+
+  // Per parameter, the user's explicit choice (else the guessed column)
+  // decides which file column feeds each dimension; null = not in the file.
+  const mapping = useMemo(() => {
+    const result = {};
+    for (const parameter of parameters) {
+      const guessed = guess.mapping[parameter.id];
+      const qualityColumn =
+        parameter.id in qualityChoice
+          ? qualityChoice[parameter.id]
+          : guessed?.qualityColumn ?? null;
+      const quantityColumn =
+        parameter.id in quantityChoice
+          ? quantityChoice[parameter.id]
+          : guessed?.quantityColumn ?? null;
+      if (qualityColumn !== null || quantityColumn !== null) {
+        result[parameter.id] = { qualityColumn, quantityColumn };
+      }
+    }
+    return result;
+  }, [parameters, guess, qualityChoice, quantityChoice]);
+
+  // The targets must be resolved before rows can be matched against them.
+  const targetsReady = assignment
+    ? assignment.groupId
+      ? membersQuery.isSuccess
+      : studentsQuery.isSuccess
+    : false;
+
   const built = useMemo(() => {
-    if (rows.length === 0 || !studentsQuery.data) return null;
+    if (rows.length === 0 || !targetsReady || effectiveSessionId === null) {
+      return null;
+    }
     return buildImport({
       rows,
       hasHeader,
       codeColumn,
       nameColumn,
       mapping,
-      parameters: periodParameters,
+      parameters,
       studentsByCode,
     });
   }, [
     rows,
+    targetsReady,
+    effectiveSessionId,
     hasHeader,
     codeColumn,
     nameColumn,
     mapping,
-    periodParameters,
+    parameters,
     studentsByCode,
-    studentsQuery.data,
   ]);
 
   const serverByIndex = useMemo(() => {
@@ -218,14 +345,15 @@ function ImportScoresPage() {
     return map;
   }, [preview]);
 
-  function resetAll() {
+  function resetFile() {
     setFileName('');
     setRows([]);
     setParseError(null);
     setHasHeader(true);
     setCodeChoice(null);
     setNameChoice(undefined);
-    setMappingChoice({});
+    setQualityChoice({});
+    setQuantityChoice({});
     setSkipProblems(false);
     setReason('');
     setStage('choose');
@@ -235,12 +363,20 @@ function ImportScoresPage() {
     run.reset();
   }
 
+  function handleSwitchAssignment(nextId) {
+    if (nextId === effectiveAssignmentId) return;
+    setAssignmentId(nextId);
+    // A null session id lets the derived default pick one once the new
+    // assignment's sessions arrive.
+    setSessionId(null);
+  }
+
   async function handleFile(event) {
     const input = event.target;
     const file = input.files?.[0];
     if (!file) return;
 
-    resetAll();
+    resetFile();
     setFileName(file.name);
     if (file.size > MAX_FILE_BYTES) {
       setParseError(t('imports.fileTooLarge', { size: '2 MB' }));
@@ -256,15 +392,15 @@ function ImportScoresPage() {
       return;
     }
     setRows(prepared);
-    setHasHeader(looksLikeScoreHeader(prepared[0].cells, periodParameters));
+    setHasHeader(looksLikeScoreHeader(prepared[0].cells, parameters));
   }
 
   function handleCheck() {
     check.mutate(
-      { periodNumber, entries: built.entries, dryRun: true },
+      { sessionId: effectiveSessionId, entries: built.entries, dryRun: true },
       {
         onSuccess: (server) => {
-          setPreview({ built, server });
+          setPreview({ built, server, mapping });
           setStage('preview');
         },
       }
@@ -292,7 +428,7 @@ function ImportScoresPage() {
   function handleImport() {
     run.mutate(
       {
-        periodNumber,
+        sessionId: effectiveSessionId,
         entries: plan.send,
         source: 'import',
         overrideReason: needsReason
@@ -310,6 +446,7 @@ function ImportScoresPage() {
           queryClient.invalidateQueries({ queryKey: ['evaluations'] });
           queryClient.invalidateQueries({ queryKey: ['results'] });
           queryClient.invalidateQueries({ queryKey: ['trends'] });
+          queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         },
       }
     );
@@ -325,7 +462,7 @@ function ImportScoresPage() {
       </main>
     );
   }
-  if (periodsQuery.isPending) {
+  if (assignmentsQuery.isPending) {
     return (
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
@@ -335,39 +472,36 @@ function ImportScoresPage() {
       </main>
     );
   }
-  if (periodsQuery.isError) {
+  if (assignmentsQuery.isError) {
     return (
       <main>
         <EmptyState
           tone="danger"
           title={t('imports.scores.loadErrorTitle')}
-          description={errorMessage(periodsQuery.error)}
+          description={errorMessage(assignmentsQuery.error)}
         />
       </main>
     );
   }
-  if (!periods.anchorDate) {
+  if (assignments.length === 0) {
     return (
       <main>
+        <p>
+          <Link to="/evaluate">{t('imports.scores.back')}</Link>
+        </p>
+        <h1>{t('imports.scores.title')}</h1>
         <EmptyState
-          title={t('imports.scores.noCalendarTitle')}
-          description={t('imports.scores.noCalendarDescription')}
-        />
-      </main>
-    );
-  }
-  if (periods.current === null) {
-    return (
-      <main>
-        <EmptyState
-          title={t('imports.scores.noActiveTitle')}
-          description={t('shared.period1NotStarted')}
-        />
+          title={t('imports.scores.noAssignments')}
+          description={t('imports.scores.noAssignmentsHint')}
+        >
+          <p>
+            <Link to="/schedule">{t('imports.scores.goToSchedule')}</Link>
+          </p>
+        </EmptyState>
       </main>
     );
   }
 
-  const period = periods.periods.find((item) => item.number === periodNumber);
   const columnCount = rows.reduce(
     (max, item) => Math.max(max, item.cells.length),
     0
@@ -377,7 +511,9 @@ function ImportScoresPage() {
   const usedColumns = new Set([
     codeColumn,
     ...(nameColumn === null ? [] : [nameColumn]),
-    ...Object.values(mapping).filter(Number.isInteger),
+    ...Object.values(mapping).flatMap((columns) =>
+      [columns.qualityColumn, columns.quantityColumn].filter(Number.isInteger)
+    ),
   ]);
   const ignoredHeaders = headerCells
     ? headerCells
@@ -385,14 +521,17 @@ function ImportScoresPage() {
         .filter(({ index, text }) => text !== '' && !usedColumns.has(index))
         .map(({ text }) => text)
     : [];
-  const notUsedHere = ignoredHeaders.filter((text) =>
-    (allParamsQuery.data ?? EMPTY).some(
-      (parameter) => nameKey(parameter.name) === nameKey(text)
-    )
-  );
 
   const tooMany = built !== null && built.entries.length > MAX_SCORE_CELLS;
   const server = preview?.server;
+  const totalDimensions =
+    preview === null
+      ? 0
+      : preview.built.mappedParameters.reduce(
+          (sum, parameter) =>
+            sum + dimensionCount(preview.mapping[parameter.id]),
+          0
+        );
 
   return (
     <main className="wide">
@@ -412,210 +551,307 @@ function ImportScoresPage() {
       {stage === 'choose' && (
         <>
           <p className="hint">{t('imports.scores.hint')}</p>
-          <PeriodPicker
-            periods={periods}
-            value={periodNumber}
-            onChange={setChosenPeriod}
-          />
 
-          <p>
-            <ExportButton
-              label={t('imports.scores.templateLabel', { period: periodNumber })}
-              filename={`score-template-period-${periodNumber}.csv`}
-              disabled={periodParameters.length === 0}
-              buildRows={async () =>
-                scoreTemplateCsvRows({
-                  students: await fetchAllStudents(),
-                  parameters: periodParameters,
-                })
-              }
-            />
-          </p>
-          {paramsQuery.isSuccess && periodParameters.length === 0 && (
-            <p className="error">
-              {t('imports.scores.noParamsInPeriod', { period: periodNumber })}
-            </p>
-          )}
-
-          <div className="drop-zone">
-            <span className="drop-zone-mark">
-              <UploadIcon />
-            </span>
-            <input
-              type="file"
-              accept=".csv,.txt,text/csv"
-              aria-label={t('imports.scores.fileAria')}
-              onChange={handleFile}
-            />
-          </div>
-          {parseError && (
-            <p className="error" role="alert">
-              {parseError}
-            </p>
-          )}
-          {rows.length > 0 && studentsQuery.isPending && (
-            <p className="hint">{t('list.loading')}</p>
-          )}
-          {studentsQuery.isError && (
-            <p className="error" role="alert">
-              {errorMessage(studentsQuery.error)}
-            </p>
-          )}
-
-          {rows.length > 0 && (
-            <section className="section-card">
-              <h2>{fileName}</h2>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>{t('imports.row')}</th>
-                      {Array.from({ length: columnCount }, (_, index) => (
-                        <th key={index}>{columnLabel(t, index, null)}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.slice(0, 5).map((item) => (
-                      <tr key={item.row}>
-                        <td>{item.row}</td>
-                        {Array.from({ length: columnCount }, (_, index) => (
-                          <td key={index}>{item.cells[index] ?? ''}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {rows.length > 5 && (
-                <p className="hint">
-                  {t('imports.showingFirst', { count: rows.length })}
-                </p>
-              )}
-
-              <div className="pref-group">
-                <label className="inline">
-                  <input
-                    type="checkbox"
-                    checked={hasHeader}
-                    onChange={(event) => setHasHeader(event.target.checked)}
-                  />
-                  {t('imports.firstRowHeader')}
-                </label>
-                <label className="inline">
-                  {t('imports.scores.codeIn')}
-                  <select
-                    value={codeColumn}
-                    onChange={(event) => setCodeChoice(Number(event.target.value))}
-                  >
-                    <ColumnOptions columnCount={columnCount} headerCells={headerCells} />
-                  </select>
-                </label>
-                <label className="inline">
-                  {t('imports.scores.nameCheck')}
-                  <select
-                    value={nameColumn ?? ''}
-                    onChange={(event) =>
-                      setNameChoice(
-                        event.target.value === '' ? null : Number(event.target.value)
-                      )
-                    }
-                  >
-                    <option value="">{t('imports.scores.noNameColumn')}</option>
-                    <ColumnOptions columnCount={columnCount} headerCells={headerCells} />
-                  </select>
-                </label>
-              </div>
-
-              <h3>{t('imports.scores.whichColumns')}</h3>
-              {!hasHeader && (
-                <p className="hint">{t('imports.scores.noHeaderHint')}</p>
-              )}
-              <div className="pref-group">
-                {periodParameters.map((parameter) => (
-                  <label key={parameter.id} className="inline">
-                    {parameter.name}
-                    <select
-                      value={mapping[parameter.id] ?? ''}
-                      onChange={(event) =>
-                        setMappingChoice((existing) => ({
-                          ...existing,
-                          [parameter.id]:
-                            event.target.value === ''
-                              ? null
-                              : Number(event.target.value),
-                        }))
-                      }
-                    >
-                      <option value="">{t('imports.scores.notInFile')}</option>
-                      <ColumnOptions
-                        columnCount={columnCount}
-                        headerCells={headerCells}
-                      />
-                    </select>
-                  </label>
-                ))}
-              </div>
-              {ignoredHeaders.length > 0 && (
-                <p className="hint">
-                  {t('imports.scores.ignoredColumns', {
-                    names: ignoredHeaders.join(', '),
-                  })}
-                </p>
-              )}
-              {notUsedHere.length > 0 && (
-                <p className="hint">
-                  {t('imports.scores.notUsedHere', {
-                    period: periodNumber,
-                    names: notUsedHere.join(', '),
-                  })}
-                </p>
-              )}
-
-              {built && (
-                <p className="summary-line">
-                  {t('imports.scores.summaryLine', {
-                    rows: built.rows.length,
-                    matched: built.rows.filter((item) => !item.rowProblem).length,
-                    scores: built.entries.length,
-                  })}
-                  {built.localProblemCount > 0 &&
-                    t('imports.scores.problemsNote', {
-                      count: built.localProblemCount,
-                    })}
-                </p>
-              )}
-              {tooMany && (
-                <p className="error">
-                  {t('imports.scores.tooMany', {
-                    count: built.entries.length,
-                    max: MAX_SCORE_CELLS,
-                  })}
-                </p>
-              )}
-              {built && built.entries.length === 0 && (
-                <p className="error">{t('imports.scores.noScores')}</p>
-              )}
-              <button
-                type="button"
-                onClick={handleCheck}
-                disabled={
-                  !built ||
-                  built.entries.length === 0 ||
-                  tooMany ||
-                  check.isPending
+          <div className="control-bar">
+            <label className="field">
+              <span>{t('imports.scores.assignmentLabel')}</span>
+              <select
+                value={effectiveAssignmentId ?? ''}
+                onChange={(event) =>
+                  handleSwitchAssignment(event.target.value || null)
                 }
               >
-                {check.isPending
-                  ? t('imports.checking')
-                  : t('imports.checkFile')}
-              </button>
-              {check.isError && (
+                {assignments.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name ?? item.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>{t('imports.scores.sessionLabel')}</span>
+              <select
+                value={effectiveSessionId ?? ''}
+                onChange={(event) => setSessionId(event.target.value || null)}
+                disabled={sessions.length === 0}
+              >
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {formatIsoDate(session.sessionDate)}
+                    {' · '}
+                    {t('imports.scores.periodShort', {
+                      seq: periodSeqs.get(session.id) ?? '…',
+                    })}
+                    {session.canceledAt ? t('imports.scores.canceledTag') : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {(sessionsQuery.error ?? membersQuery.error ?? parametersQuery.error) && (
+            <p className="error" role="alert">
+              {errorMessage(
+                sessionsQuery.error ??
+                  membersQuery.error ??
+                  parametersQuery.error
+              )}
+            </p>
+          )}
+
+          {sessionsQuery.isSuccess && sessions.length === 0 && (
+            <EmptyState
+              title={t('imports.scores.noSessions')}
+              description={t('imports.scores.noSessionsDescription')}
+            >
+              <p>
+                <Link to="/schedule">{t('imports.scores.goToSchedule')}</Link>
+              </p>
+            </EmptyState>
+          )}
+
+          {sessions.length > 0 && (
+            <>
+              <p>
+                <ExportButton
+                  label={t('imports.scores.templateLabel')}
+                  filename={`score-template-${
+                    chosenSession?.sessionDate ?? 'session'
+                  }.csv`}
+                  disabled={parameters.length === 0}
+                  buildRows={async () =>
+                    scoreTemplateCsvRows({
+                      students: await fetchAllStudents(),
+                      parameters,
+                    })
+                  }
+                />
+              </p>
+              {parametersQuery.isSuccess && parameters.length === 0 && (
+                <p className="error">{t('imports.scores.noParams')}</p>
+              )}
+
+              <div className="drop-zone">
+                <span className="drop-zone-mark">
+                  <UploadIcon />
+                </span>
+                <input
+                  type="file"
+                  accept=".csv,.txt,text/csv"
+                  aria-label={t('imports.scores.fileAria')}
+                  onChange={handleFile}
+                />
+              </div>
+              {parseError && (
                 <p className="error" role="alert">
-                  {errorMessage(check.error)}
+                  {parseError}
                 </p>
               )}
-            </section>
+              {rows.length > 0 && !targetsReady && (
+                <p className="hint">{t('list.loading')}</p>
+              )}
+              {studentsQuery.isError && (
+                <p className="error" role="alert">
+                  {errorMessage(studentsQuery.error)}
+                </p>
+              )}
+
+              {rows.length > 0 && (
+                <section className="section-card">
+                  <h2>{fileName}</h2>
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{t('imports.row')}</th>
+                          {Array.from({ length: columnCount }, (_, index) => (
+                            <th key={index}>{columnLabel(t, index, null)}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.slice(0, 5).map((item) => (
+                          <tr key={item.row}>
+                            <td>{item.row}</td>
+                            {Array.from({ length: columnCount }, (_, index) => (
+                              <td key={index}>{item.cells[index] ?? ''}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {rows.length > 5 && (
+                    <p className="hint">
+                      {t('imports.showingFirst', { count: rows.length })}
+                    </p>
+                  )}
+
+                  <div className="pref-group">
+                    <label className="inline">
+                      <input
+                        type="checkbox"
+                        checked={hasHeader}
+                        onChange={(event) =>
+                          setHasHeader(event.target.checked)
+                        }
+                      />
+                      {t('imports.firstRowHeader')}
+                    </label>
+                    <label className="inline">
+                      {t('imports.scores.codeIn')}
+                      <select
+                        value={codeColumn}
+                        onChange={(event) =>
+                          setCodeChoice(Number(event.target.value))
+                        }
+                      >
+                        <ColumnOptions
+                          columnCount={columnCount}
+                          headerCells={headerCells}
+                        />
+                      </select>
+                    </label>
+                    <label className="inline">
+                      {t('imports.scores.nameCheck')}
+                      <select
+                        value={nameColumn ?? ''}
+                        onChange={(event) =>
+                          setNameChoice(
+                            event.target.value === ''
+                              ? null
+                              : Number(event.target.value)
+                          )
+                        }
+                      >
+                        <option value="">{t('imports.scores.noNameColumn')}</option>
+                        <ColumnOptions
+                          columnCount={columnCount}
+                          headerCells={headerCells}
+                        />
+                      </select>
+                    </label>
+                  </div>
+
+                  <h3>{t('imports.scores.whichColumns')}</h3>
+                  {!hasHeader && (
+                    <p className="hint">{t('imports.scores.noHeaderHint')}</p>
+                  )}
+                  <div className="pref-group">
+                    {parameters.map((parameter) => {
+                      const columns =
+                        mapping[parameter.id] ?? {
+                          qualityColumn: null,
+                          quantityColumn: null,
+                        };
+                      return (
+                        <div key={parameter.id} className="row">
+                          <strong>{parameter.name}</strong>
+                          <label className="inline">
+                            {t('imports.scores.qualityCol')}
+                            <select
+                              value={columns.qualityColumn ?? ''}
+                              onChange={(event) =>
+                                setQualityChoice((existing) => ({
+                                  ...existing,
+                                  [parameter.id]:
+                                    event.target.value === ''
+                                      ? null
+                                      : Number(event.target.value),
+                                }))
+                              }
+                            >
+                              <option value="">
+                                {t('imports.scores.notInFile')}
+                              </option>
+                              <ColumnOptions
+                                columnCount={columnCount}
+                                headerCells={headerCells}
+                              />
+                            </select>
+                          </label>
+                          <label className="inline">
+                            {t('imports.scores.quantityCol')}
+                            <select
+                              value={columns.quantityColumn ?? ''}
+                              onChange={(event) =>
+                                setQuantityChoice((existing) => ({
+                                  ...existing,
+                                  [parameter.id]:
+                                    event.target.value === ''
+                                      ? null
+                                      : Number(event.target.value),
+                                }))
+                              }
+                            >
+                              <option value="">
+                                {t('imports.scores.notInFile')}
+                              </option>
+                              <ColumnOptions
+                                columnCount={columnCount}
+                                headerCells={headerCells}
+                              />
+                            </select>
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {ignoredHeaders.length > 0 && (
+                    <p className="hint">
+                      {t('imports.scores.ignoredColumns', {
+                        names: ignoredHeaders.join(', '),
+                      })}
+                    </p>
+                  )}
+
+                  {built && (
+                    <p className="summary-line">
+                      {t('imports.scores.summaryLine', {
+                        rows: built.rows.length,
+                        matched: built.rows.filter((item) => !item.rowProblem)
+                          .length,
+                        scores: built.entries.length,
+                      })}
+                      {built.localProblemCount > 0 &&
+                        t('imports.scores.problemsNote', {
+                          count: built.localProblemCount,
+                        })}
+                    </p>
+                  )}
+                  {tooMany && (
+                    <p className="error">
+                      {t('imports.scores.tooMany', {
+                        count: built.entries.length,
+                        max: MAX_SCORE_CELLS,
+                      })}
+                    </p>
+                  )}
+                  {built && built.entries.length === 0 && (
+                    <p className="error">{t('imports.scores.noScores')}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleCheck}
+                    disabled={
+                      !built ||
+                      built.entries.length === 0 ||
+                      tooMany ||
+                      check.isPending
+                    }
+                  >
+                    {check.isPending
+                      ? t('imports.checking')
+                      : t('imports.checkFile')}
+                  </button>
+                  {check.isError && (
+                    <p className="error" role="alert">
+                      {errorMessage(check.error)}
+                    </p>
+                  )}
+                </section>
+              )}
+            </>
           )}
         </>
       )}
@@ -625,14 +861,10 @@ function ImportScoresPage() {
           <h2>
             {t('imports.scores.previewTitle', {
               name: fileName,
-              period: periodNumber,
+              date: chosenSession
+                ? formatIsoDate(chosenSession.sessionDate)
+                : '—',
             })}
-            {period && (
-              <span className="hint">
-                {' '}
-                ({formatIsoDate(period.startDate)} – {formatIsoDate(period.endDate)})
-              </span>
-            )}
           </h2>
           <p className="summary-line">
             <strong>
@@ -691,11 +923,35 @@ function ImportScoresPage() {
             <table>
               <thead>
                 <tr>
-                  <th>{t('imports.row')}</th>
-                  <th>{t('imports.scores.colStudent')}</th>
+                  <th rowSpan={2}>{t('imports.row')}</th>
+                  <th rowSpan={2}>{t('imports.scores.colStudent')}</th>
                   {preview.built.mappedParameters.map((parameter) => (
-                    <th key={parameter.id}>{parameter.name}</th>
+                    <th
+                      key={parameter.id}
+                      colSpan={dimensionCount(preview.mapping[parameter.id])}
+                    >
+                      {parameter.name}
+                    </th>
                   ))}
+                </tr>
+                <tr>
+                  {preview.built.mappedParameters.map((parameter) => {
+                    const columns = preview.mapping[parameter.id];
+                    return (
+                      <Fragment key={parameter.id}>
+                        {columns.qualityColumn !== null && (
+                          <th className="small">
+                            {t('imports.scores.qualityCol')}
+                          </th>
+                        )}
+                        {columns.quantityColumn !== null && (
+                          <th className="small">
+                            {t('imports.scores.quantityCol')}
+                          </th>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -710,18 +966,22 @@ function ImportScoresPage() {
                         : item.rawCode || '—'}
                     </td>
                     {item.rowProblem ? (
-                      <td colSpan={preview.built.mappedParameters.length}>
-                        {item.rowProblem}
-                      </td>
+                      <td colSpan={totalDimensions}>{item.rowProblem}</td>
                     ) : (
-                      item.cells.map((cell) => (
-                        <td key={cell.parameterId}>
-                          <CellView
-                            cell={cell}
-                            info={serverByIndex.get(cell.entryIndex)}
-                            canOverride={canOverride}
-                          />
-                        </td>
+                      preview.built.mappedParameters.map((parameter) => (
+                        <Fragment key={parameter.id}>
+                          {item.cells
+                            .filter((cell) => cell.parameterId === parameter.id)
+                            .map((cell) => (
+                              <td key={cell.dimension}>
+                                <CellView
+                                  cell={cell}
+                                  info={serverByIndex.get(cell.entryIndex)}
+                                  canOverride={canOverride}
+                                />
+                              </td>
+                            ))}
+                        </Fragment>
                       ))
                     )}
                   </tr>
@@ -739,7 +999,7 @@ function ImportScoresPage() {
             <button type="button" onClick={backToSettings} disabled={run.isPending}>
               {t('imports.scores.backToColumns')}
             </button>
-            <button type="button" onClick={resetAll} disabled={run.isPending}>
+            <button type="button" onClick={resetFile} disabled={run.isPending}>
               {t('imports.chooseAnotherFile')}
             </button>
           </div>
@@ -767,7 +1027,7 @@ function ImportScoresPage() {
           <div className="row">
             <Link to="/results">{t('imports.scores.seeResults')}</Link>
             <Link to="/evaluate">{t('imports.scores.backToEvaluate')}</Link>
-            <button type="button" onClick={resetAll}>
+            <button type="button" onClick={resetFile}>
               {t('imports.importAnotherFile')}
             </button>
           </div>

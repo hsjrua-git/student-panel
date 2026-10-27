@@ -32,17 +32,24 @@ describe('small helpers', () => {
 });
 
 describe('header detection and layout guessing', () => {
-  it('recognises a header row by code, name, or a parameter name', () => {
+  it('recognises a header row by code, name, or a parameter name (with or without a dimension suffix)', () => {
     expect(looksLikeScoreHeader(['Code', 'Speed'], parameters)).toBe(true);
+    expect(looksLikeScoreHeader(['Code', 'Speed (quantity)'], parameters)).toBe(true);
     expect(looksLikeScoreHeader(['random', 'stuff'], parameters)).toBe(false);
   });
 
-  it('maps columns to code, name and each parameter by header text', () => {
-    const layout = guessLayout(['Code', 'Name', 'Speed', 'Strength'], parameters);
+  it('maps paired columns per parameter; a bare name maps to quality', () => {
+    const layout = guessLayout(
+      ['Code', 'Name', 'Speed (quality)', 'Speed (quantity)', 'Strength'],
+      parameters
+    );
     expect(layout).toEqual({
       codeColumn: 0,
       nameColumn: 1,
-      mapping: { p1: 2, p2: 3 },
+      mapping: {
+        p1: { qualityColumn: 2, quantityColumn: 3 },
+        p2: { qualityColumn: 4, quantityColumn: null },
+      },
     });
   });
 
@@ -50,75 +57,100 @@ describe('header detection and layout guessing', () => {
     const layout = guessLayout(['Speed'], parameters);
     expect(layout.codeColumn).toBe(null);
     expect(layout.nameColumn).toBe(null);
-    expect(layout.mapping).toEqual({ p1: 0 });
+    expect(layout.mapping).toEqual({
+      p1: { qualityColumn: 0, quantityColumn: null },
+    });
   });
 });
 
 describe('buildImport', () => {
   const studentsByCode = new Map([
-    ['S1', { id: 'a', fullName: 'Ada Lovelace', studentCode: 'S1' }],
-    ['S2', { id: 'b', fullName: 'Bea Ray', studentCode: 'S2' }],
+    ['S1', { id: 'a', membershipId: 'm-a', fullName: 'Ada Lovelace', studentCode: 'S1' }],
+    ['S2', { id: 'b', membershipId: 'm-b', fullName: 'Bea Ray', studentCode: 'S2' }],
+    ['S3', { id: 'c', membershipId: null, fullName: 'Cid Bay', studentCode: 'S3' }],
   ]);
 
-  function run(dataCells) {
+  function run(dataCells, mapping) {
     return buildImport({
       rows: [
-        { row: 1, cells: ['Code', 'Name', 'Speed'] },
+        { row: 1, cells: ['Code', 'Name', 'Speed (quality)', 'Speed (quantity)'] },
         ...dataCells.map((cells, i) => ({ row: i + 2, cells })),
       ],
       hasHeader: true,
       codeColumn: 0,
       nameColumn: 1,
-      mapping: { p1: 2 },
+      mapping:
+        mapping ?? { p1: { qualityColumn: 2, quantityColumn: 3 } },
       parameters,
       studentsByCode,
     });
   }
 
-  it('turns valid rows into entries with student and parameter ids', () => {
-    const built = run([['S1', 'Ada Lovelace', '8']]);
-    expect(built.entries).toEqual([{ studentId: 'a', parameterId: 'p1', value: 8 }]);
+  it('turns valid rows into full-cell entries keyed by the membership', () => {
+    const built = run([['S1', 'Ada Lovelace', '8', '']]);
+    expect(built.entries).toEqual([
+      {
+        membershipId: 'm-a',
+        parameterId: 'p1',
+        selected: true,
+        qualityValue: 8,
+        quantityValue: null,
+      },
+    ]);
+    // Both dimension cells share the entry index.
+    expect(built.rows[0].cells.map((cell) => cell.entryIndex)).toEqual([0, 0]);
     expect(built.localProblemCount).toBe(0);
   });
 
-  it('flags an unknown code and a name that does not match', () => {
+  it('flags an unknown code, a name mismatch, and a non-target student', () => {
     const built = run([
-      ['S9', '', '5'], // no such code
-      ['S2', 'Wrong Name', '5'], // name mismatch
+      ['S9', '', '5', ''], // no such code
+      ['S2', 'Wrong Name', '5', ''], // name mismatch
+      ['S3', 'Cid Bay', '5', ''], // not a target of this session's assignment
     ]);
     const problems = built.rows.map((r) => r.rowProblem);
     expect(problems[0]).toMatch(/No student with code/);
     expect(problems[1]).toMatch(/does not match/);
-    expect(built.localProblemCount).toBe(2);
-    expect(built.entries).toEqual([]); // neither row produced an entry
+    expect(problems[2]).toMatch(/not part of this session's assignment/);
+    expect(built.localProblemCount).toBe(3);
+    expect(built.entries).toEqual([]);
   });
 
-  it('flags a duplicate student and an out-of-range score', () => {
+  it('flags a duplicate student and an out-of-range dimension value', () => {
     const dup = run([
-      ['S1', 'Ada Lovelace', '8'],
-      ['S1', 'Ada Lovelace', '9'],
+      ['S1', 'Ada Lovelace', '8', ''],
+      ['S1', 'Ada Lovelace', '9', ''],
     ]);
     expect(dup.rows[1].rowProblem).toMatch(/Same student as row/);
 
-    const bad = run([['S1', 'Ada Lovelace', '99']]);
-    expect(bad.rows[0].cells[0].problem).toMatch(/at most/i);
+    const bad = run([['S1', 'Ada Lovelace', '99', '']]);
+    expect(bad.rows[0].cells[0].problem).toMatch(/Quality: at most/i);
     expect(bad.localProblemCount).toBe(1);
-    expect(bad.blankCells).toBe(0);
+    expect(bad.entries).toEqual([]);
   });
 
-  it('counts blank cells and leaves them out of entries', () => {
-    const built = run([['S1', 'Ada Lovelace', '']]);
+  it('imports a quantity-only pair and counts blanks', () => {
+    const built = run([['S1', 'Ada Lovelace', '', '7']]);
+    expect(built.entries).toEqual([
+      {
+        membershipId: 'm-a',
+        parameterId: 'p1',
+        selected: true,
+        qualityValue: null,
+        quantityValue: 7,
+      },
+    ]);
+    // Only the blank quality cell counts as blank; the pair shares one entry.
     expect(built.blankCells).toBe(1);
-    expect(built.entries).toEqual([]);
   });
 });
 
 describe('planImport', () => {
   const built = {
     entries: [
-      { studentId: 'a', parameterId: 'p1', value: 8 },
-      { studentId: 'b', parameterId: 'p1', value: 5 },
-      { studentId: 'c', parameterId: 'p1', value: 7 },
+      { membershipId: 'm-a', parameterId: 'p1', selected: true, qualityValue: 8, quantityValue: null },
+      { membershipId: 'm-b', parameterId: 'p1', selected: true, qualityValue: 5, quantityValue: null },
+      { membershipId: 'm-c', parameterId: 'p1', selected: true, qualityValue: 7, quantityValue: null },
     ],
     localProblemCount: 0,
   };
@@ -133,7 +165,7 @@ describe('planImport', () => {
 
   it('sends new/changed rows, skips unchanged, and needs override for locked', () => {
     const plan = planImport({ built, server, canOverride: true });
-    expect(plan.send.map((e) => e.studentId).sort()).toEqual(['a', 'c']);
+    expect(plan.send.map((e) => e.membershipId).sort()).toEqual(['m-a', 'm-c']);
     expect(plan.unchanged).toBe(1);
     expect(plan.lockedOverride).toBe(1);
     expect(plan.lockedBlocked).toBe(0);
@@ -141,7 +173,7 @@ describe('planImport', () => {
 
   it('blocks locked rows when the user cannot override', () => {
     const plan = planImport({ built, server, canOverride: false });
-    expect(plan.send.map((e) => e.studentId)).toEqual(['a']); // c is locked+blocked
+    expect(plan.send.map((e) => e.membershipId)).toEqual(['m-a']); // c is locked+blocked
     expect(plan.lockedBlocked).toBe(1);
     expect(plan.problemCount).toBe(1);
   });

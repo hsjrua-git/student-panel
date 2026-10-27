@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { Trans, useTranslation } from 'react-i18next';
 import { listStudentEvaluations } from '../api/evaluations.js';
 import { listParameters } from '../api/parameters.js';
 import { getStudent } from '../api/students.js';
+import { listAssignments } from '../api/schedule.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import ByParameterView from '../components/ByParameterView.jsx';
@@ -12,7 +13,7 @@ import ByPeriodView from '../components/ByPeriodView.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import HistoryGrid from '../components/HistoryGrid.jsx';
 import { formatStudentCode } from '../lib/format.js';
-import { usePeriods } from '../lib/usePeriods.js';
+import { DIMENSIONS } from '../lib/resultsView.js';
 import { visibleParameters } from '../lib/prefs.js';
 import { usePreferences } from '../preferences/PreferencesContext.jsx';
 import ExportButton from '../components/ExportButton.jsx';
@@ -20,7 +21,6 @@ import ExportLink from '../components/ExportLink.jsx';
 import StudentFieldsSection from '../components/StudentFieldsSection.jsx';
 import StudentGroupsSection from '../components/StudentGroupsSection.jsx';
 import StudentIdentitySection from '../components/StudentIdentitySection.jsx';
-import StudentEvaluateSection from '../components/StudentEvaluateSection.jsx';
 import StudentBalanceSection from '../components/StudentBalanceSection.jsx';
 import { historyCsvRows } from '../lib/exports.js';
 
@@ -38,6 +38,7 @@ function StudentDetailPage() {
   const { can } = useAuth();
   const { preferences } = usePreferences();
   const [tab, setTab] = useState(preferences.studentDefaultTab);
+  const [dimension, setDimension] = useState('quality');
 
   // The score history (all three tabs, plus the CSV export) is evaluations
   // labelled by parameters, so it needs BOTH scores.view and parameters.view.
@@ -64,7 +65,18 @@ function StudentDetailPage() {
     queryFn: listParameters,
     enabled: canViewParameters,
   });
-  const periodsQuery = usePeriods();
+  const assignmentsQuery = useQuery({
+    queryKey: ['assignments'],
+    queryFn: listAssignments,
+    enabled: canViewHistory,
+  });
+  const assignmentsById = useMemo(
+    () =>
+      new Map(
+        (assignmentsQuery.data ?? []).map((assignment) => [assignment.id, assignment])
+      ),
+    [assignmentsQuery.data]
+  );
 
   const backLink = (
     <p>
@@ -89,9 +101,10 @@ function StudentDetailPage() {
   // missing permission stays `pending` forever (its fetch never starts), so
   // including it here would wedge the page on "Loading..." — instead its
   // dependent section is simply hidden below.
-  const queries = [studentQuery, periodsQuery];
+  const queries = [studentQuery];
   if (canViewScores) queries.push(evaluationsQuery);
   if (canViewParameters) queries.push(parametersQuery);
+  if (canViewHistory) queries.push(assignmentsQuery);
   const failed = queries.find((query) => query.isError);
   if (failed) {
     return (
@@ -118,48 +131,32 @@ function StudentDetailPage() {
   }
 
   const student = studentQuery.data;
-  const periods = periodsQuery.data;
   const evaluations = evaluationsQuery.data;
   const parameters = parametersQuery.data;
 
   let content = null;
   if (canViewHistory) {
-    if (!periods.anchorDate) {
-      content = (
-        <p>
-          <Trans
-            t={t}
-            i18nKey="detail.setPeriodStart"
-            components={{ link: <Link to="/settings" /> }}
-          />
-        </p>
-      );
-    } else if (periods.current === null) {
-      content = <p>{t('shared.period1NotStarted')}</p>;
+    const shown = visibleParameters(parameters, preferences.hiddenParameterIds);
+    const viewProps = {
+      evaluations,
+      parameters: shown,
+      dimension,
+    };
+    if (evaluations.length === 0) {
+      content = <p>{t('detail.noCellsYet')}</p>;
     } else if (tab === 'period') {
       content = (
-        <ByPeriodView
-          evaluations={evaluations}
-          periods={periods}
-          parameters={parameters}
-        />
+        <ByPeriodView {...viewProps} assignmentsById={assignmentsById} />
       );
     } else if (tab === 'parameter') {
-      content = (
-        <ByParameterView
-          evaluations={evaluations}
-          periods={periods}
-          parameters={parameters}
-        />
-      );
+      content = <ByParameterView {...viewProps} />;
     } else {
-      const shown = visibleParameters(parameters, preferences.hiddenParameterIds);
       content = (
         <>
           <HistoryGrid
             evaluations={evaluations}
-            periods={periods.periods}
             parameters={shown}
+            assignmentsById={assignmentsById}
             initialShowAll={preferences.studentShowAllPeriods}
           />
           {shown.length < parameters.length && (
@@ -192,12 +189,12 @@ function StudentDetailPage() {
               <ExportButton
                 label={t('detail.exportHistory')}
                 filename={`history-${student.studentCode}.csv`}
-                disabled={!periods.anchorDate || periods.current === null}
+                disabled={!evaluations || evaluations.length === 0}
                 buildRows={() =>
                   historyCsvRows({
                     evaluations,
-                    periods: periods.periods,
                     parameters,
+                    assignmentsById,
                   })
                 }
               />
@@ -212,12 +209,33 @@ function StudentDetailPage() {
       <StudentIdentitySection student={student} />
       <StudentFieldsSection student={student} />
       <StudentGroupsSection student={student} />
-      <StudentEvaluateSection student={student} />
       {can('cafe.balance') && <StudentBalanceSection student={student} />}
 
       {canViewHistory && (
         <section className="section-card">
-          <h2>{t('detail.history')}</h2>
+          <div className="page-head">
+            <h2>{t('detail.history')}</h2>
+            <div className="page-head-actions">
+              <div
+                className="segmented"
+                role="group"
+                aria-label={t('detail.dimensionLabel')}
+              >
+                {DIMENSIONS.map((value) => (
+                  <label key={value}>
+                    <input
+                      type="radio"
+                      name="history-dimension"
+                      value={value}
+                      checked={dimension === value}
+                      onChange={() => setDimension(value)}
+                    />
+                    {t(`detail.${value}`)}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="tabs" role="tablist" aria-label={t('detail.historyViews')}>
             {TABS.map((item) => (
               <button

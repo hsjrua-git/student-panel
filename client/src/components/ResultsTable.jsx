@@ -5,7 +5,7 @@ import {
   formatParameterHint,
   formatStudentCode,
 } from '../lib/format.js';
-import { changeOf } from '../lib/resultsView.js';
+import { changeOf, valueOf } from '../lib/resultsView.js';
 
 function SortHeader({ label, sortKey, sort, onSort, className }) {
   const active = sort.key === sortKey;
@@ -24,6 +24,9 @@ function SortHeader({ label, sortKey, sort, onSort, className }) {
   );
 }
 
+// The assignment-period grid: one row per target (the whole-group row first),
+// one column per chosen parameter showing the viewed dimension's value plus
+// the change vs the previous period.
 function ResultsTable({
   rows,
   columns,
@@ -31,10 +34,11 @@ function ResultsTable({
   sort,
   onSort,
   showChange,
-  periodNumber,
+  dimension,
+  hasPrevious,
 }) {
   const { t } = useTranslation(['reports', 'common']);
-  const withChange = showChange && periodNumber > 1;
+  const withChange = showChange && hasPrevious;
 
   return (
     <div className="table-wrap">
@@ -66,7 +70,6 @@ function ResultsTable({
                     <span className="hint">
                       {' '}
                       {formatParameterHint(parameter)}
-                      {parameter.inUse ? '' : t('resultsTable.notInUse')}
                     </span>
                   </>
                 }
@@ -75,36 +78,54 @@ function ResultsTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <Link to={`/students/${row.id}`}>{row.fullName}</Link>
-              </td>
-              <td className="code">{formatStudentCode(row.studentCode)}</td>
-              {columns.map((parameter) => {
-                const value = row.values[parameter.id];
-                const change = withChange ? changeOf(row, parameter.id) : null;
-                return (
-                  <td key={parameter.id} className="num">
-                    {value === undefined ? (
-                      <span className="muted">—</span>
-                    ) : (
-                      value
-                    )}
-                    {change !== null && (
-                      <span
-                        className={`chg${
-                          change > 0 ? ' up' : change < 0 ? ' down' : ''
-                        }`}
-                      >
-                        {formatChange(change)}
-                      </span>
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const name = row.isGroup ? (
+              row.fullName
+            ) : (
+              <Link to={`/students/${row.studentId}`}>{row.fullName}</Link>
+            );
+            return (
+              <tr key={row.membershipId ?? 'group'} className={row.isGroup ? 'group-row' : undefined}>
+                <td>
+                  {name}
+                  {row.isGroup && (
+                    <div className="hint">{t('resultsTable.groupRow')}</div>
+                  )}
+                </td>
+                <td className="code">
+                  {row.studentCode === null
+                    ? '—'
+                    : formatStudentCode(row.studentCode)}
+                </td>
+                {columns.map((parameter) => {
+                  const value = valueOf(row, parameter.id, dimension);
+                  const change = withChange
+                    ? changeOf(row, parameter.id, dimension)
+                    : null;
+                  return (
+                    <td key={parameter.id} className="num">
+                      {value === undefined ? (
+                        <span className="muted">—</span>
+                      ) : value === null ? (
+                        <span className="muted">·</span>
+                      ) : (
+                        value
+                      )}
+                      {change !== null && (
+                        <span
+                          className={`chg${
+                            change > 0 ? ' up' : change < 0 ? ' down' : ''
+                          }`}
+                        >
+                          {formatChange(change)}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
         <tfoot>
           <tr>

@@ -26,6 +26,27 @@ function ActionText({ entry }) {
   ));
 }
 
+// One cell snapshot for the changes table: null = the row did not exist;
+// selected with no values = the unanswered expectation; otherwise the
+// quality/quantity pair (comments shown as the tooltip).
+function cellText(cell) {
+  if (cell === null || cell === undefined) return null;
+  if (!cell.selected) return null;
+  const hasValue = cell.qualityValue !== null || cell.quantityValue !== null;
+  if (!hasValue) return '·';
+  return [cell.qualityValue, cell.quantityValue]
+    .map((value) => (value === null ? '·' : value))
+    .join(' / ');
+}
+
+function cellTitle(cell) {
+  if (cell === null || cell === undefined || !cell.selected) return '';
+  const comments = [cell.qualityComment, cell.quantityComment]
+    .filter(Boolean)
+    .join(' — ');
+  return comments;
+}
+
 function Details({ entry }) {
   const { t } = useTranslation(['admin', 'common']);
   const details = entry.details ?? {};
@@ -40,19 +61,26 @@ function Details({ entry }) {
               <th>{t('audit.changes.parameter')}</th>
               <th className="num">{t('audit.changes.from')}</th>
               <th className="num">{t('audit.changes.to')}</th>
-              <th>{t('audit.changes.note')}</th>
+              <th>{t('audit.changes.override')}</th>
             </tr>
           </thead>
           <tbody>
-            {details.changes.map((change) => (
-              <tr key={`${change.studentId}:${change.parameterId}`}>
+            {details.changes.map((change, index) => (
+              <tr key={`${change.membershipId ?? 'group'}:${change.parameterId}:${index}`}>
                 <td>
-                  {change.student} ({formatStudentCode(change.studentCode)})
+                  {change.student
+                    ? `${change.student} (${formatStudentCode(change.studentCode)})`
+                    : t('audit.changes.wholeGroup')}
                 </td>
                 <td>{change.parameter}</td>
-                <td className="num">{change.from ?? '—'}</td>
-                <td className="num">
-                  {change.to ?? t('audit.changes.cleared')}
+                <td className="num" title={cellTitle(change.from)}>
+                  {cellText(change.from) ?? '—'}
+                </td>
+                <td className="num" title={cellTitle(change.to)}>
+                  {cellText(change.to) ??
+                    (change.to && !change.to.selected
+                      ? t('audit.changes.removed')
+                      : '—')}
                 </td>
                 <td>
                   {change.override ? t('audit.changes.overridden') : ''}

@@ -16,11 +16,11 @@ function truncate(text, max = 20) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-function HeatmapMatrix({ cube, axis = 'period', parameterId = null, periodNumber = null }) {
+function HeatmapMatrix({ cube, axis = 'period', parameterId = null, periodKey = null }) {
   const { t } = useTranslation(['reports', 'common']);
   const model = useMemo(
-    () => buildHeatmap(cube, { axis, parameterId, periodNumber }),
-    [cube, axis, parameterId, periodNumber]
+    () => buildHeatmap(cube, { axis, parameterId, periodKey }),
+    [cube, axis, parameterId, periodKey]
   );
 
   const { rows, columns, cells } = model;
@@ -32,7 +32,7 @@ function HeatmapMatrix({ cube, axis = 'period', parameterId = null, periodNumber
   const height = TOP + rows.length * CELL_H;
   const caption =
     axis === 'parameter'
-      ? t('heatmap.captionParameter', { number: model.periodNumber ?? '—' })
+      ? t('heatmap.captionParameter', { number: model.periodKey ?? '—' })
       : t('heatmap.captionPeriod', { name: model.parameterName ?? '—' });
 
   return (

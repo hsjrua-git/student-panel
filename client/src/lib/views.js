@@ -1,3 +1,13 @@
+// Per-view data shaping for the student's history (schema-4 model).
+//
+// periodView answers "what does this student carry in ONE assignment period"
+// — per parameter: the viewed dimension's value (their own member cell, or
+// the whole-group cell when they have none), its position within the
+// parameter's range, and the change vs the assignment's previous period.
+//
+// parameterView answers "how did ONE parameter evolve" — the student's cells
+// over session dates (member shadowing group), in the viewed dimension.
+
 function round(number) {
   return Math.round(number * 100) / 100;
 }
@@ -9,30 +19,55 @@ export function percentOfRange(value, minValue, maxValue) {
   return Math.min(100, Math.max(0, percent));
 }
 
-export function periodView({ periodNumber, evaluations, periods, parameters }) {
-  const period = periods.find((item) => item.number === periodNumber);
-  const inUse = new Set(period?.parameterIds ?? []);
-  const valueOf = new Map(
-    evaluations.map((item) => [
-      `${item.periodNumber}:${item.parameterId}`,
-      item.value,
-    ])
+// `evaluations` = the student's rows (member + whole-group); `periods` = the
+// assignment's materialized periods [{ seq, startDate, endDate }]; rows are
+// bucketed by their session date falling inside a period's range.
+export function periodView({
+  evaluations,
+  assignmentId,
+  periods,
+  seq,
+  parameters,
+  dimension = 'quality',
+}) {
+  const own = evaluations.filter((item) => item.assignmentId === assignmentId);
+  const bucketOf = (sessionDate) =>
+    periods.find(
+      (period) =>
+        period.startDate <= sessionDate && sessionDate <= period.endDate
+    )?.seq ?? null;
+
+  // member cell shadows group cell per (session, parameter)
+  const cellValue = new Map(); // `${seq}:${parameterId}` → {value, viaGroup}
+  const memberKeys = new Set(
+    own.filter((item) => item.membershipId !== null).map((item) => `${item.sessionId}:${item.parameterId}`)
   );
+  for (const item of own) {
+    const seq = bucketOf(item.sessionDate);
+    if (seq === null) continue;
+    const key = `${seq}:${item.parameterId}`;
+    const viaGroup = item.membershipId === null;
+    if (viaGroup && memberKeys.has(`${item.sessionId}:${item.parameterId}`)) continue;
+    const value =
+      dimension === 'quantity' ? item.quantityValue : item.qualityValue;
+    const existing = cellValue.get(key);
+    if (!existing || existing.viaGroup) {
+      cellValue.set(key, { value, viaGroup });
+    }
+  }
 
   return parameters
-    .filter(
-      (parameter) =>
-        inUse.has(parameter.id) || valueOf.has(`${periodNumber}:${parameter.id}`)
+    .filter((parameter) =>
+      [...cellValue.keys()].some((key) => key.endsWith(`:${parameter.id}`))
     )
     .map((parameter) => {
-      const value = valueOf.get(`${periodNumber}:${parameter.id}`) ?? null;
+      const value = cellValue.get(`${seq}:${parameter.id}`)?.value ?? null;
       const previous =
-        valueOf.get(`${periodNumber - 1}:${parameter.id}`) ?? null;
+        cellValue.get(`${seq - 1}:${parameter.id}`)?.value ?? null;
       return {
         parameter,
-        inUse: inUse.has(parameter.id),
         value,
-        previous,
+        viaGroup: cellValue.get(`${seq}:${parameter.id}`)?.viaGroup ?? false,
         change:
           value !== null && previous !== null ? round(value - previous) : null,
         percent: percentOfRange(value, parameter.minValue, parameter.maxValue),
@@ -40,31 +75,34 @@ export function periodView({ periodNumber, evaluations, periods, parameters }) {
     });
 }
 
-export function parameterView({ parameterId, evaluations, periods }) {
-  const valueOf = new Map(
+export function parameterView({ evaluations, parameterId, dimension = 'quality' }) {
+  const memberKeys = new Set(
     evaluations
-      .filter((item) => item.parameterId === parameterId)
-      .map((item) => [item.periodNumber, item.value])
+      .filter((item) => item.membershipId !== null && item.parameterId === parameterId)
+      .map((item) => item.sessionId)
   );
-  if (valueOf.size === 0) return { points: [], stats: null };
-
-  const firstScored = Math.min(...valueOf.keys());
-  const points = periods
-    .filter(
-      (period) =>
-        period.number >= firstScored &&
-        (period.parameterIds.includes(parameterId) || valueOf.has(period.number))
-    )
-    .map((period) => ({
-      periodNumber: period.number,
-      startDate: period.startDate,
-      endDate: period.endDate,
-      value: valueOf.get(period.number) ?? null,
-    }));
+  const seen = new Set();
+  const points = [];
+  for (const item of evaluations.filter(
+    (row) => row.parameterId === parameterId
+  )) {
+    if (item.membershipId === null && memberKeys.has(item.sessionId)) continue;
+    if (seen.has(item.sessionId)) continue;
+    seen.add(item.sessionId);
+    points.push({
+      sessionId: item.sessionId,
+      sessionDate: item.sessionDate,
+      assignmentId: item.assignmentId,
+      value: dimension === 'quantity' ? item.quantityValue : item.qualityValue,
+      viaGroup: item.membershipId === null,
+    });
+  }
+  points.sort((a, b) => String(a.sessionDate).localeCompare(String(b.sessionDate)));
 
   const scored = points.filter((point) => point.value !== null);
-  if (scored.length === 0) return { points, stats: null };
-
+  if (scored.length === 0) {
+    return { points, stats: null };
+  }
   const first = scored[0];
   const latest = scored[scored.length - 1];
   const sum = scored.reduce((total, point) => total + point.value, 0);
@@ -73,10 +111,11 @@ export function parameterView({ parameterId, evaluations, periods }) {
     points,
     stats: {
       count: scored.length,
-      first: { periodNumber: first.periodNumber, value: first.value },
-      latest: { periodNumber: latest.periodNumber, value: latest.value },
+      first: { sessionDate: first.sessionDate, value: first.value },
+      latest: { sessionDate: latest.sessionDate, value: latest.value },
       average: round(sum / scored.length),
-      change: scored.length > 1 ? round(latest.value - first.value) : null,
+      change:
+        scored.length > 1 ? round(latest.value - first.value) : null,
     },
   };
 }

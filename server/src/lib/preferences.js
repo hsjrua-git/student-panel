@@ -30,6 +30,12 @@ export const DEFAULT_PREFERENCES = {
   studentShowAllPeriods: false,
   hiddenParameterIds: [],
   csvDelimiter: ',',
+  dashboardConstellation: {
+    dimension: 'quality',
+    basis: 'value',
+    assignmentId: null,
+    seq: null,
+  },
 };
 
 const CHECKS = {
@@ -48,6 +54,30 @@ const CHECKS = {
     value.length <= MAX_HIDDEN &&
     value.every(isUuid) &&
     new Set(value).size === value.length,
+  // The dashboard hero/constellation customization: which assignment period
+  // the class field shows, which dimension feeds it, and what counts as
+  // answered. Kept as one object so the panel writes it in a single update.
+  dashboardConstellation: (value) => {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return false;
+    }
+    const dimension = value.dimension === undefined ? 'quality' : value.dimension;
+    const basis = value.basis === undefined ? 'value' : value.basis;
+    const assignmentOk =
+      value.assignmentId === undefined ||
+      value.assignmentId === null ||
+      isUuid(value.assignmentId);
+    const seqOk =
+      value.seq === undefined ||
+      value.seq === null ||
+      (Number.isInteger(value.seq) && value.seq >= 1);
+    return (
+      assignmentOk &&
+      seqOk &&
+      (dimension === 'quality' || dimension === 'quantity') &&
+      (basis === 'value' || basis === 'valueOrComment')
+    );
+  },
 };
 
 export function parsePreferencesUpdate(body) {

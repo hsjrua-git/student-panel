@@ -453,6 +453,9 @@ app.use('/api', (req, res) => {
 if (serveClient) {
   app.use((req, res, next) => {
     if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
+    // index.html points at the hashed assets — it must always revalidate, or
+    // a redeploy serves stale shells for as long as the cache lives.
+    res.set('Cache-Control', 'no-cache');
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }

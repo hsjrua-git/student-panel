@@ -38,7 +38,7 @@ function ComparisonChart({ cube, parameterIds, shape = 'bar' }) {
       points: cohortAverages(cube, parameter.id),
     }));
     return cube.periods.map((period, index) => {
-      const row = { label: t('shared.periodNumber', { number: period.number }) };
+      const row = { label: t('shared.periodKey', { label: period.label }) };
       for (const item of series) row[item.parameter.id] = item.points[index].average;
       return row;
     });

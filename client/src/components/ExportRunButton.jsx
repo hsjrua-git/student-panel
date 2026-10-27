@@ -13,7 +13,6 @@ import {
   cubeLongRows,
   cubeWideRows,
   deltaRows,
-  trackingLogRows,
 } from '../lib/exports.js';
 
 // Each selected content type is one artifact; charts add one image each. One
@@ -23,7 +22,6 @@ import {
 const TABULAR = [
   { key: 'data', name: 'scores', sheet: 'Scores' },
   { key: 'delta', name: 'changes-vs-previous', sheet: 'Changes' },
-  { key: 'trackingLog', name: 'tracking-log', sheet: 'Tracking log' },
   { key: 'auditTrail', name: 'audit-trail', sheet: 'Audit trail' },
 ];
 
@@ -43,7 +41,7 @@ function rowsToObjects(rows) {
 
 // The 2-D rows for each selected tabular content type, in a fixed order. Data
 // is raw scores (delta is its own artifact, so the data file never doubles it).
-function tabularRows(config, cube, changes, auditEntries) {
+function tabularRows(config, cube, auditEntries) {
   const out = [];
   for (const item of TABULAR) {
     if (!config.include[item.key]) continue;
@@ -52,8 +50,6 @@ function tabularRows(config, cube, changes, auditEntries) {
       rows = config.layout === 'long' ? cubeLongRows(cube) : cubeWideRows(cube);
     } else if (item.key === 'delta') {
       rows = deltaRows(cube);
-    } else if (item.key === 'trackingLog') {
-      rows = trackingLogRows(changes);
     } else {
       rows = auditTrailRows(auditEntries);
     }
@@ -66,7 +62,6 @@ function ExportRunButton({
   config,
   cube,
   scope = null,
-  changes = [],
   auditEntries = [],
   chartNodes,
   disabled = false,
@@ -80,7 +75,7 @@ function ExportRunButton({
   // One file per selected tabular content type — except XLSX, which folds them
   // all into a single multi-sheet workbook.
   async function tabularFiles() {
-    const selected = tabularRows(config, cube, changes, auditEntries);
+    const selected = tabularRows(config, cube, auditEntries);
     if (selected.length === 0) return [];
 
     if (config.tabularFormat === 'xlsx') {

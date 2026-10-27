@@ -177,11 +177,12 @@
       "parameter": "شاخص",
       "from": "از",
       "to": "به",
-      "note": "یادداشت",
-      "cleared": "پاک شد",
       "overridden": "قفل بود؛ نادیده گرفته شد",
       "moreChanges_one": "…و {{count}} تغییر دیگر.",
-      "moreChanges_other": "…و {{count}} تغییر دیگر."
+      "moreChanges_other": "…و {{count}} تغییر دیگر.",
+      "wholeGroup": "کل گروه",
+      "removed": "خانه حذف شد",
+      "override": "عبور از قفل"
     },
     "joiner": "، ",
     "actions": {
@@ -252,10 +253,10 @@
       },
       "scores": {
         "save": {
-          "saved_one": "{{count}} نمره در دوره {{periodNumber}} ذخیره شد",
-          "saved_other": "{{count}} نمره در دوره {{periodNumber}} ذخیره شد",
-          "imported_one": "{{count}} نمره از یک فایل وارد دوره {{periodNumber}} شد",
-          "imported_other": "{{count}} نمره از یک فایل وارد دوره {{periodNumber}} شد",
+          "saved_one": "{{count}} خانه در جلسهٔ {{sessionCode}} ذخیره شد",
+          "saved_other": "{{count}} خانه در جلسهٔ {{sessionCode}} ذخیره شد",
+          "imported_one": "{{count}} خانه از یک فایل به جلسهٔ {{sessionCode}} وارد شد",
+          "imported_other": "{{count}} خانه از یک فایل به جلسهٔ {{sessionCode}} وارد شد",
           "overrideSuffix": "شامل نمره‌های قفل‌شده‌ای که با نادیده‌گرفتن قفل تغییر کرده‌اند: «{{reason}}»"
         }
       },
@@ -306,15 +307,7 @@
     "title": "تنظیمات",
     "periodsTitle": "دوره‌ها",
     "periodsIntro": "ارزیابی‌ها بر پایهٔ دوره گروه‌بندی می‌شوند. هر دوره یک هفته است، از شنبه تا جمعه، و شماره‌گذاری از دورهٔ 1 آغاز می‌شود. دورهٔ 1 از تاریخ زیر شروع می‌شود.",
-    "noAnchor": "هنوز تاریخ آغاز تعیین نشده است. برای شروع، یکی را در پایین انتخاب کنید.",
-    "period1Starts": "دورهٔ 1 از {{date}} آغاز می‌شود.",
-    "currentPeriod": "دورهٔ جاری",
-    "periodValue": "دورهٔ {{number}}",
-    "today": "امروز {{date}} است.",
-    "anchorLabel": "نخستین روز دورهٔ 1 (یک شنبه)",
-    "notSaturday": "لطفاً یک شنبه انتخاب کنید.",
-    "saved": "ذخیره شد.",
-    "anchorHint": "تاریخ آغاز فقط تا پیش از ذخیرهٔ نخستین نمره قابل تغییر است، چون تغییر آن همهٔ نمره‌های ذخیره‌شده را به هفتهٔ دیگری منتقل می‌کند."
+    "saved": "ذخیره شد."
   },
   "fields": {
     "readOnlyTitle": "دسترسی فقط‌خواندنی",

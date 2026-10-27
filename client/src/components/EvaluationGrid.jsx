@@ -1,154 +1,232 @@
-import { memo, useEffect, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { listStudents } from '../api/students.js';
-import { errorMessage } from '../i18n/errors.js';
 import { cellAccess, cellKey, savedText } from '../lib/cells.js';
-import {
-  formatDateTime,
-  formatRange,
-  formatStudentCode,
-} from '../lib/format.js';
+import { formatDateTime, formatStudentCode } from '../lib/format.js';
 import { LockIcon, NoteFilledIcon, NoteIcon } from './icons.jsx';
-import { usePreferences } from '../preferences/PreferencesContext.jsx';
-
-const GRID_PAGE_SIZE = 50;
 
 function rangeHint(parameter) {
-  const range = formatRange(parameter);
-  return [range === '—' ? null : range, parameter.unit]
-    .filter(Boolean)
-    .join(' · ');
+  return `${savedText(parameter.minValue) || '…'} – ${
+    savedText(parameter.maxValue) || '…'
+  }`;
 }
 
-function lockTitle(t, lock, access) {
-  if (!lock) return undefined;
-  if (lock.isLocked) {
+function lockTitle(t, saved, access) {
+  if (!saved) return undefined;
+  if (saved.isLocked) {
     return access === 'override'
-      ? t('evaluate.lockedSinceOverride', { date: formatDateTime(lock.lockedAt) })
-      : t('evaluate.lockedSinceAdmin', { date: formatDateTime(lock.lockedAt) });
+      ? t('evaluate.lockedSinceOverride', { date: formatDateTime(saved.locksAt) })
+      : t('evaluate.lockedSinceAdmin', { date: formatDateTime(saved.locksAt) });
   }
-  return t('evaluate.changeableUntil', { date: formatDateTime(lock.lockedAt) });
+  return t('evaluate.changeableUntil', { date: formatDateTime(saved.locksAt) });
 }
 
-// One student's row. It is wrapped in React.memo (see rowsEqual) so that typing
-// in a cell only re-renders the row that changed, not the whole 50×N grid — the
-// difference between one input updating and hundreds re-rendering per keystroke.
-// It pulls its own `t` from useTranslation (rather than a prop, which rowsEqual
+// One target's row (a member, or the whole group). It is wrapped in
+// React.memo (see rowsEqual) so that typing in a cell only re-renders the row
+// that changed, not the whole targets × parameters grid — the difference
+// between one input updating and hundreds re-rendering per keystroke. It
+// pulls its own `t` from useTranslation (rather than a prop, which rowsEqual
 // would ignore) so a language switch still re-renders every row.
 const EvaluationRow = memo(function EvaluationRow({
-  student,
+  target,
   parameters,
-  saved,
-  savedNotes,
-  locks,
+  savedByCell,
   drafts,
-  noteDrafts,
   cellErrors,
   onCellChange,
-  onNoteChange,
   canOverride,
   openNote,
   onOpenNoteChange,
 }) {
   const { t } = useTranslation(['students', 'common']);
+
   return (
-    <tr>
+    <tr className={target.isGroup ? 'group-row' : undefined}>
       <td>
-        {student.fullName}
+        {target.name}
         <div className="hint code">
-          {formatStudentCode(student.studentCode)}
+          {target.isGroup
+            ? t('evaluate.wholeGroup')
+            : formatStudentCode(target.code)}
         </div>
       </td>
       {parameters.map((parameter) => {
-        const key = cellKey(student.id, parameter.id);
-        const original = savedText(saved[key]);
-        const shown = drafts[key] ?? original;
-        const message = cellErrors[key];
-        const lock = locks[key];
-        const access = cellAccess(lock, canOverride);
-        const classes = [
-          'cell',
-          key in drafts ? 'changed' : '',
-          message ? 'invalid' : '',
-          access !== 'open' ? 'locked' : '',
-        ]
-          .filter(Boolean)
-          .join(' ');
+        const key = cellKey(target.membershipId, parameter.id);
+        const saved = savedByCell.get(key) ?? null;
+        const draft = drafts[key];
+        const access = cellAccess(saved, canOverride);
+        const locked = access === 'locked';
+        const selected = draft?.selected ?? saved !== null;
+        const changed = draft !== undefined && draft.selected !== false;
 
-        const originalNote = savedNotes[key] ?? '';
-        const shownNote = key in noteDrafts ? noteDrafts[key] : originalNote;
-        const hasNote = shownNote.trim() !== '';
-        const noteChanged = key in noteDrafts;
+        const qualityShown = draft?.qualityText ?? savedText(saved?.qualityValue);
+        const quantityShown = draft?.quantityText ?? savedText(saved?.quantityValue);
+        const qualityError = cellErrors[key]?.quality;
+        const quantityError = cellErrors[key]?.quantity;
+        const generalError = cellErrors[key]?.general;
+
+        const originalNote = [
+          savedText(saved?.qualityComment),
+          savedText(saved?.quantityComment),
+        ];
+        const shownNotes = [
+          'qualityComment' in (draft ?? {}) ? draft.qualityComment : originalNote[0],
+          'quantityComment' in (draft ?? {}) ? draft.quantityComment : originalNote[1],
+        ];
+        const hasNote = shownNotes.some((note) => note.trim() !== '');
+        const noteChanged = draft !== undefined &&
+          ('qualityComment' in draft || 'quantityComment' in draft);
         const isNoteOpen = openNote === key;
+
+        const inputClasses = (message) =>
+          [
+            'cell dim',
+            changed ? 'changed' : '',
+            message ? 'invalid' : '',
+            locked ? 'locked' : '',
+            !selected ? 'off' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+
+        const title = lockTitle(t, saved, access);
 
         return (
           <td key={parameter.id}>
-            <div className="cell-wrap">
+            <div className="cell-wrap eval-cell">
               <input
-                className={classes}
-                inputMode="decimal"
-                value={shown}
-                disabled={access === 'locked'}
-                title={lockTitle(t, lock, access)}
+                type="checkbox"
+                className="cell-select"
+                checked={selected}
+                disabled={locked}
+                title={
+                  selected
+                    ? t('evaluate.deselectTitle')
+                    : t('evaluate.selectTitle')
+                }
+                aria-label={t('evaluate.selectAriaLabel', {
+                  parameter: parameter.name,
+                  student: target.name,
+                })}
                 onChange={(event) =>
-                  onCellChange(key, event.target.value, original)
+                  onCellChange(key, { selected: event.target.checked })
                 }
-                aria-label={
-                  t('evaluate.cellAriaLabel', {
-                    parameter: parameter.name,
-                    student: student.fullName,
-                  }) + (lock?.isLocked ? t('evaluate.lockedTag') : '')
-                }
-                autoComplete="off"
               />
-              {access !== 'open' && (
+              <input
+                className={inputClasses(qualityError)}
+                inputMode="numeric"
+                value={qualityShown}
+                disabled={!selected || locked}
+                title={title}
+                placeholder={t('evaluate.qualityShort')}
+                aria-label={t('evaluate.dimensionAriaLabel', {
+                  dimension: t('evaluate.quality'),
+                  parameter: parameter.name,
+                  student: target.name,
+                })}
+                autoComplete="off"
+                onChange={(event) =>
+                  onCellChange(key, {
+                    qualityText: event.target.value,
+                    selected: true,
+                  })
+                }
+              />
+              <input
+                className={inputClasses(quantityError)}
+                inputMode="numeric"
+                value={quantityShown}
+                disabled={!selected || locked}
+                title={title}
+                placeholder={t('evaluate.quantityShort')}
+                aria-label={t('evaluate.dimensionAriaLabel', {
+                  dimension: t('evaluate.quantity'),
+                  parameter: parameter.name,
+                  student: target.name,
+                })}
+                autoComplete="off"
+                onChange={(event) =>
+                  onCellChange(key, {
+                    quantityText: event.target.value,
+                    selected: true,
+                  })
+                }
+              />
+              {locked && (
                 <span className="lock" aria-hidden="true">
                   <LockIcon />
                 </span>
               )}
-              {onNoteChange && (
+              {onCellChange && (
                 <button
                   type="button"
                   className={`note-toggle${hasNote ? ' has-note' : ''}${
                     noteChanged ? ' changed' : ''
                   }`}
                   aria-label={
-                    (hasNote
-                      ? t('common:actions.edit')
-                      : t('common:actions.add')) +
+                    (hasNote ? t('common:actions.edit') : t('common:actions.add')) +
                     ' ' +
                     t('evaluate.noteFor', {
                       parameter: parameter.name,
-                      student: student.fullName,
+                      student: target.name,
                     })
                   }
                   aria-expanded={isNoteOpen}
-                  title={hasNote ? shownNote : t('evaluate.addNoteTitle')}
+                  title={hasNote ? t('evaluate.editNoteTitle') : t('evaluate.addNoteTitle')}
                   onClick={() => onOpenNoteChange(isNoteOpen ? null : key)}
                 >
                   {hasNote ? <NoteFilledIcon /> : <NoteIcon />}
                 </button>
               )}
             </div>
-            {onNoteChange && isNoteOpen && (
-              <textarea
-                className="cell-note"
-                rows={2}
-                maxLength={500}
-                value={shownNote}
-                disabled={access === 'locked'}
-                placeholder={t('evaluate.notePlaceholder')}
-                aria-label={t('evaluate.noteAriaLabel', {
-                  parameter: parameter.name,
-                  student: student.fullName,
-                })}
-                onChange={(event) =>
-                  onNoteChange(key, event.target.value, originalNote)
-                }
-              />
+            {onCellChange && isNoteOpen && (
+              <div className="cell-note-pair">
+                <textarea
+                  className="cell-note"
+                  rows={2}
+                  maxLength={500}
+                  value={shownNotes[0]}
+                  disabled={locked}
+                  placeholder={t('evaluate.qualityNotePlaceholder')}
+                  aria-label={t('evaluate.noteAriaLabel', {
+                    dimension: t('evaluate.quality'),
+                    parameter: parameter.name,
+                    student: target.name,
+                  })}
+                  onChange={(event) =>
+                    onCellChange(key, {
+                      qualityComment: event.target.value,
+                      selected: true,
+                    })
+                  }
+                />
+                <textarea
+                  className="cell-note"
+                  rows={2}
+                  maxLength={500}
+                  value={shownNotes[1]}
+                  disabled={locked}
+                  placeholder={t('evaluate.quantityNotePlaceholder')}
+                  aria-label={t('evaluate.noteAriaLabel', {
+                    dimension: t('evaluate.quantity'),
+                    parameter: parameter.name,
+                    student: target.name,
+                  })}
+                  onChange={(event) =>
+                    onCellChange(key, {
+                      quantityComment: event.target.value,
+                      selected: true,
+                    })
+                  }
+                />
+              </div>
             )}
-            {message && <div className="error small">{message}</div>}
+            {(qualityError || quantityError || generalError) && (
+              <div className="error small">
+                {[generalError, qualityError, quantityError]
+                  .filter(Boolean)
+                  .join(' ')}
+              </div>
+            )}
           </td>
         );
       })}
@@ -156,34 +234,35 @@ const EvaluationRow = memo(function EvaluationRow({
   );
 }, rowsEqual);
 
-// Custom equality for a row. The shared objects (saved/savedNotes/locks) are
-// rebuilt together only when the server data refetches, so their reference is a
-// reliable signal. The draft maps and the open-note key change on every
-// keystroke, so for those we compare just this row's own cells and skip the
-// re-render when none of them moved.
+// Custom equality for a row. The shared objects (savedByCell) are rebuilt
+// only when the server data refetches, so their reference is a reliable
+// signal. The draft map and the open-note key change on every keystroke, so
+// for those we compare just this row's own cells (draft cell objects are
+// replaced immutably on each edit) and skip the re-render when none of them
+// moved.
 function rowsEqual(prev, next) {
   if (
-    prev.student !== next.student ||
+    prev.target !== next.target ||
     prev.parameters !== next.parameters ||
     prev.canOverride !== next.canOverride ||
     prev.onCellChange !== next.onCellChange ||
-    prev.onNoteChange !== next.onNoteChange ||
     prev.onOpenNoteChange !== next.onOpenNoteChange ||
-    prev.saved !== next.saved ||
-    prev.savedNotes !== next.savedNotes ||
-    prev.locks !== next.locks
+    prev.savedByCell !== next.savedByCell
   ) {
     return false;
   }
 
   const openChanged = prev.openNote !== next.openNote;
-  const studentId = next.student.id;
   for (const parameter of next.parameters) {
-    const key = cellKey(studentId, parameter.id);
+    const key = cellKey(next.target.membershipId, parameter.id);
+    const prevDraft = prev.drafts[key];
+    const nextDraft = next.drafts[key];
+    if (prevDraft !== nextDraft) return false;
+    const prevError = prev.cellErrors[key];
+    const nextError = next.cellErrors[key];
     if (
-      prev.drafts[key] !== next.drafts[key] ||
-      prev.noteDrafts[key] !== next.noteDrafts[key] ||
-      prev.cellErrors[key] !== next.cellErrors[key]
+      prevError?.quality !== nextError?.quality ||
+      prevError?.quantity !== nextError?.quantity
     ) {
       return false;
     }
@@ -194,115 +273,58 @@ function rowsEqual(prev, next) {
   return true;
 }
 
+// The session's entry grid: rows are the assignment's targets (the whole-group
+// row first, then members), columns are the parameters. A cell is a select
+// toggle plus both dimension inputs — the row itself is the expectation, so
+// selecting a cell creates it (answered or not) and deselecting deletes it.
 function EvaluationGrid({
+  targets,
   parameters,
-  saved,
-  savedNotes = {},
-  locks,
+  savedByCell,
   drafts,
-  noteDrafts = {},
   cellErrors,
   onCellChange,
-  onNoteChange,
   canOverride,
-  search,
-  page,
-  onPageChange,
-  groupId = null,
 }) {
   const { t } = useTranslation(['students', 'common']);
-  const { preferences } = usePreferences();
-  const sort = preferences.studentsSort;
   const [openNote, setOpenNote] = useState(null);
 
-  const { data, isPending, isError, error, isPlaceholderData } = useQuery({
-    queryKey: ['students', { search, page, pageSize: GRID_PAGE_SIZE, sort, groupId }],
-    queryFn: () =>
-      listStudents({ search, page, pageSize: GRID_PAGE_SIZE, sort, groupId }),
-    placeholderData: keepPreviousData,
-  });
-
-  const totalPages = data
-    ? Math.max(1, Math.ceil(data.total / data.pageSize))
-    : 1;
-
-  useEffect(() => {
-    if (data && page > totalPages) onPageChange(totalPages);
-  }, [data, page, totalPages, onPageChange]);
-
-  if (isPending) return <p className="hint">{t('list.loading')}</p>;
-  if (isError) return <p className="error">{errorMessage(error)}</p>;
-  if (data.total === 0) {
-    return (
-      <p>
-        {search
-          ? t('list.noMatch', { search })
-          : t('list.gridEmpty')}
-      </p>
-    );
-  }
   if (parameters.length === 0) {
     return <p>{t('evaluate.gridNoParameters')}</p>;
   }
 
   return (
-    <>
-      <div className="table-wrap">
-        <table className={`grid${isPlaceholderData ? ' stale' : ''}`}>
-          <thead>
-            <tr>
-              <th>{t('evaluate.colStudent')}</th>
-              {parameters.map((parameter) => (
-                <th key={parameter.id}>
-                  {parameter.name}
-                  <div className="hint">{rangeHint(parameter)}</div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.students.map((student) => (
-              <EvaluationRow
-                key={student.id}
-                student={student}
-                parameters={parameters}
-                saved={saved}
-                savedNotes={savedNotes}
-                locks={locks}
-                drafts={drafts}
-                noteDrafts={noteDrafts}
-                cellErrors={cellErrors}
-                onCellChange={onCellChange}
-                onNoteChange={onNoteChange}
-                canOverride={canOverride}
-                openNote={openNote}
-                onOpenNoteChange={setOpenNote}
-              />
+    <div className="table-wrap">
+      <table className="grid">
+        <thead>
+          <tr>
+            <th>{t('evaluate.colStudent')}</th>
+            {parameters.map((parameter) => (
+              <th key={parameter.id}>
+                {parameter.name}
+                <div className="hint">{rangeHint(parameter)}</div>
+              </th>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="pager">
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-        >
-          {t('list.previous')}
-        </button>
-        <span>
-          {t('list.pageStatus', { page, totalPages, total: data.total })}
-        </span>
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-        >
-          {t('list.next')}
-        </button>
-      </div>
-    </>
+          </tr>
+        </thead>
+        <tbody>
+          {targets.map((target) => (
+            <EvaluationRow
+              key={target.membershipId ?? 'group'}
+              target={target}
+              parameters={parameters}
+              savedByCell={savedByCell}
+              drafts={drafts}
+              cellErrors={cellErrors}
+              onCellChange={onCellChange}
+              canOverride={canOverride}
+              openNote={openNote}
+              onOpenNoteChange={setOpenNote}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

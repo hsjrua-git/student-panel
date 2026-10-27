@@ -124,3 +124,108 @@ Client lint + 197/197 tests + build; server 183 pass / 4 skipped
 desktop + mobile drawer: panel list, swap, back, auto-active on deep links,
 both AI pages (live Jalali timestamps, checklist badges), Roles group label.
 Tour artifacts (throwaway user, seeded transcript turns) removed afterwards.
+
+# Schema-4 adoption — evaluations rebuilt (quality/quantity, session-tied)
+
+The richer reference design (the `student_panel` DB revision of schema-4) fully
+replaced the old period model. One big-bang migration (029; data wiped and
+reseeded) plus a full app adaptation across server, client and the test-only
+PGlite mirror.
+
+## The new model
+
+- An evaluation ROW is a selected cell: session × parameter × target (a
+  member, or the whole group via `membership_id NULL` — NULLS NOT DISTINCT).
+  It carries independently-nullable ranged integers **quality** and
+  **quantity** (each with its own ≤500-char comment) and `locks_at`. A stored
+  row IS the expectation; both values NULL = "selected, unanswered". Saving
+  `selected: false` deletes the row.
+- Periods are per ASSIGNMENT: every 4 non-canceled sessions in date order form
+  period 1, 2, 3… (deterministic bucketing in `lib/periods.js`, materialized
+  idempotently). The school-wide anchor and `parameter_changes` are gone.
+- Locking re-anchored to the session date (7d current/future, 1d past);
+  override keeps the written-reason + audit flow.
+- Parameters: unique code replaces unit; integer min/max shared by both
+  dimensions; range-narrowing guard (trigger + friendly pre-check).
+- Audit rows carry `old_data`/`new_data` snapshots; the scores.save entry
+  names the session.
+- Applicability = explicit cell selection; dashboard "expected" = selected
+  cells (whole-group rows expand per member; a member's own row shadows).
+
+## Bugs the port caught (fixed)
+
+- `loadTargets` read `assignment.membershipId` off a row aliased
+  `assignmentMembershipId` — saving evaluations for INDIVIDUAL assignments
+  always failed "target is not part of the assignment" (route + mirror).
+- Export cube: CTE columns referenced under the wrong quoted aliases, and the
+  scope filters ran in the outer WHERE over `expanded` (missing FROM-clause
+  entry). Every /api/export/cube request 500'd until both were fixed.
+- Seed: roster rows were stored as `{id}` but consumed as `membershipId` —
+  every member cell collapsed onto the whole-group key.
+- `listAssignmentPeriods` leaked raw Date objects where the app contract is
+  `YYYY-MM-DD` strings (now cast ::text).
+
+## Deliberate calls
+
+- The student page's inline evaluation section (period-era entry grid) is
+  REMOVED — all entry is session-first on the Evaluate page; the student page
+  keeps read-only history (timeline by session / by assignment-period / by
+  parameter, dimension-aware).
+- Dashboard hero + 3D constellation render from ONE assignment-period grid
+  (the new model's unit) with a persisted customization: assignment, period,
+  dimension (کیفیت/کمیت) and the "answered" basis (value vs value-or-comment).
+  Cross-assignment shape comes from the trends panel.
+- The export center's tracking-log include is gone with `parameter_changes`;
+  the scope is assignment/date-range/seq based and the whole export reads one
+  dimension.
+- Settings page loses the anchor card (no global calendar anymore).
+- Blind entry (scores.enter without scores.view): the Evaluate grid never
+  fetches saved values for such roles; the server still enforces everything.
+
+## Verified
+
+Server: 192 tests green (188 pass / 4 gated skips) incl. the fully ported
+core/services PGlite mirror; apiSmoke 50/50 on the live seeded server.
+Client: lint clean, 204/204 vitest, production build. Seed lights the
+constellation: 6 parameters, 2 groups/30 students, 4 assignments, 41
+sessions, 12 periods, 336 cells (264 answered).
+
+## Found during the live tour (fixed in place)
+
+8. **EvaluatePage TDZ crash**: `savedQuery` read `effectiveSessionId`
+   before its declaration — instant ErrorBoundary on load. Hoisted the
+   derivation above the query.
+9. **No default assignment**: the page waited on an explicit assignment
+   selection while the select cosmetically showed the first one, so sessions
+   never loaded ("no sessions for this assignment" with 41 seeded). Now the
+   first assignment is derived, like the session default.
+10. **`RangeError: Invalid time value`**: the sessions API returns full
+    timestamps; `formatBothDates` splits date-only strings. Session dates are
+    trimmed to `YYYY-MM-DD` at the call sites (Evaluate + Import).
+11. **Selecting a cell did nothing**: `pruneDraft` treated a fresh
+    selected-unanswered cell as a no-op, but the row IS the expectation —
+    selecting it must create it. Kept as a change (test updated).
+12. **Save sent `sessionId: null`**: `handleSave` used the raw state instead
+    of the derived default. (Found by intercepting the PUT payload.)
+13. **Raw i18n key** `evaluate.noteAriaLabel` rendered as the note editor's
+    label — I had pruned it as dead; restored (it was in the kept-supersets
+    list for a reason).
+14. **Stale shell after redeploys**: the SPA fallback sent `index.html`
+    without cache headers, so Chrome heuristically cached it (~8h of stale
+    bundles). Now `Cache-Control: no-cache`.
+15. **Results/Audit crashed on the group row**: `formatStudentCode(null)` /
+    `change.student` null — the whole-group row carries no student. Guarded,
+    and the audit changes table now renders the new cell snapshots
+    (quality / quantity pairs, "cell removed", whole-group label).
+16. **Dashboard options didn't persist**: the server's preferences
+    whitelist rejected the new `dashboardConstellation` key. Added the
+    validator + default (server suite still 188/0).
+
+Tour-verified in Persian on the live seeded app: login → forced password
+change → evaluate (select cell, quality 88 + quantity 90 + quality note,
+saved, "1 خانه تغییر کرد", lock hints, blind-entry hint logic), results
+(assignment → period 2 with 30 answered, dimension toggle, group row),
+dashboard (field-of-view panel, period switch persisted, CompletionHub hero
+with per-student states + coverage rings; IAB has no WebGL so the 3D path
+took its documented fallback), audit (session-based sentences + expanded
+old/new snapshot table). Tour artifacts (zz-tour user + audit rows) removed.

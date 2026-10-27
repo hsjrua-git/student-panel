@@ -18,7 +18,7 @@ import { useLocale } from '../lib/locale.js';
 // Single-series, so it keeps the base brand bar colour (no series class). Bins
 // come from the shared `distribution` helper the dashboard uses, fed the cube's
 // values so the chart agrees with the exported data.
-function DistributionChart({ cube, parameterId, periodNumber }) {
+function DistributionChart({ cube, parameterId, periodKey }) {
   const { t } = useTranslation(['reports', 'common']);
   const { isRtl } = useLocale();
   const parameter = useMemo(
@@ -28,7 +28,7 @@ function DistributionChart({ cube, parameterId, periodNumber }) {
       null,
     [cube.parameters, parameterId]
   );
-  const period = periodNumber ?? cube.lastPeriod;
+  const period = periodKey ?? cube.lastPeriod;
 
   const bins = useMemo(() => {
     if (!parameter || period === null) return [];

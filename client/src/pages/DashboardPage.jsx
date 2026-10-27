@@ -1,18 +1,19 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { getTrends } from '../api/dashboard.js';
 import { getResults } from '../api/results.js';
+import { getPeriods } from '../api/periods.js';
+import { listAssignments } from '../api/schedule.js';
 import { useAuth } from '../auth/AuthContext.jsx';
+import { usePreferences } from '../preferences/PreferencesContext.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import GroupFilter from '../components/GroupFilter.jsx';
 import CohortHero from '../components/CohortHero.jsx';
 import CohortDrawer from '../components/CohortDrawer.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import ExportLink from '../components/ExportLink.jsx';
 import ParameterDrawer from '../components/ParameterDrawer.jsx';
-import PeriodPicker from '../components/PeriodPicker.jsx';
 import SessionAlertsCard from '../components/SessionAlertsCard.jsx';
 import StudentDrawer from '../components/StudentDrawer.jsx';
 import UnmeasuredList from '../components/UnmeasuredList.jsx';
@@ -25,43 +26,89 @@ import {
   unmeasuredStudents,
 } from '../lib/dashboard.js';
 import { formatIsoDate } from '../lib/format.js';
-import { usePeriods } from '../lib/usePeriods.js';
 
+const DIMENSIONS = ['quality', 'quantity'];
+const BASES = ['value', 'valueOrComment'];
+
+// The dashboard: one assignment period's class field (the grid the hero and
+// the 3D constellation render from), with the customization — which
+// assignment period, which dimension feeds the values, and what counts as
+// "answered" — persisted per user in the dashboardConstellation preference.
 function DashboardPage() {
   const { t } = useTranslation(['reports', 'common']);
   const { can } = useAuth();
-  const periodsQuery = usePeriods();
-  const periods = periodsQuery.data;
-  const [chosen, setChosen] = useState(null);
+  const { preferences, update } = usePreferences();
+  const options = preferences.dashboardConstellation ?? {};
   const [groupId, setGroupId] = useState('');
-  const periodNumber = chosen ?? periods?.current ?? null;
+
+  const assignmentsQuery = useQuery({
+    queryKey: ['assignments'],
+    queryFn: listAssignments,
+  });
+  const assignments = assignmentsQuery.data ?? [];
+  const assignmentId = options.assignmentId ?? assignments[0]?.id ?? null;
+
+  const periodsQuery = useQuery({
+    queryKey: ['periods', assignmentId],
+    queryFn: () => getPeriods(assignmentId),
+    enabled: assignmentId !== null,
+  });
+  const periods = useMemo(
+    () => (periodsQuery.data ?? []).filter((period) => period.sessionCount > 0),
+    [periodsQuery.data]
+  );
+  const seq = periods.some((period) => period.seq === options.seq)
+    ? options.seq
+    : periods[periods.length - 1]?.seq ?? null;
+  const dimension = options.dimension === 'quantity' ? 'quantity' : 'quality';
+  const basis =
+    options.basis === 'valueOrComment' ? 'valueOrComment' : 'value';
 
   const resultsQuery = useQuery({
-    queryKey: ['results', periodNumber, groupId],
-    queryFn: () => getResults(periodNumber, groupId || null),
-    enabled: periodNumber !== null,
+    queryKey: ['results', { assignmentId, seq, dimension }],
+    queryFn: () => getResults({ assignmentId, seq, dimension }),
+    enabled: assignmentId !== null && seq !== null,
   });
   const trendsQuery = useQuery({
-    queryKey: ['trends', groupId],
-    queryFn: () => getTrends(groupId || null),
+    queryKey: ['trends', { groupId, dimension }],
+    queryFn: () => getTrends({ groupId: groupId || null, dimension }),
   });
 
   const results = resultsQuery.data;
-  const summary = useMemo(() => (results ? summarize(results) : null), [results]);
-  const cohort = useMemo(() => (results ? cohortField(results) : []), [results]);
-  const stats = useMemo(() => (results ? parameterStats(results) : []), [results]);
+  const viewOptions = useMemo(
+    () => ({ dimension, basis }),
+    [dimension, basis]
+  );
+  const summary = useMemo(
+    () => (results ? summarize(results, viewOptions) : null),
+    [results, viewOptions]
+  );
+  const cohort = useMemo(
+    () => (results ? cohortField(results, viewOptions) : []),
+    [results, viewOptions]
+  );
+  const stats = useMemo(
+    () => (results ? parameterStats(results, viewOptions) : []),
+    [results, viewOptions]
+  );
   const unmeasured = useMemo(
-    () => (results ? unmeasuredStudents(results) : []),
-    [results]
+    () => (results ? unmeasuredStudents(results, viewOptions) : []),
+    [results, viewOptions]
   );
   // Which detail drawer is open: {type:'parameter'|'student'|'cohort', id?} or
   // null. All three drawers stay mounted so their slide-in/out is pure CSS;
   // closing just clears the target and each panel keeps its last content (its own
   // render-time cache) until it is off-screen.
   const [openTarget, setOpenTarget] = useState(null);
-  const closeDrawer = useCallback(() => setOpenTarget(null), []);
+  function closeDrawer() {
+    setOpenTarget(null);
+  }
 
-  if (periodsQuery.isPending) {
+  function persist(changes) {
+    update({ dashboardConstellation: { ...options, ...changes } });
+  }
+
+  if (assignmentsQuery.isPending) {
     return (
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
@@ -71,78 +118,32 @@ function DashboardPage() {
       </main>
     );
   }
-  if (periodsQuery.isError) {
+  if (assignmentsQuery.isError) {
     return (
       <main>
         <EmptyState
           tone="danger"
           title={t('dashboard.errorTitle')}
-          description={errorMessage(periodsQuery.error)}
+          description={errorMessage(assignmentsQuery.error)}
         />
       </main>
     );
   }
-  if (!periods.anchorDate) {
-    return (
-      <main>
-        <h1>{t('dashboard.title')}</h1>
-        <SessionAlertsCard />
-        {can('settings.manage') ? (
-          <EmptyState
-            title={t('setup.title')}
-            description={t('dashboard.setupHint')}
-          >
-            <p>
-              <Link to="/settings">{t('setup.goToSettings')}</Link>
-            </p>
-          </EmptyState>
-        ) : (
-          <EmptyState
-            title={t('setup.notSetUpTitle')}
-            description={t('setup.adminNeeded')}
-          />
-        )}
-      </main>
-    );
-  }
-  if (periods.current === null) {
-    return (
-      <main>
-        <h1>{t('dashboard.title')}</h1>
-        <SessionAlertsCard />
-        <EmptyState
-          title={t('setup.notStartedTitle')}
-          description={t('dashboard.notStartedHint')}
-        />
-      </main>
-    );
-  }
-
-  const upToSelected = periods.periods.filter(
-    (period) => period.number <= periodNumber
-  );
 
   // The open drawer's data, derived from the unified target. Only one type is
   // ever active at a time; the others resolve to null so their (always-mounted)
-  // drawer renders its cached content while closed. Stats default to [] so the
-  // parameter lookup is safe before results land; the trend is only computed when
-  // a parameter is actually selected.
-  const openParamId =
-    openTarget?.type === 'parameter' ? openTarget.id : null;
+  // drawer renders its cached content while closed.
+  const openParamId = openTarget?.type === 'parameter' ? openTarget.id : null;
   const openStat =
     openParamId !== null
       ? stats.find((stat) => stat.parameter.id === openParamId) ?? null
       : null;
   const openTrend = openStat
-    ? trendSeries({
-        trends: trendsQuery.data ?? [],
-        periods: upToSelected,
-        parameterId: openParamId,
-      })
+    ? trendSeries({ trends: trendsQuery.data ?? [], parameterId: openParamId })
     : [];
   const openStudent =
     openTarget?.type === 'student' && results
-      ? studentBreakdown(results, openTarget.id)
+      ? studentBreakdown(results, openTarget.id, viewOptions)
       : null;
   const openCohort = openTarget?.type === 'cohort' ? summary : null;
 
@@ -150,7 +151,7 @@ function DashboardPage() {
     <main className="wide">
       <div className="page-head">
         <h1>{t('dashboard.title')}</h1>
-        {can('scores.enter') && periodNumber === periods.current && (
+        {can('scores.enter') && (
           <div className="page-head-actions">
             <Link className="btn primary" to="/evaluate">
               {t('dashboard.enterScores')}
@@ -162,19 +163,75 @@ function DashboardPage() {
       <SessionAlertsCard />
 
       <div className="toolbar">
-        <PeriodPicker
-          periods={periods}
-          value={periodNumber}
-          onChange={setChosen}
-        />
         <GroupFilter value={groupId} onChange={setGroupId} />
-        <ExportLink
-          prefill={{
-            periods: { mode: 'selection', numbers: [periodNumber] },
-            students: groupId ? { mode: 'group', groupId } : undefined,
-          }}
-        />
       </div>
+
+      <details className="panel">
+        <summary>{t('dashboard.optionsTitle')}</summary>
+        <p className="hint">{t('dashboard.optionsHint')}</p>
+        <div className="toolbar">
+          <label className="field">
+            <span>{t('dashboard.assignmentLabel')}</span>
+            <select
+              value={assignmentId ?? ''}
+              onChange={(event) =>
+                persist({ assignmentId: event.target.value || null, seq: null })
+              }
+            >
+              {assignments.map((assignment) => (
+                <option key={assignment.id} value={assignment.id}>
+                  {assignment.name ?? assignment.code}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>{t('dashboard.periodLabel')}</span>
+            <select
+              value={seq ?? ''}
+              onChange={(event) => persist({ seq: Number(event.target.value) })}
+              disabled={periods.length === 0}
+            >
+              {[...periods].reverse().map((period) => (
+                <option key={period.id} value={period.seq}>
+                  {t('dashboard.periodOption', {
+                    seq: period.seq,
+                    answered: period.answeredCount ?? 0,
+                  })}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="segmented" role="group" aria-label={t('dashboard.dimensionLabel')}>
+            {DIMENSIONS.map((value) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name="dashboard-dimension"
+                  value={value}
+                  checked={dimension === value}
+                  onChange={() => persist({ dimension: value })}
+                />
+                {t(`results.${value}`)}
+              </label>
+            ))}
+          </div>
+          <div className="segmented" role="group" aria-label={t('dashboard.basisLabel')}>
+            {BASES.map((value) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name="dashboard-basis"
+                  value={value}
+                  checked={basis === value}
+                  onChange={() => persist({ basis: value })}
+                />
+                {t(`dashboard.${value}`)}
+              </label>
+            ))}
+          </div>
+        </div>
+      </details>
 
       {resultsQuery.isPending && (
         <p className="hint">{t('common:status.loading')}</p>
@@ -187,21 +244,14 @@ function DashboardPage() {
         <>
           <p className="summary-line">
             {t('dashboard.periodLine', {
-              number: results.periodNumber,
-              start: formatIsoDate(results.startDate),
-              end: formatIsoDate(results.endDate),
+              assignment: results.assignment.name ?? results.assignment.code,
+              seq: results.period.seq,
+              start: formatIsoDate(results.period.startDate),
+              end: formatIsoDate(results.period.endDate),
             })}
           </p>
-          {results.truncated && (
-            <p className="hint">
-              {t('dashboard.truncated', {
-                shown: results.students.length,
-                total: results.total,
-              })}
-            </p>
-          )}
 
-          {results.students.length === 0 ? (
+          {results.rows.length === 0 ? (
             <EmptyState
               title={t('dashboard.noStudentsTitle')}
               description={t('dashboard.noStudentsHint')}
@@ -212,7 +262,7 @@ function DashboardPage() {
                 </p>
               )}
             </EmptyState>
-          ) : results.parameters.length === 0 ? (
+          ) : stats.every((stat) => !stat.parameter.inUse) ? (
             <EmptyState
               title={t('dashboard.nothingMeasuredTitle')}
               description={t('dashboard.nothingMeasuredHint')}

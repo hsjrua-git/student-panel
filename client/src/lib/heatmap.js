@@ -11,7 +11,7 @@ function parameterById(cube, id) {
   return cube.parameters.find((parameter) => parameter.id === id) ?? null;
 }
 
-export function buildHeatmap(cube, { axis = 'period', parameterId = null, periodNumber = null } = {}) {
+export function buildHeatmap(cube, { axis = 'period', parameterId = null, periodKey = null } = {}) {
   const rows = cube.students.map((student) => ({
     id: student.id,
     label: student.fullName,
@@ -22,7 +22,7 @@ export function buildHeatmap(cube, { axis = 'period', parameterId = null, period
     // One period down the side is fixed; each column is a parameter with its
     // own min/max, so the shading is comparable within a column, not across.
     const period =
-      cube.periods.find((item) => item.number === periodNumber) ??
+      cube.periods.find((item) => item.key === periodKey) ??
       cube.periods[cube.periods.length - 1] ??
       null;
     const columns = cube.parameters.map((parameter) => ({
@@ -33,7 +33,7 @@ export function buildHeatmap(cube, { axis = 'period', parameterId = null, period
     const cells = rows.map((row) =>
       columns.map((column) => {
         const value = period
-          ? cube.valueAt(row.id, column.parameter.id, period.number)
+          ? cube.valueAt(row.id, column.parameter.id, period.key)
           : null;
         return {
           value,
@@ -45,20 +45,20 @@ export function buildHeatmap(cube, { axis = 'period', parameterId = null, period
         };
       })
     );
-    return { axis, periodNumber: period?.number ?? null, rows, columns, cells };
+    return { axis, periodKey: period?.key ?? null, rows, columns, cells };
   }
 
   // axis === 'period': one parameter is fixed; columns are the periods.
   const parameter = parameterById(cube, parameterId) ?? cube.parameters[0] ?? null;
   const columns = cube.periods.map((period) => ({
-    key: period.number,
-    label: `P${period.number}`,
+    key: period.key,
+    label: `P${period.key}`,
     period,
   }));
   const cells = rows.map((row) =>
     columns.map((column) => {
       const value = parameter
-        ? cube.valueAt(row.id, parameter.id, column.period.number)
+        ? cube.valueAt(row.id, parameter.id, column.period.key)
         : null;
       return {
         value,

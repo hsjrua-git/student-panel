@@ -11,7 +11,7 @@ function newChart(kind = 'trend') {
   return {
     kind,
     parameterIds: [],
-    periodNumber: null,
+    periodKey: null,
     comparisonShape: 'bar',
     heatmapAxis: 'period',
     imageFormat: 'png',
@@ -45,12 +45,11 @@ function ParameterChecklist({ chosen, parameters, onChange }) {
   );
 }
 
-function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRemove }) {
+function ChartEditor({ chart, parameters, periodOptions, onChange, onRemove }) {
   const { t } = useTranslation(['reports', 'common']);
   function patch(changes) {
     onChange({ ...chart, ...changes });
   }
-  const periodOptions = periodNumbers.length ? periodNumbers : [current];
 
   return (
     <div className="section-card chart-editor">
@@ -129,12 +128,12 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
           <label className="inline">
             {t('shared.period')}
             <select
-              value={chart.periodNumber ?? current}
-              onChange={(event) => patch({ periodNumber: Number(event.target.value) })}
+              value={chart.periodKey ?? periodOptions[periodOptions.length - 1]?.key ?? ''}
+              onChange={(event) => patch({ periodKey: event.target.value })}
             >
-              {periodOptions.map((number) => (
-                <option key={number} value={number}>
-                  {t('shared.periodNumber', { number })}
+              {periodOptions.map((period) => (
+                <option key={period.key} value={period.key}>
+                  {period.label}
                 </option>
               ))}
             </select>
@@ -177,12 +176,12 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
             <label className="inline">
               {t('shared.period')}
               <select
-                value={chart.periodNumber ?? current}
-                onChange={(event) => patch({ periodNumber: Number(event.target.value) })}
+                value={chart.periodKey ?? periodOptions[periodOptions.length - 1]?.key ?? ''}
+                onChange={(event) => patch({ periodKey: event.target.value })}
               >
-                {periodOptions.map((number) => (
-                  <option key={number} value={number}>
-                    {t('shared.periodNumber', { number })}
+                {periodOptions.map((period) => (
+                  <option key={period.key} value={period.key}>
+                    {period.label}
                   </option>
                 ))}
               </select>
@@ -196,7 +195,7 @@ function ChartEditor({ chart, parameters, periodNumbers, current, onChange, onRe
 
 // Add, configure, and remove any number of charts (up to MAX_CHARTS). `value`
 // is config.charts; `onChange` receives the next charts array.
-function ChartConfigPanel({ value, parameters, periodNumbers, current, onChange }) {
+function ChartConfigPanel({ value, parameters, periodOptions, onChange }) {
   const { t } = useTranslation(['reports', 'common']);
 
   function add() {
@@ -220,8 +219,7 @@ function ChartConfigPanel({ value, parameters, periodNumbers, current, onChange 
           key={index}
           chart={chart}
           parameters={parameters}
-          periodNumbers={periodNumbers}
-          current={current}
+          periodOptions={periodOptions}
           onChange={(next) => update(index, next)}
           onRemove={() => remove(index)}
         />

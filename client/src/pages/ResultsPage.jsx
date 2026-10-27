@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { getResults } from '../api/results.js';
+import { getPeriods } from '../api/periods.js';
+import { listAssignments } from '../api/schedule.js';
 import {
   createSavedView,
   deleteSavedView,
@@ -13,8 +15,6 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { errorMessage } from '../i18n/errors.js';
 import EmptyState from '../components/EmptyState.jsx';
 import FilterEditor from '../components/FilterEditor.jsx';
-import GroupFilter from '../components/GroupFilter.jsx';
-import PeriodPicker from '../components/PeriodPicker.jsx';
 import ResultsTable from '../components/ResultsTable.jsx';
 import SavedViewsBar from '../components/SavedViewsBar.jsx';
 import { formatIsoDate } from '../lib/format.js';
@@ -22,45 +22,58 @@ import {
   applyView,
   defaultConfig,
   describeFilter,
+  DIMENSIONS,
   normalizeConfig,
   sameConfig,
   toggleColumn,
   toggleSort,
   withFilterKeys,
 } from '../lib/resultsView.js';
-import { usePeriods } from '../lib/usePeriods.js';
 import ExportButton from '../components/ExportButton.jsx';
-import ExportLink from '../components/ExportLink.jsx';
 import { resultsCsvRows } from '../lib/exports.js';
 
 const EMPTY = [];
 
+// The assignment-period results grid. The picker chain is assignment →
+// period (a saved view may pin both) → dimension toggle; filters, columns,
+// sort, search and the change column work on the viewed dimension.
 function ResultsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation(['reports', 'common']);
   const { can } = useAuth();
-  const periodsQuery = usePeriods();
-  const periods = periodsQuery.data;
 
   const [config, setConfig] = useState(() => withFilterKeys(defaultConfig()));
   const [activeView, setActiveView] = useState(null);
-  const [groupId, setGroupId] = useState('');
 
-  const current = periods?.current ?? null;
-  let periodNumber = current;
-  if (
-    current !== null &&
-    config.periodMode === 'fixed' &&
-    config.periodNumber !== null &&
-    config.periodNumber <= current
-  ) {
-    periodNumber = config.periodNumber;
-  }
+  const assignmentsQuery = useQuery({
+    queryKey: ['assignments'],
+    queryFn: listAssignments,
+  });
+  const assignments = assignmentsQuery.data ?? EMPTY;
+
+  // The assignment the grid shows: a saved view's pinned one, else the first.
+  const assignmentId = config.assignmentId ?? assignments[0]?.id ?? null;
+
+  const periodsQuery = useQuery({
+    queryKey: ['periods', assignmentId],
+    queryFn: () => getPeriods(assignmentId),
+    enabled: assignmentId !== null,
+  });
+  const periods = useMemo(
+    () => (periodsQuery.data ?? []).filter((period) => period.sessionCount > 0),
+    [periodsQuery.data]
+  );
+
+  // The period the grid shows: a pinned seq, else the latest one with sessions.
+  const seq = config.seq ?? periods[periods.length - 1]?.seq ?? null;
+  const dimension = DIMENSIONS.includes(config.dimension)
+    ? config.dimension
+    : 'quality';
 
   const resultsQuery = useQuery({
-    queryKey: ['results', periodNumber, groupId],
-    queryFn: () => getResults(periodNumber, groupId || null),
-    enabled: periodNumber !== null,
+    queryKey: ['results', { assignmentId, seq, dimension }],
+    queryFn: () => getResults({ assignmentId, seq, dimension }),
+    enabled: assignmentId !== null && seq !== null,
   });
   const viewsQuery = useQuery({
     queryKey: ['saved-views'],
@@ -107,14 +120,14 @@ function ResultsPage() {
   }
 
   const parameters = resultsQuery.data?.parameters ?? EMPTY;
-  const students = resultsQuery.data?.students ?? EMPTY;
+  const rows = resultsQuery.data?.rows ?? EMPTY;
   const parametersById = useMemo(
     () => new Map(parameters.map((parameter) => [parameter.id, parameter])),
     [parameters]
   );
   const view = useMemo(
-    () => applyView({ students, parameters, config }),
-    [students, parameters, config]
+    () => applyView({ rows, parameters, config }),
+    [rows, parameters, config]
   );
 
   const chosenColumns =
@@ -129,12 +142,14 @@ function ResultsPage() {
     setConfig((existing) => ({ ...existing, ...changes }));
   }
 
-  function handlePeriodChange(number) {
-    patch(
-      number === current
-        ? { periodMode: 'current', periodNumber: null }
-        : { periodMode: 'fixed', periodNumber: number }
-    );
+  function handleAssignmentChange(id) {
+    // Switching assignments drops the pinned period (seqs are per assignment).
+    patch({ assignmentId: id || null, seq: null });
+  }
+
+  function handlePeriodChange(event) {
+    const value = event.target.value;
+    patch({ seq: value === '' ? null : Number(value) });
   }
 
   function handleLoad(id) {
@@ -184,7 +199,7 @@ function ResultsPage() {
     setActiveView(null);
   }
 
-  if (periodsQuery.isPending) {
+  if (assignmentsQuery.isPending) {
     return (
       <main aria-busy="true">
         <div className="page-loading" role="status" aria-live="polite">
@@ -194,46 +209,29 @@ function ResultsPage() {
       </main>
     );
   }
-  if (periodsQuery.isError) {
+  if (assignmentsQuery.isError) {
     return (
       <main>
         <EmptyState
           tone="danger"
           title={t('results.errorTitle')}
-          description={errorMessage(periodsQuery.error)}
+          description={errorMessage(assignmentsQuery.error)}
         />
       </main>
     );
   }
-  if (!periods.anchorDate) {
+  if (assignments.length === 0) {
     return (
       <main>
         <h1>{t('results.title')}</h1>
         <EmptyState
-          title={t('setup.title')}
-          description={
-            can('settings.manage')
-              ? t('results.setupHint')
-              : t('setup.adminNeeded')
-          }
+          title={t('results.noAssignments')}
+          description={t('results.noAssignmentsHint')}
         >
-          {can('settings.manage') && (
-            <p>
-              <Link to="/settings">{t('setup.goToSettings')}</Link>
-            </p>
-          )}
+          <p>
+            <Link to="/schedule">{t('results.goToSchedule')}</Link>
+          </p>
         </EmptyState>
-      </main>
-    );
-  }
-  if (periods.current === null) {
-    return (
-      <main>
-        <h1>{t('results.title')}</h1>
-        <EmptyState
-          title={t('setup.notStartedTitle')}
-          description={t('results.notStartedHint')}
-        />
       </main>
     );
   }
@@ -242,6 +240,7 @@ function ResultsPage() {
   const filterTexts = config.filters.map((filter) =>
     describeFilter(filter, parametersById)
   );
+  const liveSeq = seq ?? periods[periods.length - 1]?.seq ?? null;
 
   return (
     <main className="wide results">
@@ -249,12 +248,51 @@ function ResultsPage() {
       <p className="hint">{t('results.subtitle')}</p>
 
       <div className="toolbar">
-        <PeriodPicker
-          periods={periods}
-          value={periodNumber}
-          onChange={handlePeriodChange}
-        />
-        <GroupFilter value={groupId} onChange={setGroupId} />
+        <label className="field">
+          <span>{t('results.assignmentLabel')}</span>
+          <select
+            value={assignmentId ?? ''}
+            onChange={(event) => handleAssignmentChange(event.target.value)}
+          >
+            {assignments.map((assignment) => (
+              <option key={assignment.id} value={assignment.id}>
+                {assignment.name ?? assignment.code}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>{t('results.periodLabel')}</span>
+          <select
+            value={liveSeq ?? ''}
+            onChange={handlePeriodChange}
+            disabled={periods.length === 0}
+          >
+            {periods.length === 0 && <option value="">—</option>}
+            {[...periods].reverse().map((period) => (
+              <option key={period.id} value={period.seq}>
+                {t('results.periodOption', {
+                  seq: period.seq,
+                  answered: period.answeredCount ?? 0,
+                })}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="segmented" role="group" aria-label={t('results.dimensionLabel')}>
+          {DIMENSIONS.map((value) => (
+            <label key={value}>
+              <input
+                type="radio"
+                name="results-dimension"
+                value={value}
+                checked={dimension === value}
+                onChange={() => patch({ dimension: value })}
+              />
+              {t(`results.${value}`)}
+            </label>
+          ))}
+        </div>
       </div>
 
       <SavedViewsBar
@@ -291,29 +329,19 @@ function ResultsPage() {
         {can('data.export') && (
           <ExportButton
             label={t('results.exportCsv')}
-            filename={`results-period-${periodNumber}.csv`}
+            filename={`results-${assignmentId}-period-${liveSeq}.csv`}
             disabled={!data || parameters.length === 0 || view.rows.length === 0}
             buildRows={() =>
               resultsCsvRows({
-                periodNumber,
+                period: data?.period,
                 columns,
                 rows: view.rows,
+                dimension,
                 showChange: config.showChange,
               })
             }
           />
         )}
-        <ExportLink
-          prefill={{
-            periods: { mode: 'selection', numbers: [periodNumber] },
-            students: groupId ? { mode: 'group', groupId } : undefined,
-            parameters:
-              config.parameterIds.length > 0
-                ? { mode: 'selection', ids: config.parameterIds }
-                : undefined,
-            filters: config.filters,
-          }}
-        />
       </div>
 
       {parameters.length > 0 && (
@@ -368,11 +396,12 @@ function ResultsPage() {
         <section className="section-card">
           <p className="summary-line">
             {t('results.summaryLine', {
-              number: data.periodNumber,
-              start: formatIsoDate(data.startDate),
-              end: formatIsoDate(data.endDate),
+              assignment: data.assignment.name ?? data.assignment.code,
+              seq: data.period.seq,
+              start: formatIsoDate(data.period.startDate),
+              end: formatIsoDate(data.period.endDate),
               shown: view.rows.length,
-              total: students.length,
+              total: rows.length,
             })}
           </p>
           {filterTexts.length > 0 && (
@@ -386,14 +415,6 @@ function ResultsPage() {
                 </span>
               ))}
             </span>
-          )}
-          {data.truncated && (
-            <p className="hint">
-              {t('results.truncated', {
-                shown: students.length,
-                total: data.total,
-              })}
-            </p>
           )}
           {view.ignoredFilters > 0 && (
             <p className="hint">
@@ -422,7 +443,8 @@ function ResultsPage() {
               sort={config.sort}
               onSort={(key) => patch({ sort: toggleSort(config.sort, key) })}
               showChange={config.showChange}
-              periodNumber={data.periodNumber}
+              dimension={dimension}
+              hasPrevious={data.hasPrevious}
             />
           )}
         </section>

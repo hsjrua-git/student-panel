@@ -2,8 +2,7 @@ import { useCallback, useMemo, useReducer, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { usePeriods } from '../lib/usePeriods.js';
-import { listParameters, listParameterChanges } from '../api/parameters.js';
+import { listParameters } from '../api/parameters.js';
 import { fetchAuditTrail } from '../api/audit.js';
 import { fetchCube } from '../api/export.js';
 import { buildCube } from '../lib/cube.js';
@@ -13,11 +12,10 @@ import {
   mergePrefill,
 } from '../lib/exportConfig.js';
 import { errorMessage } from '../i18n/errors.js';
-import EmptyState from '../components/EmptyState.jsx';
 import FilterEditor from '../components/FilterEditor.jsx';
 import ExportStudentPicker from '../components/ExportStudentPicker.jsx';
 import ExportParameterPicker from '../components/ExportParameterPicker.jsx';
-import PeriodRangePicker from '../components/PeriodRangePicker.jsx';
+import ExportScopePicker from '../components/ExportScopePicker.jsx';
 import IncludePicker from '../components/IncludePicker.jsx';
 import FormatPicker from '../components/FormatPicker.jsx';
 import ChartConfigPanel from '../components/ChartConfigPanel.jsx';
@@ -33,11 +31,12 @@ function reducer(state, patch) {
   return { ...state, ...patch };
 }
 
+// The Export Center: one scope (students × parameters × assignment-periods or
+// a session-date range), one dimension, filters, and any mix of tabular data,
+// deltas, the audit trail and charts — all cut from the /api/export/cube.
 function ExportPage() {
   const { t } = useTranslation(['reports', 'common']);
   const location = useLocation();
-  const periodsQuery = usePeriods();
-  const periods = periodsQuery.data;
 
   const [config, dispatch] = useReducer(
     reducer,
@@ -48,56 +47,48 @@ function ExportPage() {
   const parametersQuery = useQuery({ queryKey: ['parameters'], queryFn: listParameters });
   const parameters = parametersQuery.data ?? EMPTY;
 
-  // Periods that have actually started (≤ current), then narrowed to the mode.
-  const available = useMemo(
-    () =>
-      periods?.current
-        ? periods.periods.map((period) => period.number).filter((n) => n <= periods.current)
-        : [],
-    [periods]
-  );
-  const resolvedPeriods = useMemo(() => {
-    const { mode, from, to, numbers } = config.periods;
-    if (mode === 'range' && from !== null && to !== null) {
-      const lo = Math.min(from, to);
-      const hi = Math.max(from, to);
-      return available.filter((n) => n >= lo && n <= hi);
-    }
-    if (mode === 'selection') {
-      const want = new Set(numbers);
-      return available.filter((n) => want.has(n));
-    }
-    return available;
-  }, [config.periods, available]);
-
   // Resolve the scope to the concrete values api/export.js#fetchCube expects.
-  const scope = useMemo(
-    () => ({
-      periods: resolvedPeriods,
+  // "All" with a pinned assignment still names that assignment so the cube
+  // covers its whole calendar; unpinned "all" spans every assignment.
+  const scope = useMemo(() => {
+    const { assignmentId, mode, from, to, seqs } = config.scope;
+    const resolved = {
+      assignmentId,
       groupId: config.students.mode === 'group' ? config.students.groupId : null,
       studentIds: config.students.mode === 'selection' ? config.students.ids : [],
       parameterIds: config.parameters.mode === 'selection' ? config.parameters.ids : [],
-    }),
-    [resolvedPeriods, config.students, config.parameters]
-  );
+    };
+    if (mode === 'range') {
+      resolved.from = from;
+      resolved.to = to;
+    }
+    if (mode === 'selection') {
+      resolved.periods = seqs;
+    }
+    return resolved;
+  }, [config.scope, config.students, config.parameters]);
 
-  const ready = Boolean(periods && periods.current !== null);
+  const scopeReady =
+    config.scope.mode !== 'range' ||
+    (config.scope.from !== null && config.scope.to !== null);
+  const seqsReady =
+    config.scope.mode !== 'selection' ||
+    (config.scope.assignmentId !== null && config.scope.seqs.length > 0);
+
   const cubeQuery = useQuery({
     queryKey: ['export-cube', scope],
     queryFn: () => fetchCube(scope),
-    enabled: ready && scope.periods.length > 0,
+    enabled: scopeReady && seqsReady,
   });
   const cube = useMemo(
-    () => (cubeQuery.data ? buildCube({ ...cubeQuery.data, filters: config.filters }) : null),
-    [cubeQuery.data, config.filters]
+    () =>
+      cubeQuery.data
+        ? buildCube({ ...cubeQuery.data, filters: config.filters, dimension: config.dimension })
+        : null,
+    [cubeQuery.data, config.filters, config.dimension]
   );
 
-  // Change-history sources, fetched only when their content type is selected.
-  const changesQuery = useQuery({
-    queryKey: ['parameter-changes'],
-    queryFn: listParameterChanges,
-    enabled: config.include.trackingLog,
-  });
+  // The audit trail, fetched only when its content type is selected.
   const auditQuery = useQuery({
     queryKey: ['audit-trail'],
     queryFn: () => fetchAuditTrail({}),
@@ -111,54 +102,9 @@ function ExportPage() {
     else chartNodes.current.delete(index);
   }, []);
 
-  if (periodsQuery.isPending) {
-    return (
-      <main aria-busy="true">
-        <div className="page-loading" role="status" aria-live="polite">
-          <span className="spinner" aria-hidden="true" />
-          <p>{t('common:status.loading')}</p>
-        </div>
-      </main>
-    );
-  }
-  if (periodsQuery.isError) {
-    return (
-      <main>
-        <EmptyState
-          tone="danger"
-          title={t('export.errorTitle')}
-          description={errorMessage(periodsQuery.error)}
-        />
-      </main>
-    );
-  }
-  if (!periods.anchorDate) {
-    return (
-      <main>
-        <h1>{t('export.title')}</h1>
-        <EmptyState
-          title={t('setup.title')}
-          description={t('export.setupHint')}
-        />
-      </main>
-    );
-  }
-  if (periods.current === null) {
-    return (
-      <main>
-        <h1>{t('export.title')}</h1>
-        <EmptyState
-          title={t('setup.notStartedTitle')}
-          description={t('export.notStartedHint')}
-        />
-      </main>
-    );
-  }
-
   const errors = exportConfigErrors(config);
-  const changesLoading = config.include.trackingLog && changesQuery.isPending;
   const auditLoading = config.include.auditTrail && auditQuery.isPending;
-  const runDisabled = errors.length > 0 || !cube || changesLoading || auditLoading;
+  const runDisabled = errors.length > 0 || !cube || auditLoading;
   const truncated = cubeQuery.data?.truncated;
 
   return (
@@ -177,11 +123,27 @@ function ExportPage() {
             parameters={parameters}
             onChange={(next) => dispatch({ parameters: next })}
           />
-          <PeriodRangePicker
-            value={config.periods}
-            periods={periods}
-            onChange={(next) => dispatch({ periods: next })}
+          <ExportScopePicker
+            value={config.scope}
+            onChange={(scope) => dispatch({ scope })}
           />
+          <section className="section-card">
+            <h2 className="group-title">{t('export.dimensionTitle')}</h2>
+            <div className="include-list">
+              {['quality', 'quantity'].map((value) => (
+                <label key={value} className="inline include-item">
+                  <input
+                    type="radio"
+                    name="export-dimension"
+                    value={value}
+                    checked={config.dimension === value}
+                    onChange={() => dispatch({ dimension: value })}
+                  />
+                  <span>{t(`results.${value}`)}</span>
+                </label>
+              ))}
+            </div>
+          </section>
           <section className="section-card">
             <h2 className="group-title">{t('filter.title')}</h2>
             <FilterEditor
@@ -203,8 +165,7 @@ function ExportPage() {
           <ChartConfigPanel
             value={config.charts}
             parameters={parameters}
-            periodNumbers={resolvedPeriods}
-            current={periods.current}
+            periodOptions={cube?.periods ?? EMPTY}
             onChange={(charts) => dispatch({ charts })}
           />
         </div>
@@ -215,7 +176,6 @@ function ExportPage() {
               config={config}
               cube={cube}
               scope={scope}
-              changes={changesQuery.data ?? EMPTY}
               auditEntries={auditQuery.data?.entries ?? EMPTY}
               chartNodes={chartNodes}
               disabled={runDisabled}
@@ -231,18 +191,15 @@ function ExportPage() {
             )}
           </div>
 
-          {scope.periods.length === 0 && (
-            <p className="hint">{t('export.noPeriods')}</p>
-          )}
-          {cubeQuery.isPending && scope.periods.length > 0 && (
+          {!scopeReady && <p className="hint">{t('export.pickDates')}</p>}
+          {!seqsReady && <p className="hint">{t('export.pickPeriods')}</p>}
+          {scopeReady && seqsReady && cubeQuery.isPending && (
             <p className="hint">{t('export.loadingData')}</p>
           )}
           {cubeQuery.isError && (
             <p className="error">{errorMessage(cubeQuery.error)}</p>
           )}
-          {(changesLoading || auditLoading) && (
-            <p className="hint">{t('export.loadingChanges')}</p>
-          )}
+          {auditLoading && <p className="hint">{t('export.loadingChanges')}</p>}
           {truncated && (
             <p className="hint">
               {t('export.truncated', {
@@ -264,4 +221,3 @@ function ExportPage() {
 }
 
 export default ExportPage;
-

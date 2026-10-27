@@ -177,11 +177,12 @@
       "parameter": "Parameter",
       "from": "From",
       "to": "To",
-      "note": "Note",
-      "cleared": "cleared",
       "overridden": "Locked, overridden",
       "moreChanges_one": "…and {{count}} more change.",
-      "moreChanges_other": "…and {{count}} more changes."
+      "moreChanges_other": "…and {{count}} more changes.",
+      "wholeGroup": "Whole group",
+      "removed": "Cell removed",
+      "override": "Override"
     },
     "joiner": ", ",
     "actions": {
@@ -252,10 +253,10 @@
       },
       "scores": {
         "save": {
-          "saved_one": "Saved {{count}} score in Period {{periodNumber}}",
-          "saved_other": "Saved {{count}} scores in Period {{periodNumber}}",
-          "imported_one": "Imported {{count}} score from a file into Period {{periodNumber}}",
-          "imported_other": "Imported {{count}} scores from a file into Period {{periodNumber}}",
+          "saved_one": "Saved {{count}} cell in session {{sessionCode}}",
+          "saved_other": "Saved {{count}} cells in session {{sessionCode}}",
+          "imported_one": "Imported {{count}} cell from a file into session {{sessionCode}}",
+          "imported_other": "Imported {{count}} cells from a file into session {{sessionCode}}",
           "overrideSuffix": "including locked scores changed with an override: \"{{reason}}\""
         }
       },
@@ -306,15 +307,7 @@
     "title": "Settings",
     "periodsTitle": "Periods",
     "periodsIntro": "Evaluations are grouped into periods. Each period is one week, from Saturday to Friday, numbered from Period 1. Period 1 starts on the date below.",
-    "noAnchor": "No start date is set yet. Pick one below to begin.",
-    "period1Starts": "Period 1 starts on {{date}}.",
-    "currentPeriod": "Current period",
-    "periodValue": "Period {{number}}",
-    "today": "Today is {{date}}.",
-    "anchorLabel": "First day of Period 1 (a Saturday)",
-    "notSaturday": "Please pick a Saturday.",
-    "saved": "Saved.",
-    "anchorHint": "The start date can only be changed until the first score is saved, because changing it would move every saved score to a different week."
+    "saved": "Saved."
   },
   "fields": {
     "readOnlyTitle": "Read-only access",

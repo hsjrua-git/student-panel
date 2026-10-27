@@ -34,7 +34,7 @@ function DrawerBody({ stat, trend, trendError, titleId, onClose }) {
   const { parameter } = stat;
   const bins = distribution(stat.values, parameter);
   const trendData = trend.map((point) => ({
-    label: t('shared.periodNumber', { number: point.periodNumber }),
+    label: point.label,
     average: point.average,
   }));
   const hasTrend = trend.some((point) => point.average !== null);

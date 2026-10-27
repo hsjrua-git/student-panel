@@ -12,6 +12,7 @@ describe('normalizeExportConfig', () => {
     const config = normalizeExportConfig(null);
     expect(config).toEqual(defaultExportConfig());
     expect(config.include.data).toBe(true);
+    expect(config.dimension).toBe('quality');
     expect(exportConfigErrors(config)).toEqual([]);
   });
 
@@ -19,27 +20,62 @@ describe('normalizeExportConfig', () => {
     const config = normalizeExportConfig({
       students: { mode: 'selection', ids: [] },
       parameters: { mode: 'selection', ids: [] },
-      periods: { mode: 'selection', numbers: [] },
+      scope: { assignmentId: null, mode: 'selection', seqs: [1, 2] }, // no assignment
     });
     expect(config.students.mode).toBe('all');
     expect(config.parameters.mode).toBe('all');
-    expect(config.periods.mode).toBe('all');
+    expect(config.scope.mode).toBe('all');
 
     expect(normalizeExportConfig({ students: { mode: 'group', groupId: '' } }).students.mode).toBe(
       'all'
     );
   });
 
-  it('orders a reversed range and drops an incomplete one', () => {
-    expect(normalizeExportConfig({ periods: { mode: 'range', from: 5, to: 2 } }).periods).toEqual({
-      mode: 'range',
-      from: 2,
-      to: 5,
-      numbers: [],
+  it('the seq selection needs an assignment; a pinned one keeps valid seqs', () => {
+    const pinned = normalizeExportConfig({
+      scope: {
+        assignmentId: '00000000-0000-4000-8000-000000000001',
+        mode: 'selection',
+        seqs: [3, 1, 2, 1],
+      },
     });
-    expect(normalizeExportConfig({ periods: { mode: 'range', from: 3, to: null } }).periods.mode).toBe(
-      'all'
-    );
+    expect(pinned.scope).toEqual({
+      assignmentId: '00000000-0000-4000-8000-000000000001',
+      mode: 'selection',
+      from: null,
+      to: null,
+      seqs: [1, 2, 3],
+    });
+    // An empty seq list falls back to the whole calendar.
+    expect(
+      normalizeExportConfig({
+        scope: {
+          assignmentId: '00000000-0000-4000-8000-000000000001',
+          mode: 'selection',
+          seqs: [],
+        },
+      }).scope.mode
+    ).toBe('all');
+  });
+
+  it('orders a reversed date range and drops an incomplete one', () => {
+    expect(
+      normalizeExportConfig({ scope: { mode: 'range', from: '2024-03-01', to: '2024-01-01' } }).scope
+    ).toEqual({
+      assignmentId: null,
+      mode: 'range',
+      from: '2024-01-01',
+      to: '2024-03-01',
+      seqs: [],
+    });
+    expect(
+      normalizeExportConfig({ scope: { mode: 'range', from: '2024-03-01', to: null } }).scope.mode
+    ).toBe('all');
+    // A non-date string is dropped too.
+    expect(
+      normalizeExportConfig({ scope: { mode: 'range', from: 'nonsense', to: '2024-01-01' } }).scope
+        .mode
+    ).toBe('all');
   });
 
   it('cleans charts, dropping unknown kinds and defaulting options', () => {
@@ -47,14 +83,14 @@ describe('normalizeExportConfig', () => {
       charts: [
         { kind: 'nope' },
         { kind: 'comparison', parameterIds: ['a', 'a', 2], comparisonShape: 'pie' },
-        { kind: 'heatmap', imageFormat: 'gif' },
+        { kind: 'heatmap', imageFormat: 'gif', seq: 4 },
       ],
     });
     expect(config.charts).toEqual([
       {
         kind: 'comparison',
         parameterIds: ['a'],
-        periodNumber: null,
+        seq: null,
         comparisonShape: 'bar',
         heatmapAxis: 'period',
         imageFormat: 'png',
@@ -62,7 +98,7 @@ describe('normalizeExportConfig', () => {
       {
         kind: 'heatmap',
         parameterIds: [],
-        periodNumber: null,
+        seq: 4,
         comparisonShape: 'bar',
         heatmapAxis: 'period',
         imageFormat: 'png',
@@ -98,12 +134,21 @@ describe('mergePrefill', () => {
     expect(config.include.data).toBe(true); // untouched default preserved
     expect(config.include.delta).toBe(true);
   });
+
+  it('maps a legacy periods prefill onto the seq selection', () => {
+    const config = mergePrefill({
+      periods: { mode: 'selection', numbers: [2, 1] },
+      students: { mode: 'selection', ids: ['s1'] },
+    });
+    expect(config.scope.mode).toBe('all'); // no assignment pinned → cannot select seqs
+    expect(config.scope.seqs).toEqual([1, 2]);
+  });
 });
 
 describe('exportConfigErrors', () => {
   it('requires at least one artifact', () => {
     const empty = normalizeExportConfig({
-      include: { data: false, delta: false, trackingLog: false, auditTrail: false },
+      include: { data: false, delta: false, auditTrail: false },
       charts: [],
     });
     expect(includesTabular(empty)).toBe(false);

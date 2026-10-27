@@ -10,4 +10,13 @@ export const DEFAULT_PREFERENCES = {
   studentShowAllPeriods: false,
   hiddenParameterIds: [],
   csvDelimiter: ',',
+  // The dashboard hero/constellation customization (schema-4): which dimension
+  // feeds the values, what counts as "answered", and which assignment period
+  // the class field shows (null = the assignment's latest period).
+  dashboardConstellation: {
+    dimension: 'quality',
+    basis: 'value',
+    assignmentId: null,
+    seq: null,
+  },
 };

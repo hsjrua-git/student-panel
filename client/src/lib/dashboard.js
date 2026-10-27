@@ -1,3 +1,11 @@
+// Dashboard aggregates over the schema-4 results grid: rows are the
+// assignment's evaluation targets (the whole-group row + members), cells carry
+// BOTH dimensions plus their answered state. Everything here is
+// dimension-aware (quality | quantity) and, where it concerns completion,
+// basis-aware: "value" counts only cells with a value, "valueOrComment" also
+// counts a comment-only cell as answered. The whole-group row never counts
+// toward the student roll-up — students live in their own rows.
+
 function round(number) {
   return Math.round(number * 100) / 100;
 }
@@ -6,18 +14,48 @@ function sum(numbers) {
   return numbers.reduce((total, value) => total + value, 0);
 }
 
-export function summarize(results) {
-  const inUse = results.parameters.filter((parameter) => parameter.inUse);
-  const total = results.students.length;
-  const expected = total * inUse.length;
+function normalize({ dimension = 'quality', basis = 'value' } = {}) {
+  return {
+    dimension: dimension === 'quantity' ? 'quantity' : 'quality',
+    basis: basis === 'valueOrComment' ? 'valueOrComment' : 'value',
+  };
+}
+
+function answered(cell, basis) {
+  if (!cell) return false;
+  if (basis === 'valueOrComment') {
+    return (
+      cell.quality !== null ||
+      cell.quantity !== null ||
+      cell.qualityComment !== null ||
+      cell.quantityComment !== null
+    );
+  }
+  return cell.quality !== null || cell.quantity !== null;
+}
+
+// The parameters "in use" this period: those with at least one selected cell
+// anywhere in the grid (selected-but-unanswered still counts as in use — the
+// row is the expectation).
+function inUseParameters(results) {
+  return results.parameters.filter((parameter) =>
+    results.rows.some((row) => row.cells[parameter.id] !== undefined)
+  );
+}
+
+export function summarize(results, options = {}) {
+  const { basis } = normalize(options);
+  const inUse = inUseParameters(results);
+  const students = results.rows.filter((row) => !row.isGroup);
+  const expected = students.length * inUse.length;
   let measured = 0;
   let complete = 0;
   let partial = 0;
   let none = 0;
 
-  for (const student of results.students) {
-    const have = inUse.filter(
-      (parameter) => student.values[parameter.id] !== undefined
+  for (const row of students) {
+    const have = inUse.filter((parameter) =>
+      answered(row.cells[parameter.id], basis)
     ).length;
     measured += have;
     if (inUse.length > 0 && have === inUse.length) complete++;
@@ -26,7 +64,7 @@ export function summarize(results) {
   }
 
   return {
-    students: total,
+    students: students.length,
     parametersInUse: inUse.length,
     expected,
     measured,
@@ -37,46 +75,62 @@ export function summarize(results) {
   };
 }
 
-// One entry per student — the "living class field" on the dashboard hero. Each
-// becomes a dot lit by how completely that student is measured this period,
-// against the parameters in use (the same set summarize() counts against, so the
-// three state buckets here add up to summarize's complete/partial/none totals).
+// One entry per student — the "living class field" on the dashboard hero.
 // Roster order is preserved so a dot maps to a stable position across renders.
-export function cohortField(results) {
-  const inUse = results.parameters.filter((parameter) => parameter.inUse);
-  return results.students.map((student) => {
-    const measured = inUse.filter(
-      (parameter) => student.values[parameter.id] !== undefined
-    ).length;
-    let state;
-    if (inUse.length > 0 && measured === inUse.length) state = 'full';
-    else if (measured > 0) state = 'partial';
-    else state = 'none';
-    return {
-      id: student.id,
-      fullName: student.fullName,
-      studentCode: student.studentCode,
-      measured,
-      inUse: inUse.length,
-      state,
-    };
-  });
+export function cohortField(results, options = {}) {
+  const { basis } = normalize(options);
+  const inUse = inUseParameters(results);
+  return results.rows
+    .filter((row) => !row.isGroup)
+    .map((row) => {
+      const measured = inUse.filter((parameter) =>
+        answered(row.cells[parameter.id], basis)
+      ).length;
+      let state;
+      if (inUse.length > 0 && measured === inUse.length) state = 'full';
+      else if (measured > 0) state = 'partial';
+      else state = 'none';
+      return {
+        id: row.studentId,
+        fullName: row.fullName,
+        studentCode: row.studentCode,
+        measured,
+        inUse: inUse.length,
+        state,
+      };
+    });
 }
 
-export function parameterStats(results) {
+// Per-parameter stats over the student rows (the whole-group row is a
+// class-level summary and would double-count). `inUse` drives the
+// constellation's ring fan.
+export function parameterStats(results, options = {}) {
+  const { dimension } = normalize(options);
+  const students = results.rows.filter((row) => !row.isGroup);
   return results.parameters.map((parameter) => {
     const values = [];
     const changes = [];
-    for (const student of results.students) {
-      const now = student.values[parameter.id];
-      const before = student.previous[parameter.id];
-      if (now !== undefined) values.push(now);
-      if (now !== undefined && before !== undefined) changes.push(now - before);
+    let selected = 0;
+    for (const row of students) {
+      const cell = row.cells[parameter.id];
+      const now = cell?.[dimension];
+      if (cell !== undefined) selected++;
+      if (now !== undefined && now !== null) values.push(now);
+      const before = row.previous[parameter.id]?.[dimension];
+      if (
+        now !== null &&
+        now !== undefined &&
+        before !== null &&
+        before !== undefined
+      ) {
+        changes.push(now - before);
+      }
     }
     return {
-      parameter,
+      parameter: { ...parameter, inUse: selected > 0 },
       values,
       count: values.length,
+      selected,
       average: values.length ? round(sum(values) / values.length) : null,
       min: values.length ? Math.min(...values) : null,
       max: values.length ? Math.max(...values) : null,
@@ -121,71 +175,76 @@ export function distribution(values, parameter, binCount = 5) {
   return bins;
 }
 
-export function trendSeries({ trends, periods, parameterId }) {
-  const byPeriod = new Map();
-  for (const row of trends) {
-    if (row.parameterId === parameterId) {
-      byPeriod.set(row.periodNumber, { average: row.average, count: row.count });
-    }
-  }
-  if (byPeriod.size === 0) return [];
-
-  const first = Math.min(...byPeriod.keys());
-  return periods
-    .filter(
-      (period) =>
-        period.number >= first &&
-        (period.parameterIds.includes(parameterId) || byPeriod.has(period.number))
+// Trend lines are per (parameter, assignment, period) now. For one parameter
+// the series walks the assignments in name order, each period its own point,
+// labelled so the sequences stay distinguishable.
+export function trendSeries({ trends, parameterId }) {
+  return trends
+    .filter((row) => row.parameterId === parameterId)
+    .sort(
+      (a, b) =>
+        String(a.assignmentName).localeCompare(String(b.assignmentName)) ||
+        a.periodSeq - b.periodSeq
     )
-    .map((period) => ({
-      periodNumber: period.number,
-      average: byPeriod.get(period.number)?.average ?? null,
-      count: byPeriod.get(period.number)?.count ?? 0,
+    .map((row) => ({
+      label: `${row.assignmentName} · ${row.periodSeq}`,
+      assignmentId: row.assignmentId,
+      periodSeq: row.periodSeq,
+      average: row.average,
+      count: row.count,
+      lastSessionDate: row.lastSessionDate,
     }));
 }
 
-// One student's card behind their node: every in-use parameter this period with
-// the score entered (or null where it's still missing) and the change from the
-// previous period, plus the measured/total tally. Built from the results already
-// loaded — the same "measured means the value is defined" rule summarize() and
-// cohortField() use — so a click on a node needs no extra fetch. An unknown id
-// (e.g. a stale selection) yields an empty-but-shaped record rather than throwing.
-export function studentBreakdown(results, studentId) {
-  const inUse = results.parameters.filter((parameter) => parameter.inUse);
-  const student = results.students.find((s) => s.id === studentId) ?? null;
-  const values = student?.values ?? {};
-  const previous = student?.previous ?? {};
+// One student's card behind their node: every in-use parameter with the
+// viewed dimension's value (null where nothing was answered) and the change
+// from the previous period. The student's own cell wins over the whole-group
+// row — that shadowing already happened server-side in the grid.
+export function studentBreakdown(results, studentId, options = {}) {
+  const { dimension, basis } = normalize(options);
+  const inUse = inUseParameters(results);
+  const row =
+    results.rows.find((item) => item.studentId === studentId && !item.isGroup) ??
+    null;
   const rows = inUse.map((parameter) => {
-    const now = values[parameter.id];
-    const before = previous[parameter.id];
+    const cell = row?.cells[parameter.id];
+    const value = cell?.[dimension] ?? null;
+    const before = row?.previous[parameter.id]?.[dimension];
     return {
       parameter,
-      value: now === undefined ? null : now,
+      value,
+      answered: answered(cell, basis),
       change:
-        now !== undefined && before !== undefined ? round(now - before) : null,
+        value !== null && before !== null && before !== undefined
+          ? round(value - before)
+          : null,
     };
   });
   return {
     id: studentId,
-    fullName: student?.fullName ?? '',
-    studentCode: student?.studentCode ?? null,
-    measured: rows.filter((row) => row.value !== null).length,
+    fullName: row?.fullName ?? '',
+    studentCode: row?.studentCode ?? null,
+    measured: rows.filter((entry) => entry.answered).length,
     inUse: inUse.length,
     rows,
   };
 }
 
-export function unmeasuredStudents(results) {
-  const inUse = results.parameters.filter((parameter) => parameter.inUse);
+// Who still owes answers: students with selected-but-unanswered (or entirely
+// unselected) cells among the in-use parameters, worst first.
+export function unmeasuredStudents(results, options = {}) {
+  const { basis } = normalize(options);
+  const inUse = inUseParameters(results);
   if (inUse.length === 0) return [];
 
-  return results.students
-    .map((student) => ({
-      id: student.id,
-      fullName: student.fullName,
-      studentCode: student.studentCode,
+  return results.rows
+    .filter((row) => !row.isGroup)
+    .map((row) => ({
+      id: row.studentId,
+      fullName: row.fullName,
+      studentCode: row.studentCode,
       missing: inUse
-        .filter((parameter) => student.values[parameter.id] === undefined)
+        .filter((parameter) => !answered(row.cells[parameter.id], basis))
         .map((parameter) => parameter.name),
     }))
     .filter((item) => item.missing.length > 0)

@@ -3,47 +3,60 @@ import { useTranslation } from 'react-i18next';
 import { formatParameterHint, formatShortIsoDate } from '../lib/format.js';
 import { buildHistory, visibleRows } from '../lib/history.js';
 
+// One timeline cell: the student's two dimensions for that session ×
+// parameter. A member cell shadows the group cell; a group-sourced value is
+// marked. Selected-but-unanswered cells read as a small dot.
 function Cell({ cell }) {
   const { t } = useTranslation(['reports', 'common']);
-  if (cell.state === 'value') {
-    return <td className="num">{cell.value}</td>;
-  }
-  if (cell.state === 'missing') {
+  if (cell.state === 'none') {
     return (
-      <td className="num muted" title={t('history.inUseNotMeasured')}>
+      <td className="num na" title={t('history.notSelected')}>
         —
       </td>
     );
   }
+  if (!cell.answered) {
+    return (
+      <td className="num muted" title={t('history.selectedNotAnswered')}>
+        ·
+      </td>
+    );
+  }
+  const value = [cell.quality, cell.quantity]
+    .map((value) => (value === null ? '·' : value))
+    .join(' / ');
+  const comment = [cell.qualityComment, cell.quantityComment]
+    .filter(Boolean)
+    .join(' — ');
   return (
-    <td className="num na" title={t('shared.notUsedThisPeriod')}>
-      {t('history.na')}
+    <td
+      className="num"
+      title={`${cell.viaGroup ? t('history.viaGroup') + ' · ' : ''}${comment}`}
+    >
+      {value}
+      {cell.viaGroup && <span className="hint">*</span>}
     </td>
   );
 }
 
-function HistoryGrid({
-  evaluations,
-  periods,
-  parameters,
-  initialShowAll = false,
-}) {
+// The overview tab: the student's evaluation timeline by session date.
+function HistoryGrid({ evaluations, parameters, assignmentsById, initialShowAll = false }) {
   const { t } = useTranslation(['reports', 'common']);
   const [showAll, setShowAll] = useState(initialShowAll);
 
   const history = useMemo(
-    () => buildHistory({ evaluations, periods, parameters }),
-    [evaluations, periods, parameters]
+    () => buildHistory({ evaluations, parameters }),
+    [evaluations, parameters]
   );
   const rows = useMemo(
-    () => [...visibleRows(history.rows, evaluations, showAll)].reverse(),
-    [history.rows, evaluations, showAll]
+    () => [...visibleRows(history.rows, showAll)].reverse(),
+    [history.rows, showAll]
   );
 
   if (history.columns.length === 0) {
     return <p>{t('shared.noParametersYet')}</p>;
   }
-  if (rows.length === 0) return <p>{t('history.noPeriods')}</p>;
+  if (rows.length === 0) return <p>{t('history.noSessions')}</p>;
 
   return (
     <>
@@ -61,7 +74,7 @@ function HistoryGrid({
         <table className="history">
           <thead>
             <tr>
-              <th>{t('shared.period')}</th>
+              <th>{t('history.sessionCol')}</th>
               {history.columns.map((parameter) => (
                 <th key={parameter.id} className="num">
                   {parameter.name}
@@ -72,12 +85,13 @@ function HistoryGrid({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.periodNumber}>
+              <tr key={row.sessionId}>
                 <th scope="row">
-                  {t('shared.periodNumber', { number: row.periodNumber })}
+                  {formatShortIsoDate(row.sessionDate)}
                   <div className="hint">
-                    {formatShortIsoDate(row.startDate)} –{' '}
-                    {formatShortIsoDate(row.endDate)}
+                    {assignmentsById.get(row.assignmentId)?.name ??
+                      assignmentsById.get(row.assignmentId)?.code ??
+                      row.sessionCode}
                   </div>
                 </th>
                 {history.columns.map((parameter) => (

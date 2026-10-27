@@ -1,7 +1,13 @@
 import { request } from './http.js';
 
-export function getResults(periodNumber, groupId = null) {
-  const params = new URLSearchParams({ periodNumber: String(periodNumber) });
-  if (groupId) params.set('groupId', groupId);
+// One assignment period's grid (rows = the assignment's targets, columns =
+// parameters, cells carry both dimensions). `seq` is the period's number
+// within the assignment; `dimension` picks the value column (quality|quantity).
+export function getResults({ assignmentId, seq, dimension = 'quality' }) {
+  const params = new URLSearchParams({
+    assignmentId,
+    seq: String(seq),
+    dimension,
+  });
   return request(`/api/results?${params}`);
 }

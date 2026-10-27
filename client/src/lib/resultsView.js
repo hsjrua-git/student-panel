@@ -1,6 +1,12 @@
 // Operator labels are NOT here: the select options and the filter chips
 // translate the stable `value` ids through the reports namespace's
 // filterEditor.operators.* keys at render time (lib stays data-only).
+//
+// The view filters/sorts the assignment-period grid the server assembled:
+// rows are the assignment's targets (the whole-group row + members), each
+// cell carries BOTH dimensions plus its answered state, and the view picks
+// ONE dimension (quality | quantity) to feed the value columns, the filters
+// and the stats.
 import i18n from '../i18n/index.js';
 
 export const OPERATORS = [
@@ -13,6 +19,7 @@ export const OPERATORS = [
   { value: 'present', symbol: null, needsValue: false },
 ];
 
+export const DIMENSIONS = ['quality', 'quantity'];
 export const MAX_FILTERS = 10;
 
 const OPERATOR_BY_VALUE = new Map(OPERATORS.map((item) => [item.value, item]));
@@ -36,8 +43,9 @@ export function newFilterKey() {
 
 export function defaultConfig() {
   return {
-    periodMode: 'current',
-    periodNumber: null,
+    assignmentId: null,
+    seq: null, // null = the assignment's latest period
+    dimension: 'quality',
     parameterIds: [],
     filters: [],
     sort: { key: 'name', direction: 'asc' },
@@ -55,24 +63,29 @@ function cleanFilter(raw) {
   return { parameterId: raw.parameterId, op: raw.op, value: raw.value };
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+  return typeof value === 'string' && UUID_PATTERN.test(value);
+}
+
 export function normalizeConfig(raw) {
   const base = defaultConfig();
   if (raw === null || typeof raw !== 'object') return base;
 
-  const isFixed =
-    raw.periodMode === 'fixed' &&
-    Number.isInteger(raw.periodNumber) &&
-    raw.periodNumber >= 1;
   const sort = raw.sort;
   const sortOk =
     sort !== null &&
     typeof sort === 'object' &&
     typeof sort.key === 'string' &&
     (sort.direction === 'asc' || sort.direction === 'desc');
+  const seqOk = raw.seq === null || raw.seq === undefined;
 
   return {
-    periodMode: isFixed ? 'fixed' : 'current',
-    periodNumber: isFixed ? raw.periodNumber : null,
+    assignmentId: isUuid(raw.assignmentId) ? raw.assignmentId : null,
+    seq: seqOk ? null : Number.isInteger(raw.seq) && raw.seq >= 1 ? raw.seq : null,
+    dimension: DIMENSIONS.includes(raw.dimension) ? raw.dimension : base.dimension,
     parameterIds: Array.isArray(raw.parameterIds)
       ? raw.parameterIds.filter((id) => typeof id === 'string')
       : [],
@@ -116,10 +129,21 @@ export function toggleColumn(selectedIds, allIds, parameterId, shouldShow) {
   return next.length === allIds.length ? [] : next;
 }
 
-export function changeOf(row, parameterId) {
-  const now = row.values[parameterId];
-  const before = row.previous[parameterId];
-  if (now === undefined || before === undefined) return null;
+// The row's saved value for one parameter, in the viewed dimension. A cell
+// the evaluator never selected is undefined; a selected-but-unanswered cell
+// is null.
+export function valueOf(row, parameterId, dimension) {
+  const cell = row.cells[parameterId];
+  if (cell === undefined) return undefined;
+  return cell[dimension] ?? null;
+}
+
+export function changeOf(row, parameterId, dimension) {
+  const now = valueOf(row, parameterId, dimension);
+  const before = row.previous[parameterId]?.[dimension];
+  if (now === undefined || now === null || before === undefined || before === null) {
+    return null;
+  }
   return round(now - before);
 }
 
@@ -133,8 +157,8 @@ export function describeFilter(filter, parametersById) {
   return `${name} ${i18n.t(`reports:filterEditor.operators.${filter.op}`)}`;
 }
 
-function matchesFilter(row, filter) {
-  const value = row.values[filter.parameterId];
+function matchesFilter(row, filter, dimension) {
+  const value = valueOf(row, filter.parameterId, dimension);
   const has = value !== undefined && value !== null;
   if (filter.op === 'missing') return !has;
   if (filter.op === 'present') return has;
@@ -145,8 +169,11 @@ function normalizeCode(text) {
   return text.replace(/[-\s]/g, '').toLowerCase();
 }
 
-export function applyView({ students, parameters, config }) {
+export function applyView({ rows, parameters, config }) {
   const known = new Set(parameters.map((parameter) => parameter.id));
+  const dimension = DIMENSIONS.includes(config.dimension)
+    ? config.dimension
+    : 'quality';
   const cleaned = config.filters.map(cleanFilter).filter(Boolean);
   const activeFilters = cleaned.filter((filter) => known.has(filter.parameterId));
   const ignoredFilters = config.filters.length - activeFilters.length;
@@ -154,45 +181,49 @@ export function applyView({ students, parameters, config }) {
   const needle = config.search.trim().toLowerCase();
   const codeNeedle = normalizeCode(needle);
 
-  const matching = students.filter((row) => {
+  const matching = rows.filter((row) => {
     if (needle) {
       const nameMatch = row.fullName.toLowerCase().includes(needle);
       const codeMatch =
-        codeNeedle !== '' && row.studentCode.toLowerCase().includes(codeNeedle);
+        codeNeedle !== '' &&
+        row.studentCode !== null &&
+        row.studentCode.toLowerCase().includes(codeNeedle);
       if (!nameMatch && !codeMatch) return false;
     }
-    return activeFilters.every((filter) => matchesFilter(row, filter));
+    return activeFilters.every((filter) => matchesFilter(row, filter, dimension));
   });
 
   const direction = config.sort.direction === 'desc' ? -1 : 1;
   const key = config.sort.key;
   const byName = (a, b) =>
     a.fullName.localeCompare(b.fullName, undefined, { sensitivity: 'base' }) ||
-    a.id.localeCompare(b.id);
+    (a.membershipId ?? 'group').localeCompare(b.membershipId ?? 'group');
 
   let compare;
   if (key === 'name') {
     compare = (a, b) => byName(a, b) * direction;
   } else if (key === 'code') {
-    compare = (a, b) => a.studentCode.localeCompare(b.studentCode) * direction || byName(a, b);
+    compare = (a, b) =>
+      String(a.studentCode ?? '').localeCompare(String(b.studentCode ?? '')) *
+        direction || byName(a, b);
   } else if (known.has(key)) {
     compare = (a, b) => {
-      const hasA = a.values[key] !== undefined;
-      const hasB = b.values[key] !== undefined;
-      if (!hasA && !hasB) return byName(a, b);
-      if (!hasA) return 1;
-      if (!hasB) return -1;
-      return (a.values[key] - b.values[key]) * direction || byName(a, b);
+      const aHas = valueOf(a, key, dimension) !== undefined;
+      const bHas = valueOf(b, key, dimension) !== undefined;
+      if (!aHas && !bHas) return byName(a, b);
+      if (!aHas) return 1;
+      if (!bHas) return -1;
+      return (valueOf(a, key, dimension) ?? 0) * direction - (valueOf(b, key, dimension) ?? 0) * direction || byName(a, b);
     };
   } else {
     compare = byName;
   }
-  const rows = [...matching].sort(compare);
+  const sorted = [...matching].sort(compare);
 
   const stats = {};
   for (const parameter of parameters) {
-    const measured = rows
-      .map((row) => row.values[parameter.id])
+    const measured = sorted
+      .map((row) => valueOf(row, parameter.id, dimension))
       .filter((value) => value !== undefined && value !== null);
     stats[parameter.id] =
       measured.length === 0
@@ -205,5 +236,5 @@ export function applyView({ students, parameters, config }) {
           };
   }
 
-  return { rows, stats, ignoredFilters };
+  return { rows: sorted, stats, ignoredFilters, dimension };
 }

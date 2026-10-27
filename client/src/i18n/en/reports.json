@@ -8,7 +8,8 @@
     "of": "{{a}} of {{b}}",
     "allStudents": "All students",
     "noParametersYet": "No parameters are in use yet. Add some on the Parameters page.",
-    "notUsedThisPeriod": "Not used in this period"
+    "notUsedThisPeriod": "Not used in this period",
+    "periodLabel": "{{label}}"
   },
   "setup": {
     "title": "Set up the calendar",
@@ -23,14 +24,23 @@
     "setupHint": "Set the period start date to begin tracking scores.",
     "notStartedHint": "Once the first period begins, results will show up here.",
     "enterScores": "Enter scores",
-    "periodLine": "Period {{number}} ({{start}} – {{end}})",
+    "periodLine": "«{{assignment}}» — period {{seq}} ({{start}} – {{end}})",
     "truncated": "Only the first {{shown}} of {{total}} students are included.",
     "noStudentsTitle": "No students yet",
     "noStudentsHint": "Add students to start entering and reviewing scores.",
     "goToStudents": "Go to Students",
     "nothingMeasuredTitle": "Nothing measured this period",
     "nothingMeasuredHint": "No parameters were used in this period, and no scores were entered yet.",
-    "needsScoring": "Needs scoring"
+    "needsScoring": "Needs scoring",
+    "optionsTitle": "Field of view",
+    "optionsHint": "Choose which assignment period the class field shows, which dimension feeds it, and what counts as answered. Saved with your preferences.",
+    "assignmentLabel": "Assignment",
+    "periodLabel": "Period",
+    "periodOption": "Period {{seq}} · {{answered}} answered",
+    "dimensionLabel": "Dimension",
+    "basisLabel": "Answered means",
+    "value": "a value was entered",
+    "valueOrComment": "a value or comment was entered"
   },
   "results": {
     "title": "Results",
@@ -43,7 +53,7 @@
     "showChange": "Show change vs previous period",
     "exportCsv": "Export this table (CSV)",
     "columnsSummary": "Columns ({{chosen}} of {{total}})",
-    "summaryLine": "Period {{number}} ({{start}} – {{end}}) · Showing {{shown}} of {{total}} students",
+    "summaryLine": "«{{assignment}}» — period {{seq}} ({{start}} – {{end}}) · Showing {{shown}} of {{total}} targets",
     "truncated": "Only the first {{shown}} of {{total}} students are included.",
     "ignoredFilters_one": "{{count}} filter refers to parameters this period does not use, and is ignored.",
     "ignoredFilters_other": "{{count}} filters refer to parameters this period does not use, and are ignored.",
@@ -52,7 +62,16 @@
     "clearFilters": "Clear filters and search",
     "promptName": "Name for this view (up to 60 characters):",
     "promptRename": "New name:",
-    "confirmDelete": "Delete the view \"{{name}}\"?"
+    "confirmDelete": "Delete the view \"{{name}}\"?",
+    "assignmentLabel": "Assignment",
+    "periodLabel": "Period",
+    "dimensionLabel": "Dimension",
+    "quality": "Quality",
+    "quantity": "Quantity",
+    "periodOption": "Period {{seq}} · {{answered}} answered",
+    "noAssignments": "No assignments yet",
+    "noAssignmentsHint": "Results appear once a class assignment with sessions exists.",
+    "goToSchedule": "Go to Schedule"
   },
   "export": {
     "title": "Export Center",
@@ -66,7 +85,10 @@
     "loadingChanges": "Loading change history…",
     "truncated": "This export is capped at {{count}} students — narrow the scope (a group or a selection) to include everyone.",
     "chooseSomething": "Choose something to export to see a preview.",
-    "preparingCsv": "Preparing..."
+    "preparingCsv": "Preparing...",
+    "dimensionTitle": "Dimension",
+    "pickDates": "Pick the date range to load data.",
+    "pickPeriods": "Pick at least one period to load data."
   },
   "savedViews": {
     "label": "View",
@@ -138,8 +160,6 @@
     "dataHint": "The measured values themselves.",
     "deltaLabel": "Changes vs previous period",
     "deltaHint": "Each score alongside how much it moved since the period before.",
-    "trackingLogLabel": "Parameter tracking log",
-    "trackingLogHint": "When each parameter started or stopped being measured.",
     "auditTrailLabel": "Edit audit trail",
     "auditTrailHint": "The recorded history of who changed what."
   },
@@ -271,7 +291,8 @@
     "studentCol": "Student",
     "notInUse": " (not in use)",
     "average": "Average",
-    "measured": "Measured"
+    "measured": "Measured",
+    "groupRow": "Whole group"
   },
   "headlineCards": {
     "students": "Students",
@@ -286,26 +307,41 @@
     "partlyMeasured": "{{count}} partly measured"
   },
   "byParameter": {
-    "notInUseNow": " (not in use now)",
     "noScores": "No scores for {{name}} yet.",
     "latest": "Latest",
-    "inPeriod": "(Period {{number}})",
     "sinceFirst": "Since first score",
     "scoreCount_one": "{{count}} score",
     "scoreCount_other": "{{count}} scores",
-    "dates": "Dates"
+    "onDate": "on {{date}}"
   },
   "byPeriod": {
     "empty": "No parameters were used in Period {{number}}, and no scores were entered.",
     "withinRange": "Within range",
     "changeVsPrevious": "Change vs previous period",
-    "notUsedSuffix": " (not used this period)"
+    "notUsedSuffix": " (not used this period)",
+    "assignment": "Assignment",
+    "period": "Period",
+    "periodOption": "Period {{seq}}"
   },
   "history": {
-    "inUseNotMeasured": "In use, but not measured",
-    "na": "n/a",
-    "noPeriods": "No periods have started yet.",
-    "showAll": "Show all periods",
-    "legend": "Periods before the first score are hidden. \"—\" means the parameter was in use but not measured. \"n/a\" means it was not used that period."
+    "showAll": "Show all sessions",
+    "legend": "Sessions before the first answer are hidden. \"·\" means selected but unanswered; \"—\" means not selected. * marks a value carried from the whole-group row.",
+    "sessionCol": "Session",
+    "notSelected": "Not selected for this student",
+    "selectedNotAnswered": "Selected, not answered yet",
+    "viaGroup": "Value carried from the whole-group row",
+    "noSessions": "No evaluated sessions yet."
+  },
+  "scopePicker": {
+    "legend": "Scope",
+    "assignment": "Assignment",
+    "allAssignments": "All assignments",
+    "allLabel": "The whole calendar",
+    "rangeLabel": "A session-date range",
+    "selectionLabel": "Chosen periods",
+    "from": "From",
+    "to": "To",
+    "seqNeedsAssignment": "Pick an assignment first — period numbers are per assignment.",
+    "seqOption": "Period {{seq}} · {{answered}} answered"
   }
 }

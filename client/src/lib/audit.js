@@ -114,7 +114,10 @@ export function describeAudit(entry) {
             details.source === 'import'
               ? 'scores.save.imported'
               : 'scores.save.saved',
-          params: { count, periodNumber: details.periodNumber ?? '?' },
+          params: {
+            count,
+            sessionCode: details.sessionCode ?? details.assignmentCode ?? '?',
+          },
         },
       ];
       if (details.overrideReason) {

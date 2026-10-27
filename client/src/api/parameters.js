@@ -19,15 +19,6 @@ export function updateParameter(id, fields) {
   });
 }
 
-export async function listParameterChanges() {
-  const data = await request('/api/parameter-changes');
-  return data.changes;
-}
-
-export function deleteParameterChange(id) {
-  return request(`/api/parameter-changes/${id}`, { method: 'DELETE' });
-}
-
 export function createParameterChange(change) {
   return request('/api/parameter-changes', {
     method: 'POST',

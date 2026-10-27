@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
 
 // The "what to include" checkboxes. Everything is multi-select: an export can
-// carry the scores cube (data), the period-over-period deltas, the parameter
-// tracking log, and the full edit audit trail together. `value` is
-// config.include; `onChange` receives the next include object.
-const ITEM_KEYS = ['data', 'delta', 'trackingLog', 'auditTrail'];
+// carry the scores cube (data), the period-over-period deltas, and the full
+// edit audit trail together. `value` is config.include; `onChange` receives
+// the next include object.
+const ITEM_KEYS = ['data', 'delta', 'auditTrail'];
 
 function IncludePicker({ value, onChange }) {
   const { t } = useTranslation(['reports', 'common']);

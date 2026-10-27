@@ -1,13 +1,21 @@
-// The client-side view of the export cube. The server hands back a flat list of
-// scored cells for the requested periods plus each period − 1 (the "previous"
-// values needed for deltas); this turns that into a lookup keyed by
-// student × parameter × period and applies the optional numeric filters.
+// The client-side view of the export cube under the schema-4 model. The
+// server hands back a flat list of student-shaped cells (whole-group rows
+// already expanded per member, with the member's own row shadowing the group
+// row per session) plus the period buckets they belong to; this turns them
+// into a lookup keyed by student × parameter × assignment-period, picks ONE
+// dimension (quality | quantity) as the value column, and applies the
+// optional numeric filters.
+//
+// A period bucket can hold several sessions, so a (student, parameter,
+// period) key can carry several cells; the LATEST session in the bucket wins
+// (the most recent evaluation of that period). The previous-value lookup uses
+// the same assignment's previous seq.
 //
 // Filter semantics: a filter narrows the ROSTER, judged against the student's
-// value in the LAST requested period (the most recent slice the export covers).
-// This mirrors the Results grid, where filters test one period's values — here
-// that period is the latest one being exported. Reuses the same operator set as
-// resultsView so a filter carried in from Results behaves identically.
+// value in the LAST period of the export (the most recent slice it covers) —
+// mirroring the Results grid, where filters test one period's values. Reuses
+// the same operator set as resultsView so a filter carried in from Results
+// behaves identically.
 
 const COMPARE = {
   lt: (a, b) => a < b,
@@ -21,29 +29,96 @@ function round(number) {
   return Math.round(number * 100) / 100;
 }
 
-export function buildCube({ periods = [], parameters = [], students = [], cells = [], filters = [] }) {
-  const valueByKey = new Map();
+export function periodKey(assignmentId, seq) {
+  return `${assignmentId}:${seq}`;
+}
+
+export function buildCube({
+  periods = [],
+  parameters = [],
+  students = [],
+  assignments = [],
+  cells = [],
+  filters = [],
+  dimension = 'quality',
+}) {
+  const dim = dimension === 'quantity' ? 'quantity' : 'quality';
+
+  // Normalize the period buckets: one entry per (assignment, seq), labelled
+  // from the assignment list, ordered by start date.
+  const assignmentById = new Map(assignments.map((a) => [a.id, a]));
+  const buckets = [...new Map(
+    periods.map((period) => [
+      periodKey(period.assignmentId, period.seq),
+      {
+        key: periodKey(period.assignmentId, period.seq),
+        assignmentId: period.assignmentId,
+        seq: period.seq,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        label: `${assignmentById.get(period.assignmentId)?.name ?? assignmentById.get(period.assignmentId)?.code ?? period.assignmentId} · ${period.seq}`,
+      },
+    ])
+  ).values()].sort((a, b) =>
+    String(a.startDate).localeCompare(String(b.startDate)) || a.seq - b.seq
+  );
+  const bucketByKey = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+  // Latest session wins inside a bucket; a member's own cell beats a group
+  // cell from the same session date.
+  const latestByKey = new Map(); // `${studentId}:${parameterId}:${bucketKey}` → cell
   for (const cell of cells) {
-    valueByKey.set(`${cell.studentId}:${cell.parameterId}:${cell.periodNumber}`, cell.value);
+    const bucket = bucketByKey.get(periodKey(cell.assignmentId, cell.periodSeq));
+    if (!bucket) continue;
+    const key = `${cell.studentId}:${cell.parameterId}:${bucket.key}`;
+    const existing = latestByKey.get(key);
+    if (
+      !existing ||
+      String(cell.sessionDate).localeCompare(String(existing.sessionDate)) > 0 ||
+      (String(cell.sessionDate).localeCompare(String(existing.sessionDate)) === 0 &&
+        existing.viaGroup &&
+        !cell.viaGroup)
+    ) {
+      latestByKey.set(key, cell);
+    }
   }
 
-  const periodNumbers = periods.map((period) => period.number);
-  const lastPeriod = periodNumbers.length ? periodNumbers[periodNumbers.length - 1] : null;
-
-  const valueAt = (studentId, parameterId, periodNumber) => {
-    const value = valueByKey.get(`${studentId}:${parameterId}:${periodNumber}`);
+  const valueAt = (studentId, parameterId, key) => {
+    const cell = latestByKey.get(`${studentId}:${parameterId}:${key}`);
+    const value = cell === undefined ? undefined : cell[dim];
     return value === undefined ? null : value;
   };
 
-  const cellAt = (studentId, parameterId, periodNumber) => {
-    const value = valueAt(studentId, parameterId, periodNumber);
-    const previous = valueAt(studentId, parameterId, periodNumber - 1);
-    const delta = value !== null && previous !== null ? round(value - previous) : null;
+  // The previous bucket of the SAME assignment (seq − 1); missing → null.
+  const previousKeyOf = (key) => {
+    const bucket = bucketByKey.get(key);
+    if (!bucket) return null;
+    const candidate = periodKey(bucket.assignmentId, bucket.seq - 1);
+    return bucketByKey.has(candidate) ? candidate : null;
+  };
+
+  const cellAt = (studentId, parameterId, key) => {
+    const value = valueAt(studentId, parameterId, key);
+    const previousKey = previousKeyOf(key);
+    const previous = previousKey === null ? null : valueAt(studentId, parameterId, previousKey);
+    const delta =
+      value !== null && previous !== null ? round(value - previous) : null;
     return { value, previous, delta };
   };
 
+  const lastPeriod =
+    buckets.length === 0
+      ? null
+      : buckets.reduce((last, bucket) =>
+          String(bucket.endDate).localeCompare(String(last.endDate)) > 0 ||
+          (bucket.endDate === last.endDate && bucket.seq > last.seq)
+            ? bucket
+            : last
+        );
+
   const passes = (student, filter) => {
-    const value = lastPeriod === null ? null : valueAt(student.id, filter.parameterId, lastPeriod);
+    const value =
+      lastPeriod === null ? null : valueAt(student.id, filter.parameterId, lastPeriod.key);
     const has = value !== null;
     if (filter.op === 'missing') return !has;
     if (filter.op === 'present') return has;
@@ -57,10 +132,11 @@ export function buildCube({ periods = [], parameters = [], students = [], cells 
   );
 
   return {
-    periods,
+    dimension: dim,
+    periods: buckets,
     parameters,
+    assignments,
     students: filteredStudents,
-    periodNumbers,
     lastPeriod,
     valueAt,
     cellAt,
@@ -69,24 +145,25 @@ export function buildCube({ periods = [], parameters = [], students = [], cells 
 
 // Cohort average of one parameter across every period in the cube: one point
 // per period carrying the mean of all (filtered) students' values that period
-// and the count behind it. Missing values are skipped; a period with no scores
-// yields `average: null`, `count: 0`. Feeds the trend and comparison charts.
+// and the count behind it. Missing values are skipped; a period with no
+// scores yields `average: null`, `count: 0`. Feeds the trend and comparison
+// charts.
 export function cohortAverages(cube, parameterId) {
   return cube.periods.map((period) => {
-    const values = cubeValues(cube, parameterId, period.number);
+    const values = cubeValues(cube, parameterId, period.key);
     const average = values.length
       ? round(values.reduce((total, value) => total + value, 0) / values.length)
       : null;
-    return { periodNumber: period.number, average, count: values.length };
+    return { period, average, count: values.length };
   });
 }
 
-// Every non-null value recorded for a parameter in one period, across the cube's
-// (filtered) students. Feeds the distribution chart.
-export function cubeValues(cube, parameterId, periodNumber) {
+// Every non-null value recorded for a parameter in one period, across the
+// cube's (filtered) students. Feeds the distribution chart.
+export function cubeValues(cube, parameterId, periodKey) {
   const values = [];
   for (const student of cube.students) {
-    const value = cube.valueAt(student.id, parameterId, periodNumber);
+    const value = cube.valueAt(student.id, parameterId, periodKey);
     if (value !== null) values.push(value);
   }
   return values;

@@ -9,6 +9,7 @@ import {
   sameConfig,
   toggleColumn,
   toggleSort,
+  valueOf,
 } from './resultsView.js';
 
 // describeFilter renders the valueless operators through i18next, whose
@@ -18,16 +19,46 @@ beforeAll(() => {
   i18n.changeLanguage('en');
 });
 
+const ASSIGNMENT = '00000000-0000-4000-8000-000000000001';
 const parameters = [
-  { id: 'p1', name: 'Speed' },
-  { id: 'p2', name: 'Strength' },
+  { id: 'p1', name: 'Speed', minValue: 0, maxValue: 10 },
+  { id: 'p2', name: 'Strength', minValue: 0, maxValue: 10 },
 ];
 const parametersById = new Map(parameters.map((p) => [p.id, p]));
 
-const students = [
-  { id: 'a', fullName: 'Bea', studentCode: 'S2', values: { p1: 5 }, previous: { p1: 3 } },
-  { id: 'b', fullName: 'Ada', studentCode: 'S1', values: { p1: 9, p2: 4 }, previous: {} },
-  { id: 'c', fullName: 'Cid', studentCode: 'S3', values: {}, previous: {} },
+// Server row shape: cells keyed by parameter carrying BOTH dimensions plus
+// the answered state; previous holds the earlier period's per-dimension values.
+const rows = [
+  {
+    membershipId: null,
+    studentId: null,
+    fullName: 'Whole group',
+    studentCode: null,
+    isGroup: true,
+    cells: { p1: { quality: 5, quantity: 7, answered: true } },
+    previous: { p1: { quality: 3, quantity: 6 } },
+  },
+  {
+    membershipId: 'm-b',
+    studentId: 'b',
+    fullName: 'Ada',
+    studentCode: 'S1',
+    isGroup: false,
+    cells: {
+      p1: { quality: 9, quantity: 1, answered: true },
+      p2: { quality: 4, quantity: null, answered: true },
+    },
+    previous: {},
+  },
+  {
+    membershipId: 'm-c',
+    studentId: 'c',
+    fullName: 'Cid',
+    studentCode: 'S3',
+    isGroup: false,
+    cells: { p1: { quality: null, quantity: null, answered: false } },
+    previous: {},
+  },
 ];
 
 describe('normalizeConfig', () => {
@@ -36,15 +67,17 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig(42)).toEqual(defaultConfig());
   });
 
-  it('keeps a valid fixed period but rejects a bad one', () => {
-    expect(normalizeConfig({ periodMode: 'fixed', periodNumber: 3 })).toMatchObject({
-      periodMode: 'fixed',
-      periodNumber: 3,
+  it('pins assignment/seq/dimension, rejects junk ones', () => {
+    expect(
+      normalizeConfig({ assignmentId: ASSIGNMENT, seq: 3, dimension: 'quantity' })
+    ).toMatchObject({
+      assignmentId: ASSIGNMENT,
+      seq: 3,
+      dimension: 'quantity',
     });
-    expect(normalizeConfig({ periodMode: 'fixed', periodNumber: 0 })).toMatchObject({
-      periodMode: 'current',
-      periodNumber: null,
-    });
+    expect(normalizeConfig({ assignmentId: 'nope' }).assignmentId).toBe(null);
+    expect(normalizeConfig({ seq: 0 }).seq).toBe(null);
+    expect(normalizeConfig({ dimension: 'depth' }).dimension).toBe('quality');
   });
 
   it('drops filters that are malformed or missing a required value', () => {
@@ -64,132 +97,148 @@ describe('normalizeConfig', () => {
   });
 });
 
-describe('sameConfig', () => {
-  it('compares by normalized value, not reference', () => {
-    expect(sameConfig({ search: ' hi ' }, { search: 'hi' })).toBe(true);
-    expect(sameConfig({ showChange: true }, { showChange: false })).toBe(false);
-  });
-});
-
-describe('toggleSort', () => {
-  it('flips direction on the same key and resets to asc on a new key', () => {
-    expect(toggleSort({ key: 'name', direction: 'asc' }, 'name')).toEqual({
-      key: 'name',
-      direction: 'desc',
-    });
-    expect(toggleSort({ key: 'name', direction: 'desc' }, 'code')).toEqual({
-      key: 'code',
-      direction: 'asc',
-    });
-  });
-});
-
-describe('toggleColumn', () => {
-  const allIds = ['p1', 'p2'];
-
-  it('hiding one of "all shown" narrows to the rest', () => {
-    expect(toggleColumn([], allIds, 'p1', false)).toEqual(['p2']);
+describe('valueOf / changeOf', () => {
+  it('undefined = never selected, null = selected but unanswered', () => {
+    expect(valueOf(rows[0], 'p2', 'quality')).toBeUndefined();
+    expect(valueOf(rows[2], 'p1', 'quality')).toBeNull();
+    expect(valueOf(rows[1], 'p1', 'quality')).toBe(9);
   });
 
-  it('showing the final missing column collapses back to "all" ([])', () => {
-    expect(toggleColumn(['p1'], allIds, 'p2', true)).toEqual([]);
-  });
-
-  it('refuses to hide the last visible column', () => {
-    expect(toggleColumn(['p2'], allIds, 'p2', false)).toEqual(['p2']);
-  });
-});
-
-describe('changeOf', () => {
-  it('rounds the delta when both periods have a value', () => {
-    expect(changeOf({ values: { p1: 5 }, previous: { p1: 3 } }, 'p1')).toBe(2);
-  });
-
-  it('is null when either side is missing', () => {
-    expect(changeOf({ values: {}, previous: { p1: 3 } }, 'p1')).toBe(null);
-  });
-});
-
-describe('describeFilter', () => {
-  it('renders a value operator with its symbol', () => {
-    expect(describeFilter({ parameterId: 'p1', op: 'gte', value: 5 }, parametersById)).toBe(
-      'Speed ≥ 5',
-    );
-  });
-
-  it('renders the valueless operators in words', () => {
-    expect(describeFilter({ parameterId: 'p2', op: 'missing' }, parametersById)).toBe(
-      'Strength was not measured',
-    );
+  it('the change needs both periods and the viewed dimension', () => {
+    expect(changeOf(rows[0], 'p1', 'quality')).toBe(2);
+    expect(changeOf(rows[0], 'p1', 'quantity')).toBe(1);
+    expect(changeOf(rows[0], 'p2', 'quality')).toBeNull(); // no cell at all
+    expect(changeOf(rows[1], 'p1', 'quality')).toBeNull(); // no previous
   });
 });
 
 describe('applyView', () => {
-  it('filters by a threshold and ignores filters for unknown parameters', () => {
-    const { rows, ignoredFilters } = applyView({
-      students,
+  it('filters on the viewed dimension; unselected cells are missing', () => {
+    const view = applyView({
+      rows,
+      parameters,
+      config: { ...defaultConfig(), filters: [{ parameterId: 'p1', op: 'gt', value: 6 }] },
+    });
+    // Only Ada's quality 9 clears the bar in the quality dimension.
+    expect(view.rows.map((row) => row.fullName)).toEqual(['Ada']);
+
+    const quantity = applyView({
+      rows,
       parameters,
       config: {
         ...defaultConfig(),
-        filters: [
-          { parameterId: 'p1', op: 'gte', value: 6 },
-          { parameterId: 'ghost', op: 'gte', value: 1 },
-        ],
+        dimension: 'quantity',
+        filters: [{ parameterId: 'p1', op: 'gt', value: 6 }],
       },
     });
-    expect(rows.map((r) => r.id)).toEqual(['b']); // only p1 >= 6
-    expect(ignoredFilters).toBe(1);
+    // In quantity the group row's 7 clears it instead.
+    expect(quantity.rows.map((row) => row.fullName)).toEqual(['Whole group']);
   });
 
-  it('supports missing/present operators', () => {
-    const present = applyView({
-      students,
-      parameters,
-      config: { ...defaultConfig(), filters: [{ parameterId: 'p1', op: 'present' }] },
-    });
-    expect(present.rows.map((r) => r.id).sort()).toEqual(['a', 'b']);
-
-    const missing = applyView({
-      students,
-      parameters,
-      config: { ...defaultConfig(), filters: [{ parameterId: 'p1', op: 'missing' }] },
-    });
-    expect(missing.rows.map((r) => r.id)).toEqual(['c']);
-  });
-
-  it('searches by name and by normalized code', () => {
+  it('searches names and codes, keeps the group row searchable', () => {
     const byName = applyView({
-      students,
+      rows,
       parameters,
       config: { ...defaultConfig(), search: 'ada' },
     });
-    expect(byName.rows.map((r) => r.id)).toEqual(['b']);
-
-    const byCode = applyView({
-      students,
+    expect(byName.rows).toHaveLength(1);
+    const none = applyView({
+      rows,
       parameters,
-      config: { ...defaultConfig(), search: 's3' },
+      config: { ...defaultConfig(), search: 'zzz' },
     });
-    expect(byCode.rows.map((r) => r.id)).toEqual(['c']);
+    expect(none.rows).toHaveLength(0);
   });
 
-  it('sorts by a parameter value, pushing the unmeasured to the end', () => {
-    const { rows } = applyView({
-      students,
+  it('sorts by name/code/parameter value with unanswered last', () => {
+    const byName = applyView({
+      rows,
+      parameters,
+      config: { ...defaultConfig(), sort: { key: 'name', direction: 'asc' } },
+    });
+    expect(byName.rows.map((row) => row.fullName)).toEqual([
+      'Ada',
+      'Cid',
+      'Whole group',
+    ]);
+
+    const bySpeed = applyView({
+      rows,
       parameters,
       config: { ...defaultConfig(), sort: { key: 'p1', direction: 'desc' } },
     });
-    // b(9), a(5), then c (no value) last regardless of direction.
-    expect(rows.map((r) => r.id)).toEqual(['b', 'a', 'c']);
+    expect(bySpeed.rows.map((row) => row.fullName)).toEqual([
+      'Ada',
+      'Whole group',
+      'Cid', // selected-unanswered sorts after answered ones
+    ]);
   });
 
-  it('computes per-parameter stats over the visible rows', () => {
-    const { stats } = applyView({
-      students,
+  it('computes per-parameter stats on the viewed dimension', () => {
+    const view = applyView({ rows, parameters, config: defaultConfig() });
+    // Quality: 5, 9 measured. Quantity: 7, 1.
+    expect(view.stats.p1).toMatchObject({ count: 2, average: 7, min: 5, max: 9 });
+    const quantity = applyView({
+      rows,
       parameters,
-      config: defaultConfig(),
+      config: { ...defaultConfig(), dimension: 'quantity' },
     });
-    expect(stats.p1).toEqual({ count: 2, average: 7, min: 5, max: 9 });
-    expect(stats.p2).toEqual({ count: 1, average: 4, min: 4, max: 4 });
+    expect(quantity.stats.p1).toMatchObject({ count: 2, average: 4, min: 1, max: 7 });
+  });
+
+  it('reports filters that reference unknown parameters', () => {
+    const view = applyView({
+      rows,
+      parameters,
+      config: {
+        ...defaultConfig(),
+        filters: [{ parameterId: 'ghost', op: 'present' }],
+      },
+    });
+    expect(view.ignoredFilters).toBe(1);
+  });
+});
+
+describe('describeFilter', () => {
+  it('renders symbols for value operators and words for the valueless ones', () => {
+    expect(describeFilter({ parameterId: 'p1', op: 'gte', value: 5 }, parametersById)).toBe(
+      'Speed ≥ 5'
+    );
+    expect(
+      describeFilter({ parameterId: 'p1', op: 'present' }, parametersById)
+    ).toContain('Speed');
+  });
+});
+
+describe('toggleSort / toggleColumn / sameConfig', () => {
+  it('toggles sort direction and resets on a new key', () => {
+    expect(toggleSort({ key: 'name', direction: 'asc' }, 'name')).toEqual({
+      key: 'name',
+      direction: 'desc',
+    });
+    expect(toggleSort({ key: 'name', direction: 'asc' }, 'code')).toEqual({
+      key: 'code',
+      direction: 'asc',
+    });
+  });
+
+  it('toggleColumn keeps at least one column and collapses to all', () => {
+    // An empty selection means "all": unchecking one of two leaves the other.
+    expect(toggleColumn([], ['p1', 'p2'], 'p1', false)).toEqual(['p2']);
+    // Re-checking the missing one re-selects everything.
+    expect(toggleColumn(['p1'], ['p1', 'p2'], 'p2', true)).toEqual([]);
+    expect(toggleColumn(['p1', 'p2'], ['p1', 'p2'], 'p2', false)).toEqual(['p1']);
+  });
+
+  it('sameConfig ignores key ordering and filter keys', () => {
+    expect(
+      sameConfig(
+        { ...defaultConfig(), search: 'x' },
+        { ...defaultConfig(), search: 'x' }
+      )
+    ).toBe(true);
+    expect(sameConfig(defaultConfig(), { ...defaultConfig(), showChange: true })).toBe(
+      false
+    );
   });
 });

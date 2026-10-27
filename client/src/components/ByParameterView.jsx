@@ -15,23 +15,24 @@ import { buildHistory } from '../lib/history.js';
 import { useLocale } from '../lib/locale.js';
 import { parameterView } from '../lib/views.js';
 
-function ByParameterView({ evaluations, periods, parameters }) {
+// "By parameter": one parameter's evolution over the student's sessions, in
+// the viewed dimension. Whole-group values (where the student has no cell of
+// their own) are drawn hollow and marked in the table.
+function ByParameterView({ evaluations, parameters, dimension }) {
   const { t } = useTranslation(['reports', 'common']);
   const { isRtl } = useLocale();
   const [chosenId, setChosenId] = useState(null);
   const gradientId = useId();
 
-  const list = periods.periods;
   const columns = useMemo(
-    () => buildHistory({ evaluations, periods: list, parameters }).columns,
-    [evaluations, list, parameters]
+    () => buildHistory({ evaluations, parameters }).columns,
+    [evaluations, parameters]
   );
 
   if (columns.length === 0) {
     return <p>{t('shared.noParametersYet')}</p>;
   }
 
-  const inUseNow = new Set(list[list.length - 1]?.parameterIds ?? []);
   const scoredIds = new Set(evaluations.map((item) => item.parameterId));
   const defaultId = (columns.find((c) => scoredIds.has(c.id)) ?? columns[0]).id;
   const parameterId = columns.some((c) => c.id === chosenId)
@@ -40,12 +41,12 @@ function ByParameterView({ evaluations, periods, parameters }) {
   const parameter = columns.find((c) => c.id === parameterId);
 
   const { points, stats } = parameterView({
-    parameterId,
     evaluations,
-    periods: list,
+    parameterId,
+    dimension,
   });
   const chartData = points.map((point) => ({
-    label: t('shared.periodNumber', { number: point.periodNumber }),
+    label: formatShortIsoDate(point.sessionDate),
     value: point.value,
   }));
 
@@ -60,7 +61,6 @@ function ByParameterView({ evaluations, periods, parameters }) {
           {columns.map((column) => (
             <option key={column.id} value={column.id}>
               {column.name}
-              {inUseNow.has(column.id) ? '' : t('byParameter.notInUseNow')}
             </option>
           ))}
         </select>
@@ -72,8 +72,10 @@ function ByParameterView({ evaluations, periods, parameters }) {
         <>
           <p className="summary">
             {t('byParameter.latest')} <strong>{stats.latest.value}</strong>{' '}
-            {t('byParameter.inPeriod', { number: stats.latest.periodNumber })} ·{' '}
-            {t('charts.averageLabel')} <strong>{stats.average}</strong>
+            {t('byParameter.onDate', {
+              date: formatShortIsoDate(stats.latest.sessionDate),
+            })}{' '}
+            · {t('charts.averageLabel')} <strong>{stats.average}</strong>
             {stats.change !== null && (
               <>
                 {' '}
@@ -134,21 +136,27 @@ function ByParameterView({ evaluations, periods, parameters }) {
             <table>
               <thead>
                 <tr>
-                  <th>{t('shared.period')}</th>
-                  <th>{t('byParameter.dates')}</th>
+                  <th>{t('history.sessionCol')}</th>
                   <th className="num">{t('shared.score')}</th>
                 </tr>
               </thead>
               <tbody>
                 {[...points].reverse().map((point) => (
-                  <tr key={point.periodNumber}>
-                    <td>{t('shared.periodNumber', { number: point.periodNumber })}</td>
-                    <td>
-                      {formatShortIsoDate(point.startDate)} –{' '}
-                      {formatShortIsoDate(point.endDate)}
-                    </td>
+                  <tr key={point.sessionId}>
+                    <td>{formatShortIsoDate(point.sessionDate)}</td>
                     <td className="num">
-                      {point.value === null ? '—' : point.value}
+                      {point.value === null ? (
+                        <span className="muted" title={t('history.selectedNotAnswered')}>
+                          ·
+                        </span>
+                      ) : (
+                        point.value
+                      )}
+                      {point.viaGroup && (
+                        <span className="hint" title={t('history.viaGroup')}>
+                          *
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
